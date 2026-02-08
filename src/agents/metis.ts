@@ -1,8 +1,8 @@
-import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentMode, AgentPromptMetadata } from "./types"
-import { createAgentToolRestrictions } from "../shared/permission-compat"
+import type { AgentConfig } from "@opencode-ai/sdk";
+import type { AgentMode, AgentPromptMetadata } from "./types";
+import { createAgentToolRestrictions } from "../shared/permission-compat";
 
-const MODE: AgentMode = "subagent"
+const MODE: AgentMode = "subagent";
 
 /**
  * Metis - Plan Consultant Agent
@@ -301,27 +301,27 @@ User confirms the button works as expected.
 - Provide actionable directives for Prometheus
 - Include QA automation directives in every output
 - Ensure acceptance criteria are agent-executable (commands, not human actions)
-`
+`;
 
 const metisRestrictions = createAgentToolRestrictions([
   "write",
   "edit",
   "task",
-])
+]);
 
 export function createMetisAgent(model: string): AgentConfig {
   return {
     description:
-      "Pre-planning consultant that analyzes requests to identify hidden intentions, ambiguities, and AI failure points. (Metis - OhMyOpenCode)",
+      "Pre-planning consultant that analyzes requests to identify hidden intentions, ambiguities, and AI failure points. (Metis - Open-AIOS)",
     mode: MODE,
     model,
     temperature: 0.3,
     ...metisRestrictions,
     prompt: METIS_SYSTEM_PROMPT,
     thinking: { type: "enabled", budgetTokens: 32000 },
-  } as AgentConfig
+  } as AgentConfig;
 }
-createMetisAgent.mode = MODE
+createMetisAgent.mode = MODE;
 
 export const metisPromptMetadata: AgentPromptMetadata = {
   category: "advisor",
@@ -329,7 +329,8 @@ export const metisPromptMetadata: AgentPromptMetadata = {
   triggers: [
     {
       domain: "Pre-planning analysis",
-      trigger: "Complex task requiring scope clarification, ambiguous requirements",
+      trigger:
+        "Complex task requiring scope clarification, ambiguous requirements",
     },
   ],
   useWhen: [
@@ -343,4 +344,4 @@ export const metisPromptMetadata: AgentPromptMetadata = {
   ],
   promptAlias: "Metis",
   keyTrigger: "Ambiguous or complex request → consult Metis before Prometheus",
-}
+};

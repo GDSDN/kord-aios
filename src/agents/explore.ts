@@ -1,8 +1,8 @@
-import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentMode, AgentPromptMetadata } from "./types"
-import { createAgentToolRestrictions } from "../shared/permission-compat"
+import type { AgentConfig } from "@opencode-ai/sdk";
+import type { AgentMode, AgentPromptMetadata } from "./types";
+import { createAgentToolRestrictions } from "../shared/permission-compat";
 
-const MODE: AgentMode = "subagent"
+const MODE: AgentMode = "subagent";
 
 export const EXPLORE_PROMPT_METADATA: AgentPromptMetadata = {
   category: "exploration",
@@ -10,7 +10,10 @@ export const EXPLORE_PROMPT_METADATA: AgentPromptMetadata = {
   promptAlias: "Explore",
   keyTrigger: "2+ modules involved → fire `explore` background",
   triggers: [
-    { domain: "Explore", trigger: "Find existing codebase structure, patterns and styles" },
+    {
+      domain: "Explore",
+      trigger: "Find existing codebase structure, patterns and styles",
+    },
   ],
   useWhen: [
     "Multiple search angles needed",
@@ -22,7 +25,7 @@ export const EXPLORE_PROMPT_METADATA: AgentPromptMetadata = {
     "Single keyword/pattern suffices",
     "Known file location",
   ],
-}
+};
 
 export function createExploreAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([
@@ -31,11 +34,11 @@ export function createExploreAgent(model: string): AgentConfig {
     "task",
     "task",
     "call_omo_agent",
-  ])
+  ]);
 
   return {
     description:
-      'Contextual grep for codebases. Answers "Where is X?", "Which file has Y?", "Find the code that does Z". Fire multiple in parallel for broad searches. Specify thoroughness: "quick" for basic, "medium" for moderate, "very thorough" for comprehensive analysis. (Explore - OhMyOpenCode)',
+      'Contextual grep for codebases. Answers "Where is X?", "Which file has Y?", "Find the code that does Z". Fire multiple in parallel for broad searches. Specify thoroughness: "quick" for basic, "medium" for moderate, "very thorough" for comprehensive analysis. (Explore - Open-AIOS)',
     mode: MODE,
     model,
     temperature: 0.1,
@@ -119,6 +122,6 @@ Use the right tool for the job:
 - **History/evolution** (when added, who changed): git commands
 
 Flood with parallel calls. Cross-validate findings across multiple tools.`,
-  }
+  };
 }
-createExploreAgent.mode = MODE
+createExploreAgent.mode = MODE;

@@ -18,7 +18,7 @@
 
 export const ATLAS_GPT_SYSTEM_PROMPT = `
 <identity>
-You are Atlas - Master Orchestrator from OhMyOpenCode.
+You are Atlas - Master Orchestrator from Open-AIOS.
 Role: Conductor, not musician. General, not soldier.
 You DELEGATE, COORDINATE, and VERIFY. You NEVER write code yourself.
 </identity>
@@ -323,8 +323,8 @@ You are the QA gate. Subagents lie. Verify EVERYTHING.
 - Each update must include a concrete outcome ("Found X", "Verified Y", "Delegated Z")
 - Do NOT expand task scope; if you notice new work, call it out as optional
 </user_updates_spec>
-`
+`;
 
 export function getGptAtlasPrompt(): string {
-  return ATLAS_GPT_SYSTEM_PROMPT
+  return ATLAS_GPT_SYSTEM_PROMPT;
 }

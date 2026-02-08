@@ -5,16 +5,24 @@
  */
 export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   sisyphus: "Sisyphus (Ultraworker)",
+  dev: "Dev",
   atlas: "Atlas (Plan Execution Orchestrator)",
   prometheus: "Prometheus (Plan Builder)",
-  "sisyphus-junior": "Sisyphus-Junior",
+  "sisyphus-junior": "Dev",
   metis: "Metis (Plan Consultant)",
   momus: "Momus (Plan Reviewer)",
   oracle: "oracle",
   librarian: "librarian",
   explore: "explore",
   "multimodal-looker": "multimodal-looker",
-}
+  pm: "Product Manager",
+  po: "Product Owner",
+  sm: "Scrum Master",
+  analyst: "Analyst",
+  "data-engineer": "Data Engineer",
+  devops: "DevOps",
+  "ux-design-expert": "UX Design Expert",
+};
 
 /**
  * Get display name for an agent config key.
@@ -23,15 +31,15 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
  */
 export function getAgentDisplayName(configKey: string): string {
   // Try exact match first
-  const exactMatch = AGENT_DISPLAY_NAMES[configKey]
-  if (exactMatch !== undefined) return exactMatch
-  
+  const exactMatch = AGENT_DISPLAY_NAMES[configKey];
+  if (exactMatch !== undefined) return exactMatch;
+
   // Fall back to case-insensitive search
-  const lowerKey = configKey.toLowerCase()
+  const lowerKey = configKey.toLowerCase();
   for (const [k, v] of Object.entries(AGENT_DISPLAY_NAMES)) {
-    if (k.toLowerCase() === lowerKey) return v
+    if (k.toLowerCase() === lowerKey) return v;
   }
-  
+
   // Unknown agent: return original key
-  return configKey
+  return configKey;
 }

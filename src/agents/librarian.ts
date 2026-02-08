@@ -1,8 +1,8 @@
-import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentMode, AgentPromptMetadata } from "./types"
-import { createAgentToolRestrictions } from "../shared/permission-compat"
+import type { AgentConfig } from "@opencode-ai/sdk";
+import type { AgentMode, AgentPromptMetadata } from "./types";
+import { createAgentToolRestrictions } from "../shared/permission-compat";
 
-const MODE: AgentMode = "subagent"
+const MODE: AgentMode = "subagent";
 
 export const LIBRARIAN_PROMPT_METADATA: AgentPromptMetadata = {
   category: "exploration",
@@ -10,7 +10,11 @@ export const LIBRARIAN_PROMPT_METADATA: AgentPromptMetadata = {
   promptAlias: "Librarian",
   keyTrigger: "External library/source mentioned → fire `librarian` background",
   triggers: [
-    { domain: "Librarian", trigger: "Unfamiliar packages / libraries, struggles at weird behaviour (to find existing implementation of opensource)" },
+    {
+      domain: "Librarian",
+      trigger:
+        "Unfamiliar packages / libraries, struggles at weird behaviour (to find existing implementation of opensource)",
+    },
   ],
   useWhen: [
     "How do I use [library]?",
@@ -19,7 +23,7 @@ export const LIBRARIAN_PROMPT_METADATA: AgentPromptMetadata = {
     "Find examples of [library] usage",
     "Working with unfamiliar npm/pip/cargo packages",
   ],
-}
+};
 
 export function createLibrarianAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([
@@ -28,11 +32,11 @@ export function createLibrarianAgent(model: string): AgentConfig {
     "task",
     "task",
     "call_omo_agent",
-  ])
+  ]);
 
   return {
     description:
-      "Specialized codebase understanding agent for multi-repository analysis, searching remote codebases, retrieving official documentation, and finding implementation examples using GitHub CLI, Context7, and Web Search. MUST BE USED when users ask to look up code in remote repositories, explain library internals, or find usage examples in open source. (Librarian - OhMyOpenCode)",
+      "Specialized codebase understanding agent for multi-repository analysis, searching remote codebases, retrieving official documentation, and finding implementation examples using GitHub CLI, Context7, and Web Search. MUST BE USED when users ask to look up code in remote repositories, explain library internals, or find usage examples in open source. (Librarian - Open-AIOS)",
     mode: MODE,
     model,
     temperature: 0.1,
@@ -323,6 +327,6 @@ grep_app_searchGitHub(query: "useQuery")
 5. **BE CONCISE**: Facts > opinions, evidence > speculation
 
 `,
-  }
+  };
 }
-createLibrarianAgent.mode = MODE
+createLibrarianAgent.mode = MODE;

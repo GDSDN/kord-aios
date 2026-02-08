@@ -1,9 +1,9 @@
-import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentMode, AgentPromptMetadata } from "./types"
-import { isGptModel } from "./types"
-import { createAgentToolRestrictions } from "../shared/permission-compat"
+import type { AgentConfig } from "@opencode-ai/sdk";
+import type { AgentMode, AgentPromptMetadata } from "./types";
+import { isGptModel } from "./types";
+import { createAgentToolRestrictions } from "../shared/permission-compat";
 
-const MODE: AgentMode = "subagent"
+const MODE: AgentMode = "subagent";
 
 /**
  * Momus - Plan Reviewer Agent
@@ -186,7 +186,7 @@ If REJECT:
 **Your job is to UNBLOCK work, not to BLOCK it with perfectionism.**
 
 **Response Language**: Match the language of the plan content.
-`
+`;
 
 export function createMomusAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([
@@ -194,25 +194,32 @@ export function createMomusAgent(model: string): AgentConfig {
     "edit",
     "task",
     "task",
-  ])
+  ]);
 
   const base = {
     description:
-      "Expert reviewer for evaluating work plans against rigorous clarity, verifiability, and completeness standards. (Momus - OhMyOpenCode)",
+      "Expert reviewer for evaluating work plans against rigorous clarity, verifiability, and completeness standards. (Momus - Open-AIOS)",
     mode: MODE,
     model,
     temperature: 0.1,
     ...restrictions,
     prompt: MOMUS_SYSTEM_PROMPT,
-  } as AgentConfig
+  } as AgentConfig;
 
   if (isGptModel(model)) {
-    return { ...base, reasoningEffort: "medium", textVerbosity: "high" } as AgentConfig
+    return {
+      ...base,
+      reasoningEffort: "medium",
+      textVerbosity: "high",
+    } as AgentConfig;
   }
 
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } } as AgentConfig
+  return {
+    ...base,
+    thinking: { type: "enabled", budgetTokens: 32000 },
+  } as AgentConfig;
 }
-createMomusAgent.mode = MODE
+createMomusAgent.mode = MODE;
 
 export const momusPromptMetadata: AgentPromptMetadata = {
   category: "advisor",
@@ -221,11 +228,13 @@ export const momusPromptMetadata: AgentPromptMetadata = {
   triggers: [
     {
       domain: "Plan review",
-      trigger: "Evaluate work plans for clarity, verifiability, and completeness",
+      trigger:
+        "Evaluate work plans for clarity, verifiability, and completeness",
     },
     {
       domain: "Quality assurance",
-      trigger: "Catch gaps, ambiguities, and missing context before implementation",
+      trigger:
+        "Catch gaps, ambiguities, and missing context before implementation",
     },
   ],
   useWhen: [
@@ -240,4 +249,4 @@ export const momusPromptMetadata: AgentPromptMetadata = {
     "For trivial plans that don't need formal review",
   ],
   keyTrigger: "Work plan created → invoke Momus for review before execution",
-}
+};

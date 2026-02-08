@@ -9,120 +9,126 @@
  * 2. Default (Claude, etc.) → default.ts (Claude-optimized)
  */
 
-import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentMode, AgentPromptMetadata } from "../types"
-import { isGptModel } from "../types"
-import type { AvailableAgent, AvailableSkill, AvailableCategory } from "../dynamic-agent-prompt-builder"
-import { buildCategorySkillsDelegationGuide } from "../dynamic-agent-prompt-builder"
-import type { CategoryConfig } from "../../config/schema"
-import { DEFAULT_CATEGORIES } from "../../tools/delegate-task/constants"
-import { createAgentToolRestrictions } from "../../shared/permission-compat"
+import type { AgentConfig } from "@opencode-ai/sdk";
+import type { AgentMode, AgentPromptMetadata } from "../types";
+import { isGptModel } from "../types";
+import type {
+  AvailableAgent,
+  AvailableSkill,
+  AvailableCategory,
+} from "../dynamic-agent-prompt-builder";
+import { buildCategorySkillsDelegationGuide } from "../dynamic-agent-prompt-builder";
+import type { CategoryConfig } from "../../config/schema";
+import { DEFAULT_CATEGORIES } from "../../tools/delegate-task/constants";
+import { createAgentToolRestrictions } from "../../shared/permission-compat";
 
-import { ATLAS_SYSTEM_PROMPT, getDefaultAtlasPrompt } from "./default"
-import { ATLAS_GPT_SYSTEM_PROMPT, getGptAtlasPrompt } from "./gpt"
+import { ATLAS_SYSTEM_PROMPT, getDefaultAtlasPrompt } from "./default";
+import { ATLAS_GPT_SYSTEM_PROMPT, getGptAtlasPrompt } from "./gpt";
 import {
   getCategoryDescription,
   buildAgentSelectionSection,
   buildCategorySection,
   buildSkillsSection,
   buildDecisionMatrix,
-} from "./utils"
+} from "./utils";
 
-export { ATLAS_SYSTEM_PROMPT, getDefaultAtlasPrompt } from "./default"
-export { ATLAS_GPT_SYSTEM_PROMPT, getGptAtlasPrompt } from "./gpt"
+export { ATLAS_SYSTEM_PROMPT, getDefaultAtlasPrompt } from "./default";
+export { ATLAS_GPT_SYSTEM_PROMPT, getGptAtlasPrompt } from "./gpt";
 export {
   getCategoryDescription,
   buildAgentSelectionSection,
   buildCategorySection,
   buildSkillsSection,
   buildDecisionMatrix,
-} from "./utils"
-export { isGptModel }
+} from "./utils";
+export { isGptModel };
 
-const MODE: AgentMode = "primary"
+const MODE: AgentMode = "primary";
 
-export type AtlasPromptSource = "default" | "gpt"
+export type AtlasPromptSource = "default" | "gpt";
 
 /**
  * Determines which Atlas prompt to use based on model.
  */
 export function getAtlasPromptSource(model?: string): AtlasPromptSource {
   if (model && isGptModel(model)) {
-    return "gpt"
+    return "gpt";
   }
-  return "default"
+  return "default";
 }
 
 export interface OrchestratorContext {
-  model?: string
-  availableAgents?: AvailableAgent[]
-  availableSkills?: AvailableSkill[]
-  userCategories?: Record<string, CategoryConfig>
+  model?: string;
+  availableAgents?: AvailableAgent[];
+  availableSkills?: AvailableSkill[];
+  userCategories?: Record<string, CategoryConfig>;
 }
 
 /**
  * Gets the appropriate Atlas prompt based on model.
  */
 export function getAtlasPrompt(model?: string): string {
-  const source = getAtlasPromptSource(model)
+  const source = getAtlasPromptSource(model);
 
   switch (source) {
     case "gpt":
-      return getGptAtlasPrompt()
+      return getGptAtlasPrompt();
     case "default":
     default:
-      return getDefaultAtlasPrompt()
+      return getDefaultAtlasPrompt();
   }
 }
 
 function buildDynamicOrchestratorPrompt(ctx?: OrchestratorContext): string {
-  const agents = ctx?.availableAgents ?? []
-  const skills = ctx?.availableSkills ?? []
-  const userCategories = ctx?.userCategories
-  const model = ctx?.model
+  const agents = ctx?.availableAgents ?? [];
+  const skills = ctx?.availableSkills ?? [];
+  const userCategories = ctx?.userCategories;
+  const model = ctx?.model;
 
-  const allCategories = { ...DEFAULT_CATEGORIES, ...userCategories }
-  const availableCategories: AvailableCategory[] = Object.entries(allCategories).map(([name]) => ({
+  const allCategories = { ...DEFAULT_CATEGORIES, ...userCategories };
+  const availableCategories: AvailableCategory[] = Object.entries(
+    allCategories,
+  ).map(([name]) => ({
     name,
     description: getCategoryDescription(name, userCategories),
-  }))
+  }));
 
-  const categorySection = buildCategorySection(userCategories)
-  const agentSection = buildAgentSelectionSection(agents)
-  const decisionMatrix = buildDecisionMatrix(agents, userCategories)
-  const skillsSection = buildSkillsSection(skills)
-  const categorySkillsGuide = buildCategorySkillsDelegationGuide(availableCategories, skills)
+  const categorySection = buildCategorySection(userCategories);
+  const agentSection = buildAgentSelectionSection(agents);
+  const decisionMatrix = buildDecisionMatrix(agents, userCategories);
+  const skillsSection = buildSkillsSection(skills);
+  const categorySkillsGuide = buildCategorySkillsDelegationGuide(
+    availableCategories,
+    skills,
+  );
 
-  const basePrompt = getAtlasPrompt(model)
+  const basePrompt = getAtlasPrompt(model);
 
   return basePrompt
     .replace("{CATEGORY_SECTION}", categorySection)
     .replace("{AGENT_SECTION}", agentSection)
     .replace("{DECISION_MATRIX}", decisionMatrix)
     .replace("{SKILLS_SECTION}", skillsSection)
-    .replace("{{CATEGORY_SKILLS_DELEGATION_GUIDE}}", categorySkillsGuide)
+    .replace("{{CATEGORY_SKILLS_DELEGATION_GUIDE}}", categorySkillsGuide);
 }
 
 export function createAtlasAgent(ctx: OrchestratorContext): AgentConfig {
-  const restrictions = createAgentToolRestrictions([
-    "task",
-    "call_omo_agent",
-  ])
+  const restrictions = createAgentToolRestrictions(["task", "call_omo_agent"]);
 
   const baseConfig = {
     description:
-      "Orchestrates work via task() to complete ALL tasks in a todo list until fully done. (Atlas - OhMyOpenCode)",
+      "Orchestrates work via task() to complete ALL tasks in a todo list until fully done. (Atlas - Open-AIOS)",
     mode: MODE,
     ...(ctx.model ? { model: ctx.model } : {}),
     temperature: 0.1,
     prompt: buildDynamicOrchestratorPrompt(ctx),
     color: "#10B981",
     ...restrictions,
-  }
+  };
 
-  return baseConfig as AgentConfig
+  return baseConfig as AgentConfig;
 }
-createAtlasAgent.mode = MODE
+createAtlasAgent.mode = MODE;
 
 export const atlasPromptMetadata: AgentPromptMetadata = {
   category: "advisor",
@@ -150,4 +156,4 @@ export const atlasPromptMetadata: AgentPromptMetadata = {
   ],
   keyTrigger:
     "Todo list path provided OR multiple tasks requiring multi-agent orchestration",
-}
+};

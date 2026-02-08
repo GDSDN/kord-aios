@@ -1,11 +1,12 @@
 {
-  "name": "oh-my-opencode",
+  "name": "open-aios",
   "version": "3.3.0",
-  "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools",
+  "description": "Open-AIOS: OMOC engine with AIOS full-stack story-driven layer",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
   "bin": {
+    "open-aios": "./bin/oh-my-opencode.js",
     "oh-my-opencode": "./bin/oh-my-opencode.js"
   },
   "files": [
@@ -29,7 +30,12 @@
     "postinstall": "node postinstall.mjs",
     "prepublishOnly": "bun run clean && bun run build",
     "typecheck": "tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "sync:aios-layer": "node script/sync-aios-layer.mjs",
+    "migration:status": "node -e \"console.log('See docs/migration/open-aios-task-board.md')\"",
+    "sync:upstream": "git fetch upstream && git rebase upstream/master",
+    "audit:omoc-drift": "node script/audit-omoc-drift.mjs",
+    "audit:hooks": "node script/audit-hooks.mjs"
   },
   "keywords": [
     "opencode",
@@ -40,16 +46,16 @@
     "ai",
     "llm"
   ],
-  "author": "YeonGyu-Kim",
-  "license": "SUL-1.0",
+  "author": "GDSDN + Open-AIOS Contributors",
+  "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/code-yeongyu/oh-my-opencode.git"
+    "url": "git+https://github.com/GDSDN/open-aios.git"
   },
   "bugs": {
-    "url": "https://github.com/code-yeongyu/oh-my-opencode/issues"
+    "url": "https://github.com/GDSDN/open-aios/issues"
   },
-  "homepage": "https://github.com/code-yeongyu/oh-my-opencode#readme",
+  "homepage": "https://github.com/GDSDN/open-aios#readme",
   "dependencies": {
     "@ast-grep/cli": "^0.40.0",
     "@ast-grep/napi": "^0.40.0",

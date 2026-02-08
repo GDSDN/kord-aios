@@ -27,9 +27,11 @@ export const AGENT_NAME_MAP: Record<string, string> = {
   "Momus (Plan Reviewer)": "momus",
   momus: "momus",
 
-  // Sisyphus-Junior → "sisyphus-junior"
-  "Sisyphus-Junior": "sisyphus-junior",
-  "sisyphus-junior": "sisyphus-junior",
+  // Dev variants → "dev"
+  dev: "dev",
+  Dev: "dev",
+  "Sisyphus-Junior": "dev",
+  "sisyphus-junior": "dev",
 
   // Already lowercase - passthrough
   build: "build",
@@ -37,7 +39,14 @@ export const AGENT_NAME_MAP: Record<string, string> = {
   librarian: "librarian",
   explore: "explore",
   "multimodal-looker": "multimodal-looker",
-}
+  pm: "pm",
+  po: "po",
+  sm: "sm",
+  analyst: "analyst",
+  "data-engineer": "data-engineer",
+  devops: "devops",
+  "ux-design-expert": "ux-design-expert",
+};
 
 export const BUILTIN_AGENT_NAMES = new Set([
   "sisyphus", // was "Sisyphus"
@@ -49,22 +58,32 @@ export const BUILTIN_AGENT_NAMES = new Set([
   "momus", // was "Momus (Plan Reviewer)"
   "prometheus", // was "Prometheus (Planner)"
   "atlas", // was "Atlas"
+  "dev",
   "build",
-])
+  "pm",
+  "po",
+  "sm",
+  "analyst",
+  "data-engineer",
+  "devops",
+  "ux-design-expert",
+]);
 
-export function migrateAgentNames(
-  agents: Record<string, unknown>
-): { migrated: Record<string, unknown>; changed: boolean } {
-  const migrated: Record<string, unknown> = {}
-  let changed = false
+export function migrateAgentNames(agents: Record<string, unknown>): {
+  migrated: Record<string, unknown>;
+  changed: boolean;
+} {
+  const migrated: Record<string, unknown> = {};
+  let changed = false;
 
   for (const [key, value] of Object.entries(agents)) {
-    const newKey = AGENT_NAME_MAP[key.toLowerCase()] ?? AGENT_NAME_MAP[key] ?? key
+    const newKey =
+      AGENT_NAME_MAP[key.toLowerCase()] ?? AGENT_NAME_MAP[key] ?? key;
     if (newKey !== key) {
-      changed = true
+      changed = true;
     }
-    migrated[newKey] = value
+    migrated[newKey] = value;
   }
 
-  return { migrated, changed }
+  return { migrated, changed };
 }

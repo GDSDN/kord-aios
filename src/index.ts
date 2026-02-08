@@ -14,6 +14,7 @@ import {
   createClaudeCodeHooksHook,
   createAnthropicContextWindowLimitRecoveryHook,
   createRulesInjectorHook,
+  createStoryWorkflowEnforcerHook,
   createBackgroundNotificationHook,
   createAutoUpdateCheckerHook,
   createKeywordDetectorHook,
@@ -146,17 +147,30 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const modelCacheState = createModelCacheState();
 
   const contextWindowMonitor = isHookEnabled("context-window-monitor")
-    ? safeCreateHook("context-window-monitor", () => createContextWindowMonitorHook(ctx), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "context-window-monitor",
+        () => createContextWindowMonitorHook(ctx),
+        { enabled: safeHookEnabled },
+      )
     : null;
   const preemptiveCompaction =
     isHookEnabled("preemptive-compaction") &&
     pluginConfig.experimental?.preemptive_compaction
-      ? safeCreateHook("preemptive-compaction", () => createPreemptiveCompactionHook(ctx), { enabled: safeHookEnabled })
+      ? safeCreateHook(
+          "preemptive-compaction",
+          () => createPreemptiveCompactionHook(ctx),
+          { enabled: safeHookEnabled },
+        )
       : null;
   const sessionRecovery = isHookEnabled("session-recovery")
-    ? safeCreateHook("session-recovery", () => createSessionRecoveryHook(ctx, {
-        experimental: pluginConfig.experimental,
-      }), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "session-recovery",
+        () =>
+          createSessionRecoveryHook(ctx, {
+            experimental: pluginConfig.experimental,
+          }),
+        { enabled: safeHookEnabled },
+      )
     : null;
 
   // Check for conflicting notification plugins before creating session-notification
@@ -173,17 +187,30 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         allPlugins: externalNotifier.allPlugins,
       });
     } else {
-      sessionNotification = safeCreateHook("session-notification", () => createSessionNotification(ctx), { enabled: safeHookEnabled });
+      sessionNotification = safeCreateHook(
+        "session-notification",
+        () => createSessionNotification(ctx),
+        { enabled: safeHookEnabled },
+      );
     }
   }
 
   const commentChecker = isHookEnabled("comment-checker")
-    ? safeCreateHook("comment-checker", () => createCommentCheckerHooks(pluginConfig.comment_checker), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "comment-checker",
+        () => createCommentCheckerHooks(pluginConfig.comment_checker),
+        { enabled: safeHookEnabled },
+      )
     : null;
   const toolOutputTruncator = isHookEnabled("tool-output-truncator")
-    ? safeCreateHook("tool-output-truncator", () => createToolOutputTruncatorHook(ctx, {
-        experimental: pluginConfig.experimental,
-      }), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "tool-output-truncator",
+        () =>
+          createToolOutputTruncatorHook(ctx, {
+            experimental: pluginConfig.experimental,
+          }),
+        { enabled: safeHookEnabled },
+      )
     : null;
   // Check for native OpenCode AGENTS.md injection support before creating hook
   let directoryAgentsInjector = null;
@@ -202,18 +229,34 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         },
       );
     } else {
-      directoryAgentsInjector = safeCreateHook("directory-agents-injector", () => createDirectoryAgentsInjectorHook(ctx), { enabled: safeHookEnabled });
+      directoryAgentsInjector = safeCreateHook(
+        "directory-agents-injector",
+        () => createDirectoryAgentsInjectorHook(ctx),
+        { enabled: safeHookEnabled },
+      );
     }
   }
   const directoryReadmeInjector = isHookEnabled("directory-readme-injector")
-    ? safeCreateHook("directory-readme-injector", () => createDirectoryReadmeInjectorHook(ctx), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "directory-readme-injector",
+        () => createDirectoryReadmeInjectorHook(ctx),
+        { enabled: safeHookEnabled },
+      )
     : null;
   const emptyTaskResponseDetector = isHookEnabled(
     "empty-task-response-detector",
   )
-    ? safeCreateHook("empty-task-response-detector", () => createEmptyTaskResponseDetectorHook(ctx), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "empty-task-response-detector",
+        () => createEmptyTaskResponseDetectorHook(ctx),
+        { enabled: safeHookEnabled },
+      )
     : null;
-  const thinkMode = isHookEnabled("think-mode") ? safeCreateHook("think-mode", () => createThinkModeHook(), { enabled: safeHookEnabled }) : null;
+  const thinkMode = isHookEnabled("think-mode")
+    ? safeCreateHook("think-mode", () => createThinkModeHook(), {
+        enabled: safeHookEnabled,
+      })
+    : null;
   const claudeCodeHooks = createClaudeCodeHooksHook(
     ctx,
     {
@@ -226,84 +269,159 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const anthropicContextWindowLimitRecovery = isHookEnabled(
     "anthropic-context-window-limit-recovery",
   )
-    ? safeCreateHook("anthropic-context-window-limit-recovery", () => createAnthropicContextWindowLimitRecoveryHook(ctx, {
-        experimental: pluginConfig.experimental,
-      }), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "anthropic-context-window-limit-recovery",
+        () =>
+          createAnthropicContextWindowLimitRecoveryHook(ctx, {
+            experimental: pluginConfig.experimental,
+          }),
+        { enabled: safeHookEnabled },
+      )
     : null;
   const rulesInjector = isHookEnabled("rules-injector")
-    ? safeCreateHook("rules-injector", () => createRulesInjectorHook(ctx), { enabled: safeHookEnabled })
+    ? safeCreateHook("rules-injector", () => createRulesInjectorHook(ctx), {
+        enabled: safeHookEnabled,
+      })
+    : null;
+  const storyWorkflowEnforcer = isHookEnabled("story-workflow-enforcer")
+    ? safeCreateHook(
+        "story-workflow-enforcer",
+        () => createStoryWorkflowEnforcerHook(ctx),
+        { enabled: safeHookEnabled },
+      )
     : null;
   const autoUpdateChecker = isHookEnabled("auto-update-checker")
-    ? safeCreateHook("auto-update-checker", () => createAutoUpdateCheckerHook(ctx, {
-        showStartupToast: isHookEnabled("startup-toast"),
-        isSisyphusEnabled: pluginConfig.sisyphus_agent?.disabled !== true,
-        autoUpdate: pluginConfig.auto_update ?? true,
-      }), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "auto-update-checker",
+        () =>
+          createAutoUpdateCheckerHook(ctx, {
+            showStartupToast: isHookEnabled("startup-toast"),
+            isSisyphusEnabled: pluginConfig.sisyphus_agent?.disabled !== true,
+            autoUpdate: pluginConfig.auto_update ?? true,
+          }),
+        { enabled: safeHookEnabled },
+      )
     : null;
   const keywordDetector = isHookEnabled("keyword-detector")
-    ? safeCreateHook("keyword-detector", () => createKeywordDetectorHook(ctx, contextCollector), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "keyword-detector",
+        () => createKeywordDetectorHook(ctx, contextCollector),
+        { enabled: safeHookEnabled },
+      )
     : null;
   const contextInjectorMessagesTransform =
     createContextInjectorMessagesTransformHook(contextCollector);
   const agentUsageReminder = isHookEnabled("agent-usage-reminder")
-    ? safeCreateHook("agent-usage-reminder", () => createAgentUsageReminderHook(ctx), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "agent-usage-reminder",
+        () => createAgentUsageReminderHook(ctx),
+        { enabled: safeHookEnabled },
+      )
     : null;
   const nonInteractiveEnv = isHookEnabled("non-interactive-env")
-    ? safeCreateHook("non-interactive-env", () => createNonInteractiveEnvHook(ctx), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "non-interactive-env",
+        () => createNonInteractiveEnvHook(ctx),
+        { enabled: safeHookEnabled },
+      )
     : null;
   const interactiveBashSession = isHookEnabled("interactive-bash-session")
-    ? safeCreateHook("interactive-bash-session", () => createInteractiveBashSessionHook(ctx), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "interactive-bash-session",
+        () => createInteractiveBashSessionHook(ctx),
+        { enabled: safeHookEnabled },
+      )
     : null;
 
   const thinkingBlockValidator = isHookEnabled("thinking-block-validator")
-    ? safeCreateHook("thinking-block-validator", () => createThinkingBlockValidatorHook(), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "thinking-block-validator",
+        () => createThinkingBlockValidatorHook(),
+        { enabled: safeHookEnabled },
+      )
     : null;
 
-  let categorySkillReminder: ReturnType<typeof createCategorySkillReminderHook> | null = null;
+  let categorySkillReminder: ReturnType<
+    typeof createCategorySkillReminderHook
+  > | null = null;
 
   const ralphLoop = isHookEnabled("ralph-loop")
-    ? safeCreateHook("ralph-loop", () => createRalphLoopHook(ctx, {
-        config: pluginConfig.ralph_loop,
-        checkSessionExists: async (sessionId) => sessionExists(sessionId),
-      }), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "ralph-loop",
+        () =>
+          createRalphLoopHook(ctx, {
+            config: pluginConfig.ralph_loop,
+            checkSessionExists: async (sessionId) => sessionExists(sessionId),
+          }),
+        { enabled: safeHookEnabled },
+      )
     : null;
 
   const editErrorRecovery = isHookEnabled("edit-error-recovery")
-    ? safeCreateHook("edit-error-recovery", () => createEditErrorRecoveryHook(ctx), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "edit-error-recovery",
+        () => createEditErrorRecoveryHook(ctx),
+        { enabled: safeHookEnabled },
+      )
     : null;
 
   const delegateTaskRetry = isHookEnabled("delegate-task-retry")
-    ? safeCreateHook("delegate-task-retry", () => createDelegateTaskRetryHook(ctx), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "delegate-task-retry",
+        () => createDelegateTaskRetryHook(ctx),
+        { enabled: safeHookEnabled },
+      )
     : null;
 
   const startWork = isHookEnabled("start-work")
-    ? safeCreateHook("start-work", () => createStartWorkHook(ctx), { enabled: safeHookEnabled })
+    ? safeCreateHook("start-work", () => createStartWorkHook(ctx), {
+        enabled: safeHookEnabled,
+      })
     : null;
 
   const prometheusMdOnly = isHookEnabled("prometheus-md-only")
-    ? safeCreateHook("prometheus-md-only", () => createPrometheusMdOnlyHook(ctx), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "prometheus-md-only",
+        () => createPrometheusMdOnlyHook(ctx),
+        { enabled: safeHookEnabled },
+      )
     : null;
 
   const sisyphusJuniorNotepad = isHookEnabled("sisyphus-junior-notepad")
-    ? safeCreateHook("sisyphus-junior-notepad", () => createSisyphusJuniorNotepadHook(ctx), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "sisyphus-junior-notepad",
+        () => createSisyphusJuniorNotepadHook(ctx),
+        { enabled: safeHookEnabled },
+      )
     : null;
 
   const tasksTodowriteDisabler = isHookEnabled("tasks-todowrite-disabler")
-    ? safeCreateHook("tasks-todowrite-disabler", () => createTasksTodowriteDisablerHook({
-        experimental: pluginConfig.experimental,
-      }), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "tasks-todowrite-disabler",
+        () =>
+          createTasksTodowriteDisablerHook({
+            experimental: pluginConfig.experimental,
+          }),
+        { enabled: safeHookEnabled },
+      )
     : null;
 
   const questionLabelTruncator = createQuestionLabelTruncatorHook();
   const subagentQuestionBlocker = createSubagentQuestionBlockerHook();
   const writeExistingFileGuard = isHookEnabled("write-existing-file-guard")
-    ? safeCreateHook("write-existing-file-guard", () => createWriteExistingFileGuardHook(ctx), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "write-existing-file-guard",
+        () => createWriteExistingFileGuardHook(ctx),
+        { enabled: safeHookEnabled },
+      )
     : null;
 
   const taskResumeInfo = createTaskResumeInfoHook();
 
   const anthropicEffort = isHookEnabled("anthropic-effort")
-    ? safeCreateHook("anthropic-effort", () => createAnthropicEffortHook(), { enabled: safeHookEnabled })
+    ? safeCreateHook("anthropic-effort", () => createAnthropicEffortHook(), {
+        enabled: safeHookEnabled,
+      })
     : null;
 
   const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig);
@@ -340,67 +458,95 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   );
 
   const atlasHook = isHookEnabled("atlas")
-    ? safeCreateHook("atlas", () => createAtlasHook(ctx, { 
-        directory: ctx.directory, 
-        backgroundManager,
-        isContinuationStopped: (sessionID: string) => stopContinuationGuard?.isStopped(sessionID) ?? false,
-      }), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "atlas",
+        () =>
+          createAtlasHook(ctx, {
+            directory: ctx.directory,
+            backgroundManager,
+            isContinuationStopped: (sessionID: string) =>
+              stopContinuationGuard?.isStopped(sessionID) ?? false,
+          }),
+        { enabled: safeHookEnabled },
+      )
     : null;
 
   initTaskToastManager(ctx.client);
 
   const stopContinuationGuard = isHookEnabled("stop-continuation-guard")
-    ? safeCreateHook("stop-continuation-guard", () => createStopContinuationGuardHook(ctx), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "stop-continuation-guard",
+        () => createStopContinuationGuardHook(ctx),
+        { enabled: safeHookEnabled },
+      )
     : null;
 
   const compactionContextInjector = isHookEnabled("compaction-context-injector")
-    ? safeCreateHook("compaction-context-injector", () => createCompactionContextInjector(), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "compaction-context-injector",
+        () => createCompactionContextInjector(),
+        { enabled: safeHookEnabled },
+      )
     : null;
 
   const compactionTodoPreserver = isHookEnabled("compaction-todo-preserver")
-    ? safeCreateHook("compaction-todo-preserver", () => createCompactionTodoPreserverHook(ctx), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "compaction-todo-preserver",
+        () => createCompactionTodoPreserverHook(ctx),
+        { enabled: safeHookEnabled },
+      )
     : null;
 
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
-    ? safeCreateHook("todo-continuation-enforcer", () => createTodoContinuationEnforcer(ctx, {
-        backgroundManager,
-        isContinuationStopped: stopContinuationGuard?.isStopped,
-      }), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "todo-continuation-enforcer",
+        () =>
+          createTodoContinuationEnforcer(ctx, {
+            backgroundManager,
+            isContinuationStopped: stopContinuationGuard?.isStopped,
+          }),
+        { enabled: safeHookEnabled },
+      )
     : null;
 
   const unstableAgentBabysitter = isHookEnabled("unstable-agent-babysitter")
-    ? safeCreateHook("unstable-agent-babysitter", () => createUnstableAgentBabysitterHook(
-        {
-          directory: ctx.directory,
-          client: {
-            session: {
-              messages: async (args) => {
-                const result = await ctx.client.session.messages(args);
-                if (Array.isArray(result)) return result;
-                if (
-                  typeof result === "object" &&
-                  result !== null &&
-                  "data" in result
-                ) {
-                  const record = result as Record<string, unknown>;
-                  return { data: record.data };
-                }
-                return [];
+    ? safeCreateHook(
+        "unstable-agent-babysitter",
+        () =>
+          createUnstableAgentBabysitterHook(
+            {
+              directory: ctx.directory,
+              client: {
+                session: {
+                  messages: async (args) => {
+                    const result = await ctx.client.session.messages(args);
+                    if (Array.isArray(result)) return result;
+                    if (
+                      typeof result === "object" &&
+                      result !== null &&
+                      "data" in result
+                    ) {
+                      const record = result as Record<string, unknown>;
+                      return { data: record.data };
+                    }
+                    return [];
+                  },
+                  prompt: async (args) => {
+                    await ctx.client.session.promptAsync(args);
+                  },
+                  promptAsync: async (args) => {
+                    await ctx.client.session.promptAsync(args);
+                  },
+                },
               },
-               prompt: async (args) => {
-                 await ctx.client.session.promptAsync(args);
-               },
-               promptAsync: async (args) => {
-                 await ctx.client.session.promptAsync(args);
-               },
-             },
-          },
-        },
-        {
-          backgroundManager,
-          config: pluginConfig.babysitting,
-        },
-      ), { enabled: safeHookEnabled })
+            },
+            {
+              backgroundManager,
+              config: pluginConfig.babysitting,
+            },
+          ),
+        { enabled: safeHookEnabled },
+      )
     : null;
 
   if (sessionRecovery && todoContinuationEnforcer) {
@@ -411,7 +557,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   }
 
   const backgroundNotificationHook = isHookEnabled("background-notification")
-    ? safeCreateHook("background-notification", () => createBackgroundNotificationHook(backgroundManager), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "background-notification",
+        () => createBackgroundNotificationHook(backgroundManager),
+        { enabled: safeHookEnabled },
+      )
     : null;
   const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
 
@@ -424,15 +574,17 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     pluginConfig.browser_automation_engine?.provider ?? "playwright";
   const disabledSkills = new Set<string>(pluginConfig.disabled_skills ?? []);
   const systemMcpNames = getSystemMcpServerNames();
-  const builtinSkills = createBuiltinSkills({ browserProvider, disabledSkills }).filter((skill) => {
-      if (skill.mcpConfig) {
-        for (const mcpName of Object.keys(skill.mcpConfig)) {
-          if (systemMcpNames.has(mcpName)) return false;
-        }
+  const builtinSkills = createBuiltinSkills({
+    browserProvider,
+    disabledSkills,
+  }).filter((skill) => {
+    if (skill.mcpConfig) {
+      for (const mcpName of Object.keys(skill.mcpConfig)) {
+        if (systemMcpNames.has(mcpName)) return false;
       }
-      return true;
-    },
-  );
+    }
+    return true;
+  });
   const includeClaudeSkills = pluginConfig.claude_code?.skills !== false;
   const [userSkills, globalSkills, projectSkills, opencodeProjectSkills] =
     await Promise.all([
@@ -470,9 +622,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ([name, categoryConfig]) => ({
       name,
       description:
-        pluginConfig.categories?.[name]?.description
-          ?? CATEGORY_DESCRIPTIONS[name]
-          ?? "General tasks",
+        pluginConfig.categories?.[name]?.description ??
+        CATEGORY_DESCRIPTIONS[name] ??
+        "General tasks",
       model: categoryConfig.model,
     }),
   );
@@ -483,7 +635,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     directory: ctx.directory,
     userCategories: pluginConfig.categories,
     gitMasterConfig: pluginConfig.git_master,
-    sisyphusJuniorModel: pluginConfig.agents?.["sisyphus-junior"]?.model,
+    sisyphusJuniorModel:
+      pluginConfig.agents?.dev?.model ??
+      pluginConfig.agents?.["sisyphus-junior"]?.model,
     browserProvider,
     disabledSkills,
     availableCategories,
@@ -508,7 +662,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   });
 
   categorySkillReminder = isHookEnabled("category-skill-reminder")
-    ? safeCreateHook("category-skill-reminder", () => createCategorySkillReminderHook(ctx, availableSkills), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "category-skill-reminder",
+        () => createCategorySkillReminderHook(ctx, availableSkills),
+        { enabled: safeHookEnabled },
+      )
     : null;
 
   const skillMcpManager = new SkillMcpManager();
@@ -518,7 +676,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     mcpManager: skillMcpManager,
     getSessionID: getSessionIDForMcp,
     gitMasterConfig: pluginConfig.git_master,
-    disabledSkills
+    disabledSkills,
   });
   const skillMcpTool = createSkillMcpTool({
     manager: skillMcpManager,
@@ -533,7 +691,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   });
 
   const autoSlashCommand = isHookEnabled("auto-slash-command")
-    ? safeCreateHook("auto-slash-command", () => createAutoSlashCommandHook({ skills: mergedSkills }), { enabled: safeHookEnabled })
+    ? safeCreateHook(
+        "auto-slash-command",
+        () => createAutoSlashCommandHook({ skills: mergedSkills }),
+        { enabled: safeHookEnabled },
+      )
     : null;
 
   const configHandler = createConfigHandler({
@@ -561,7 +723,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ...backgroundTools,
     call_omo_agent: callOmoAgent,
     ...(lookAt ? { look_at: lookAt } : {}),
-      task: delegateTask,
+    task: delegateTask,
     skill: skillTool,
     skill_mcp: skillMcpTool,
     slashcommand: slashcommandTool,
@@ -579,23 +741,29 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
     "chat.params": async (
       input: {
-        sessionID: string
-        agent: string
-        model: Record<string, unknown>
-        provider: Record<string, unknown>
-        message: Record<string, unknown>
+        sessionID: string;
+        agent: string;
+        model: Record<string, unknown>;
+        provider: Record<string, unknown>;
+        message: Record<string, unknown>;
       },
       output: {
-        temperature: number
-        topP: number
-        topK: number
-        options: Record<string, unknown>
+        temperature: number;
+        topP: number;
+        topK: number;
+        options: Record<string, unknown>;
       },
     ) => {
-      const model = input.model as { providerID: string; modelID: string }
-      const message = input.message as { variant?: string }
+      const model = input.model as { providerID: string; modelID: string };
+      const message = input.message as { variant?: string };
       await anthropicEffort?.["chat.params"]?.(
-        { ...input, agent: { name: input.agent }, model, provider: input.provider as { id: string }, message },
+        {
+          ...input,
+          agent: { name: input.agent },
+          model,
+          provider: input.provider as { id: string },
+          message,
+        },
         output,
       );
     },
@@ -832,6 +1000,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await directoryAgentsInjector?.["tool.execute.before"]?.(input, output);
       await directoryReadmeInjector?.["tool.execute.before"]?.(input, output);
       await rulesInjector?.["tool.execute.before"]?.(input, output);
+      await storyWorkflowEnforcer?.["tool.execute.before"]?.(input, output);
       await tasksTodowriteDisabler?.["tool.execute.before"]?.(input, output);
       await prometheusMdOnly?.["tool.execute.before"]?.(input, output);
       await sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output);
@@ -839,10 +1008,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
       if (input.tool === "task") {
         const args = output.args as Record<string, unknown>;
-        const category = typeof args.category === "string" ? args.category : undefined;
-        const subagentType = typeof args.subagent_type === "string" ? args.subagent_type : undefined;
+        const category =
+          typeof args.category === "string" ? args.category : undefined;
+        const subagentType =
+          typeof args.subagent_type === "string"
+            ? args.subagent_type
+            : undefined;
         if (category && !subagentType) {
-          args.subagent_type = "sisyphus-junior";
+          args.subagent_type = "dev";
         }
       }
 
@@ -922,13 +1095,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
       // Restore metadata that fromPlugin() overwrites with { truncated, outputPath }.
       // This must run FIRST, before any hook reads output.metadata.
-      const stored = consumeToolMetadata(input.sessionID, input.callID)
+      const stored = consumeToolMetadata(input.sessionID, input.callID);
       if (stored) {
         if (stored.title) {
-          output.title = stored.title
+          output.title = stored.title;
         }
         if (stored.metadata) {
-          output.metadata = { ...output.metadata, ...stored.metadata }
+          output.metadata = { ...output.metadata, ...stored.metadata };
         }
       }
 

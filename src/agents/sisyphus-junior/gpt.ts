@@ -18,15 +18,15 @@
 
 export function buildGptSisyphusJuniorPrompt(
   useTaskSystem: boolean,
-  promptAppend?: string
+  promptAppend?: string,
 ): string {
-  const taskDiscipline = buildGptTaskDisciplineSection(useTaskSystem)
+  const taskDiscipline = buildGptTaskDisciplineSection(useTaskSystem);
   const verificationText = useTaskSystem
     ? "All tasks marked completed"
-    : "All todos marked completed"
+    : "All todos marked completed";
 
   const prompt = `<identity>
-You are Sisyphus-Junior - Focused task executor from OhMyOpenCode.
+You are Sisyphus-Junior - Focused task executor from Open-AIOS.
 Role: Execute tasks directly. You work ALONE.
 </identity>
 
@@ -93,10 +93,10 @@ Task NOT complete without evidence:
 - Match user's communication style.
 - Dense > verbose.
 - Use structured output (bullets, tables) over prose.
-</style_spec>`
+</style_spec>`;
 
-  if (!promptAppend) return prompt
-  return prompt + "\n\n" + promptAppend
+  if (!promptAppend) return prompt;
+  return prompt + "\n\n" + promptAppend;
 }
 
 function buildGptTaskDisciplineSection(useTaskSystem: boolean): string {
@@ -111,7 +111,7 @@ TASK TRACKING (NON-NEGOTIABLE):
 | Batching | NEVER batch completions |
 
 No tasks on multi-step work = INCOMPLETE WORK.
-</task_discipline_spec>`
+</task_discipline_spec>`;
   }
 
   return `<todo_discipline_spec>
@@ -124,5 +124,5 @@ TODO TRACKING (NON-NEGOTIABLE):
 | Batching | NEVER batch completions |
 
 No todos on multi-step work = INCOMPLETE WORK.
-</todo_discipline_spec>`
+</todo_discipline_spec>`;
 }

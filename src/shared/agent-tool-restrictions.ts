@@ -9,7 +9,7 @@ const EXPLORATION_AGENT_DENYLIST: Record<string, boolean> = {
   edit: false,
   task: false,
   call_omo_agent: false,
-}
+};
 
 const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
   explore: EXPLORATION_AGENT_DENYLIST,
@@ -39,19 +39,82 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
     read: true,
   },
 
+  dev: {
+    task: false,
+  },
+
   "sisyphus-junior": {
     task: false,
   },
-}
 
-export function getAgentToolRestrictions(agentName: string): Record<string, boolean> {
-  return AGENT_RESTRICTIONS[agentName]
-    ?? Object.entries(AGENT_RESTRICTIONS).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
-    ?? {}
+  pm: {
+    write: false,
+    edit: false,
+    bash: false,
+    task: false,
+    call_omo_agent: false,
+  },
+
+  po: {
+    write: false,
+    edit: false,
+    bash: false,
+    task: false,
+    call_omo_agent: false,
+  },
+
+  sm: {
+    write: false,
+    edit: false,
+    bash: false,
+    task: false,
+    call_omo_agent: false,
+  },
+
+  analyst: {
+    write: false,
+    edit: false,
+    bash: false,
+    task: false,
+    call_omo_agent: false,
+  },
+
+  "data-engineer": {
+    task: false,
+    call_omo_agent: false,
+  },
+
+  devops: {
+    task: false,
+    call_omo_agent: false,
+  },
+
+  "ux-design-expert": {
+    write: false,
+    edit: false,
+    bash: false,
+    task: false,
+    call_omo_agent: false,
+  },
+};
+
+export function getAgentToolRestrictions(
+  agentName: string,
+): Record<string, boolean> {
+  return (
+    AGENT_RESTRICTIONS[agentName] ??
+    Object.entries(AGENT_RESTRICTIONS).find(
+      ([key]) => key.toLowerCase() === agentName.toLowerCase(),
+    )?.[1] ??
+    {}
+  );
 }
 
 export function hasAgentToolRestrictions(agentName: string): boolean {
-  const restrictions = AGENT_RESTRICTIONS[agentName]
-    ?? Object.entries(AGENT_RESTRICTIONS).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
-  return restrictions !== undefined && Object.keys(restrictions).length > 0
+  const restrictions =
+    AGENT_RESTRICTIONS[agentName] ??
+    Object.entries(AGENT_RESTRICTIONS).find(
+      ([key]) => key.toLowerCase() === agentName.toLowerCase(),
+    )?.[1];
+  return restrictions !== undefined && Object.keys(restrictions).length > 0;
 }

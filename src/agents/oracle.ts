@@ -1,17 +1,23 @@
-import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentMode, AgentPromptMetadata } from "./types"
-import { isGptModel } from "./types"
-import { createAgentToolRestrictions } from "../shared/permission-compat"
+import type { AgentConfig } from "@opencode-ai/sdk";
+import type { AgentMode, AgentPromptMetadata } from "./types";
+import { isGptModel } from "./types";
+import { createAgentToolRestrictions } from "../shared/permission-compat";
 
-const MODE: AgentMode = "subagent"
+const MODE: AgentMode = "subagent";
 
 export const ORACLE_PROMPT_METADATA: AgentPromptMetadata = {
   category: "advisor",
   cost: "EXPENSIVE",
   promptAlias: "Oracle",
   triggers: [
-    { domain: "Architecture decisions", trigger: "Multi-system tradeoffs, unfamiliar patterns" },
-    { domain: "Self-review", trigger: "After completing significant implementation" },
+    {
+      domain: "Architecture decisions",
+      trigger: "Multi-system tradeoffs, unfamiliar patterns",
+    },
+    {
+      domain: "Self-review",
+      trigger: "After completing significant implementation",
+    },
     { domain: "Hard debugging", trigger: "After 2+ failed fix attempts" },
   ],
   useWhen: [
@@ -29,7 +35,7 @@ export const ORACLE_PROMPT_METADATA: AgentPromptMetadata = {
     "Trivial decisions (variable names, formatting)",
     "Things you can infer from existing code patterns",
   ],
-}
+};
 
 const ORACLE_SYSTEM_PROMPT = `You are a strategic technical advisor with deep reasoning capabilities, operating as a specialized consultant within an AI-assisted development environment.
 
@@ -140,7 +146,7 @@ Before finalizing answers on architecture, security, or performance:
 
 <delivery>
 Your response goes directly to the user with no intermediate processing. Make your final message self-contained: a clear recommendation they can act on immediately, covering both what to do and why.
-</delivery>`
+</delivery>`;
 
 export function createOracleAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([
@@ -148,23 +154,29 @@ export function createOracleAgent(model: string): AgentConfig {
     "edit",
     "task",
     "task",
-  ])
+  ]);
 
   const base = {
     description:
-      "Read-only consultation agent. High-IQ reasoning specialist for debugging hard problems and high-difficulty architecture design. (Oracle - OhMyOpenCode)",
+      "Read-only consultation agent. High-IQ reasoning specialist for debugging hard problems and high-difficulty architecture design. (Oracle - Open-AIOS)",
     mode: MODE,
     model,
     temperature: 0.1,
     ...restrictions,
     prompt: ORACLE_SYSTEM_PROMPT,
-  } as AgentConfig
+  } as AgentConfig;
 
   if (isGptModel(model)) {
-    return { ...base, reasoningEffort: "medium", textVerbosity: "high" } as AgentConfig
+    return {
+      ...base,
+      reasoningEffort: "medium",
+      textVerbosity: "high",
+    } as AgentConfig;
   }
 
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } } as AgentConfig
+  return {
+    ...base,
+    thinking: { type: "enabled", budgetTokens: 32000 },
+  } as AgentConfig;
 }
-createOracleAgent.mode = MODE
-
+createOracleAgent.mode = MODE;
