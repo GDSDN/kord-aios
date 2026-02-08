@@ -2,13 +2,21 @@
 
 **Updated:** 2026-02-08  
 **Version:** 3.0 (Execution Waves)  
-**Status:** Wave 1 In Progress
+**Status:** Decision: V1 Rebuild (OMOC v3.4.0 baseline)
 
 ---
 
 ## Current Active Story
 
-**Active Story:** `docs/stories/module-2-installer-fusion.md`
+**Active Story:** `docs/stories/v1-rebuild-baseline.md`
+
+---
+
+## Decision (Rebuild V1)
+
+We are restarting V1 from a clean OMOC baseline (`v3.4.0`) using scripts/codemods for hard renames and wiring. The current branch work is kept as a backup reference only.
+
+Canonical owners: `plan`, `build`, `build-loop`, `deep`, `kord` (+ AIOS specialists).
 
 ---
 

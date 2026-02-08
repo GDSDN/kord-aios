@@ -9,6 +9,19 @@
 
 ---
 
+## Superseded (Rebuild V1)
+
+This story reflects the *previous* migration approach that relied on alias/compat layers.
+
+**New V1 direction:** hard replace OMOC agent naming with Open-AIOS canonical owners (no runtime aliases), then add AIOS specialists, then adapt prompts/hooks/tools.
+
+Use these instead:
+- `docs/stories/v1-rebuild-baseline.md
+- `docs/stories/v1-agent-hard-rename.md
+- `docs/stories/v1-add-aios-specialists.md
+
+---
+
 ## 1. Objective
 
 Port AIOS agents to Open-AIOS format while maintaining backward compatibility and infusing methodology (story-driven workflows, quality gates, skill awareness).

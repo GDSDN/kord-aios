@@ -2,14 +2,30 @@
 
 **Version:** 3.0.0  
 **Date:** 2026-02-08  
-**Status:** In Progress (Wave 1 Active)  
+**Status:** Decision: V1 Rebuild (OMOC v3.4.0 baseline)  
 **Architecture:** [open-aios-architecture.md](../architecture/open-aios-architecture.md)
 
 ---
 
 ## Current Active Story
 
-**Active Story:** `docs/stories/module-2-installer-fusion.md`
+**Active Story:** `docs/stories/v1-rebuild-baseline.md`
+
+---
+
+## Decision (Rebuild V1)
+
+We will **rebuild Open-AIOS V1 on top of a clean OMOC baseline** (tag `v3.4.0`) and apply **deterministic codemods/scripts** for hard renames and wiring before adapting prompts/hooks/tools.
+
+Rationale:
+- The prior attempt introduced duplication (owners/wrappers/alias layers) that increases regression risk and cost.
+- A rebuild enables a clean, script-first migration with single ownership per agent and stable test gates.
+
+Rebuild rules (non-negotiable):
+- Canonical Open-AIOS owners: `plan`, `build`, `build-loop`, `deep` (subagent), `kord`.
+- OMOC greek agent names are **replaced** in implementation (no runtime aliases for v1).
+- AIOS specialist agents are added net-new: `qa`, `pm`, `po`, `sm`, `analyst`, `data-engineer`, `devops`, `ux-design-expert`.
+- Story-driven methodology is infused after rename + wiring are stable (then prompts/hooks/tools).
 
 ---
 

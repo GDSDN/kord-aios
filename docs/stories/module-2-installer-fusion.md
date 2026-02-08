@@ -9,6 +9,12 @@
 
 ---
 
+## Rebuild Note
+
+This installer work continues in the V1 rebuild branch, but it must be applied after the hard rename + agent wiring baseline is stable.
+
+---
+
 ## 1. Objective
 
 Create unified installer that fuses OMOC's interactive setup with AIOS project bootstrap, enabling seamless initialization of Open-AIOS projects.
