@@ -591,6 +591,17 @@ bun pack
 
 ---
 
+## Star Commands Policy
+
+When agents use `*command` syntax to invoke skill workflows:
+
+- `*command` means skill workflow intent
+- Try exact skill match first
+- Fallback to skill search if no exact match
+- If still missing, continue with normal build/plan flow and record fallback
+
+---
+
 ## Branding Policy
 
 **Credits/Inspiration Only** — No trademark infringement:

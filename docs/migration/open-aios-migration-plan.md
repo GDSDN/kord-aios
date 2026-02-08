@@ -263,6 +263,15 @@ Phase 3: Execution
 | Design System       | 10    | bootstrap-shadcn-library, extract-tokens |
 | Utilities           | 56    | create-_, improve-_, generate-\*         |
 
+### 3.5 Star Commands Policy
+
+When agents use `*command` syntax to invoke skill workflows:
+
+- `*command` means skill workflow intent
+- Try exact skill match first
+- Fallback to skill search if no exact match
+- If still missing, continue with normal build/plan flow and record fallback
+
 ---
 
 ## Module 4: Installer & Init Command Fusion ⏳

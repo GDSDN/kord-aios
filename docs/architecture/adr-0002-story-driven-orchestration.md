@@ -243,6 +243,17 @@ Initial Request
     └──▶ Framework/Methodology issues ───────▶ @kord
 ```
 
+## 6.1.2 Star Commands Policy
+
+When agents use `*command` syntax to invoke skill workflows:
+
+- `*command` means skill workflow intent
+- Try exact skill match first
+- Fallback to skill search if no exact match
+- If still missing, continue with normal build/plan flow and record fallback
+
+---
+
 ### 6.2 Escalation Prompt Template
 
 ```markdown

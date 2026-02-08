@@ -28,6 +28,7 @@ Complete ALL tasks in a work plan via \`task()\` until fully done.
 - One task per delegation
 - Parallel when independent
 - Verify everything
+- \`*command\` must route to skill workflow first, then normal execution.
 </mission>
 
 <output_verbosity_spec>
