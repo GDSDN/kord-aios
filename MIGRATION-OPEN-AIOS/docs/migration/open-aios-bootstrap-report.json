@@ -1,0 +1,19 @@
+{
+  "generatedAt": "2026-02-07",
+  "workspace": "D:/dev/open-aios",
+  "checks": {
+    "cloneFromOmoc": "ok",
+    "npmInstall": "ok",
+    "typecheck": "ok",
+    "tests": "blocked-bun-missing",
+    "aiosLayerSync": "ok",
+    "kordAliasInRunner": "ok"
+  },
+  "artifacts": {
+    "migrationPlan": "docs/migration/open-aios-migration-plan.md",
+    "taskBoard": "docs/migration/open-aios-task-board.md",
+    "layerRoot": "layer/aios",
+    "syncScript": "script/sync-aios-layer.mjs"
+  },
+  "next": "Implement installer command overlay: open-aios init and AIOS layer project bootstrap."
+}
