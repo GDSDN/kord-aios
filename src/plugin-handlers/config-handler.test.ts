@@ -202,7 +202,7 @@ describe("Dev model inheritance", () => {
 });
 
 describe("Plan agent demote behavior", () => {
-  test("orders core agents as sisyphus -> hephaestus -> prometheus -> atlas", async () => {
+  test("orders core agents as build -> deep -> plan -> build-loop", async () => {
     // #given
     const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
       mockResolvedValue: (value: Record<string, unknown>) => void;
@@ -236,7 +236,7 @@ describe("Plan agent demote behavior", () => {
 
     // #then
     const keys = Object.keys(config.agent as Record<string, unknown>);
-    const coreAgents = ["sisyphus", "hephaestus", "prometheus", "atlas"];
+    const coreAgents = ["build", "deep", "plan", "build-loop"];
     const ordered = keys.filter((key) => coreAgents.includes(key));
     expect(ordered).toEqual(coreAgents);
   });
@@ -311,12 +311,12 @@ describe("Plan agent demote behavior", () => {
     // #when
     await handler(config);
 
-    // #then - plan is not touched, prometheus is not created
+    // #then - plan is not touched, compatibility alias points to same config
     const agents = config.agent as Record<
       string,
       { mode?: string; name?: string; prompt?: string }
     >;
-    expect(agents.prometheus).toBeUndefined();
+    expect(agents.prometheus).toBeDefined();
     expect(agents.plan).toBeDefined();
     expect(agents.plan.mode).toBe("primary");
     expect(agents.plan.prompt).toBe("original plan prompt");

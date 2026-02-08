@@ -3,19 +3,20 @@ import type { RunOptions } from "./types";
 import type { OhMyOpenCodeConfig } from "../../config";
 
 const CORE_AGENT_ORDER = [
-  "sisyphus",
-  "hephaestus",
-  "prometheus",
-  "atlas",
+  "build",
+  "deep",
+  "plan",
+  "build-loop",
+  "kord",
 ] as const;
-const DEFAULT_AGENT = "sisyphus";
+const DEFAULT_AGENT = "build";
 const AGENT_ALIASES: Record<string, string> = {
-  plan: "prometheus",
-  build: "sisyphus",
-  "build-loop": "atlas",
-  deep: "hephaestus",
-  // Temporary until dedicated kord runtime primary exists.
-  kord: "sisyphus",
+  prometheus: "plan",
+  sisyphus: "build",
+  atlas: "build-loop",
+  hephaestus: "deep",
+  "aios-master": "kord",
+  planner: "plan",
 };
 
 type EnvVars = Record<string, string | undefined>;
@@ -42,13 +43,19 @@ const isAgentDisabled = (
   agent: string,
   config: OhMyOpenCodeConfig,
 ): boolean => {
-  const lowered = agent.toLowerCase();
-  if (lowered === "sisyphus" && config.sisyphus_agent?.disabled === true) {
+  const lowered =
+    normalizeAgentName(agent)?.toLowerCase() ?? agent.toLowerCase();
+  if (
+    (lowered === "build" || lowered === "kord" || lowered === "sisyphus") &&
+    config.sisyphus_agent?.disabled === true
+  ) {
     return true;
   }
-  return (config.disabled_agents ?? []).some(
-    (disabled) => disabled.toLowerCase() === lowered,
-  );
+  return (config.disabled_agents ?? []).some((disabled) => {
+    const normalizedDisabled =
+      normalizeAgentName(disabled)?.toLowerCase() ?? disabled.toLowerCase();
+    return normalizedDisabled === lowered;
+  });
 };
 
 const pickFallbackAgent = (config: OhMyOpenCodeConfig): string => {

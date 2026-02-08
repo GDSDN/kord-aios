@@ -75,10 +75,17 @@ export function isGptModel(model: string): boolean {
 }
 
 export type BuiltinAgentName =
+  | "build"
+  | "plan"
+  | "build-loop"
+  | "deep"
+  | "kord"
   | "sisyphus"
   | "dev"
   | "sisyphus-junior"
   | "hephaestus"
+  | "aios-master"
+  | "prometheus"
   | "oracle"
   | "librarian"
   | "explore"
@@ -96,7 +103,7 @@ export type BuiltinAgentName =
   | "devops"
   | "ux-design-expert";
 
-export type OverridableAgentName = "build" | BuiltinAgentName;
+export type OverridableAgentName = BuiltinAgentName;
 
 export type AgentName = BuiltinAgentName;
 

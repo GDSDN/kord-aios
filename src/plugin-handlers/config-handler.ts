@@ -42,7 +42,7 @@ import {
 } from "../agents/prometheus";
 import { DEFAULT_CATEGORIES } from "../tools/delegate-task/constants";
 import type { ModelCacheState } from "../plugin-state";
-import type { CategoryConfig } from "../config/schema";
+import type { AgentOverrides, CategoryConfig } from "../config/schema";
 
 export interface ConfigHandlerDeps {
   ctx: { directory: string; client?: any };
@@ -58,11 +58,60 @@ export function resolveCategoryConfig(
 }
 
 const CORE_AGENT_ORDER = [
+  "build",
+  "deep",
+  "plan",
+  "build-loop",
+  "kord",
   "sisyphus",
   "hephaestus",
   "prometheus",
   "atlas",
 ] as const;
+
+function getCanonicalAgentKey(agentKey: string): string {
+  return (
+    AGENT_NAME_MAP[agentKey.toLowerCase()] ??
+    AGENT_NAME_MAP[agentKey] ??
+    agentKey
+  );
+}
+
+function normalizeAndMergeAgentOverrides(
+  agentOverrides?: AgentOverrides,
+): AgentOverrides | undefined {
+  if (!agentOverrides) return undefined;
+
+  const merged: Record<string, unknown> = {};
+  const entries = Object.entries(agentOverrides).sort(([a], [b]) => {
+    const aCanonical = getCanonicalAgentKey(a) === a;
+    const bCanonical = getCanonicalAgentKey(b) === b;
+    return Number(aCanonical) - Number(bCanonical);
+  });
+
+  for (const [key, value] of entries) {
+    if (!value) continue;
+    const canonicalKey = getCanonicalAgentKey(key);
+    const existing = merged[canonicalKey];
+
+    if (
+      existing &&
+      typeof existing === "object" &&
+      value &&
+      typeof value === "object"
+    ) {
+      merged[canonicalKey] = {
+        ...(existing as Record<string, unknown>),
+        ...(value as Record<string, unknown>),
+      };
+      continue;
+    }
+
+    merged[canonicalKey] = value;
+  }
+
+  return merged as AgentOverrides;
+}
 
 function reorderAgentsByPriority(
   agents: Record<string, unknown>,
@@ -86,6 +135,28 @@ function reorderAgentsByPriority(
   return ordered;
 }
 
+function withLegacyCoreAliases(
+  agents: Record<string, unknown>,
+): Record<string, unknown> {
+  const result = { ...agents };
+  const aliases: Array<[canonical: string, legacy: string]> = [
+    ["build", "sisyphus"],
+    ["deep", "hephaestus"],
+    ["plan", "prometheus"],
+    ["build-loop", "atlas"],
+    ["kord", "aios-master"],
+    ["dev", "sisyphus-junior"],
+  ];
+
+  for (const [canonical, legacy] of aliases) {
+    if (result[canonical] !== undefined && result[legacy] === undefined) {
+      result[legacy] = result[canonical];
+    }
+  }
+
+  return result;
+}
+
 export function createConfigHandler(deps: ConfigHandlerDeps) {
   const { ctx, pluginConfig, modelCacheState } = deps;
 
@@ -95,13 +166,9 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       models?: Record<string, { limit?: { context?: number } }>;
     };
 
-    const getCanonicalAgentKey = (agentKey: string): string => {
-      return (
-        AGENT_NAME_MAP[agentKey.toLowerCase()] ??
-        AGENT_NAME_MAP[agentKey] ??
-        agentKey
-      );
-    };
+    const normalizedAgentOverrides = normalizeAndMergeAgentOverrides(
+      pluginConfig.agents,
+    );
     const providers = config.provider as
       | Record<string, ProviderConfig>
       | undefined;
@@ -224,7 +291,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     const disabledSkills = new Set<string>(pluginConfig.disabled_skills ?? []);
     const builtinAgents = await createBuiltinAgents(
       migratedDisabledAgents,
-      pluginConfig.agents,
+      normalizedAgentOverrides,
       ctx.directory,
       undefined, // systemDefaultModel - let fallback chain handle this
       pluginConfig.categories,
@@ -235,6 +302,12 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       currentModel, // uiSelectedModel - takes highest priority
       disabledSkills,
     );
+    const canonicalBuiltinAgents = Object.fromEntries(
+      Object.entries(builtinAgents).map(([key, value]) => [
+        getCanonicalAgentKey(key),
+        value,
+      ]),
+    ) as typeof builtinAgents;
 
     // Claude Code agents: Do NOT apply permission migration
     // Claude Code uses whitelist-based tools format which is semantically different
@@ -279,15 +352,29 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     };
     const configAgent = config.agent as AgentConfig | undefined;
 
-    if (isSisyphusEnabled && builtinAgents.sisyphus) {
-      (config as { default_agent?: string }).default_agent = "sisyphus";
+    if (
+      isSisyphusEnabled &&
+      (canonicalBuiltinAgents.build || canonicalBuiltinAgents.sisyphus)
+    ) {
+      (config as { default_agent?: string }).default_agent = "build";
+
+      const primaryBuildAgent =
+        canonicalBuiltinAgents.build ??
+        canonicalBuiltinAgents.sisyphus ??
+        canonicalBuiltinAgents.kord;
 
       const agentConfig: Record<string, unknown> = {
-        sisyphus: builtinAgents.sisyphus,
+        ...(primaryBuildAgent
+          ? {
+              build: primaryBuildAgent,
+              sisyphus: primaryBuildAgent,
+              kord: primaryBuildAgent,
+            }
+          : {}),
       };
 
-      const legacyDevOverride = pluginConfig.agents?.["sisyphus-junior"];
-      const canonicalDevOverride = pluginConfig.agents?.dev;
+      const legacyDevOverride = normalizedAgentOverrides?.["sisyphus-junior"];
+      const canonicalDevOverride = normalizedAgentOverrides?.dev;
       const mergedDevOverride =
         legacyDevOverride || canonicalDevOverride
           ? { ...legacyDevOverride, ...canonicalDevOverride }
@@ -305,7 +392,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           buildConfigWithoutName as Record<string, unknown>,
         );
         const openCodeBuilderOverride =
-          pluginConfig.agents?.["OpenCode-Builder"];
+          normalizedAgentOverrides?.["OpenCode-Builder"];
         const openCodeBuilderBase = {
           ...migratedBuildConfig,
           description: `${configAgent?.build?.description ?? "Build agent"} (OpenCode default)`,
@@ -317,7 +404,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       }
 
       if (plannerEnabled) {
-        const prometheusOverride = pluginConfig.agents?.["prometheus"] as
+        const prometheusOverride = normalizedAgentOverrides?.["plan"] as
           | (Record<string, unknown> & {
               category?: string;
               model?: string;
@@ -338,7 +425,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
             )
           : undefined;
 
-        const prometheusRequirement = AGENT_MODEL_REQUIREMENTS["prometheus"];
+        const prometheusRequirement = AGENT_MODEL_REQUIREMENTS["plan"];
         const connectedProviders = readConnectedProvidersCache();
         // IMPORTANT: Do NOT pass ctx.client to fetchAvailableModels during plugin initialization.
         // Calling client API (e.g., client.provider.list()) from config handler causes deadlock:
@@ -378,7 +465,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         const maxTokensToUse =
           prometheusOverride?.maxTokens ?? categoryConfig?.maxTokens;
         const prometheusBase = {
-          name: "prometheus",
+          name: "plan",
           ...(resolvedModel ? { model: resolvedModel } : {}),
           ...(variantToUse ? { variant: variantToUse } : {}),
           mode: "all" as const,
@@ -415,8 +502,10 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           if (prompt_append && merged.prompt) {
             merged.prompt = merged.prompt + "\n" + prompt_append;
           }
+          agentConfig["plan"] = merged;
           agentConfig["prometheus"] = merged;
         } else {
+          agentConfig["plan"] = prometheusBase;
           agentConfig["prometheus"] = prometheusBase;
         }
       }
@@ -433,7 +522,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
                 // Filter out agents that oh-my-opencode provides to prevent
                 // OpenCode defaults from overwriting user config in oh-my-opencode.json
                 // See: https://github.com/code-yeongyu/oh-my-opencode/issues/472
-                if (key in builtinAgents) return false;
+                if (key in canonicalBuiltinAgents) return false;
                 return true;
               })
               .map(([key, value]) => [
@@ -456,18 +545,21 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       config.agent = {
         ...agentConfig,
         ...Object.fromEntries(
-          Object.entries(builtinAgents).filter(([k]) => k !== "sisyphus"),
+          Object.entries(canonicalBuiltinAgents).filter(
+            ([k]) => k !== "build" && k !== "sisyphus" && k !== "kord",
+          ),
         ),
         ...userAgents,
         ...projectAgents,
         ...pluginAgents,
         ...filteredConfigAgents,
         build: { ...migratedBuild, mode: "subagent", hidden: true },
+        sisyphus: { ...migratedBuild, mode: "subagent", hidden: true },
         ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
       };
     } else {
       config.agent = {
-        ...builtinAgents,
+        ...canonicalBuiltinAgents,
         ...userAgents,
         ...projectAgents,
         ...pluginAgents,
@@ -476,6 +568,9 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     }
 
     if (config.agent) {
+      config.agent = withLegacyCoreAliases(
+        config.agent as Record<string, unknown>,
+      );
       config.agent = reorderAgentsByPriority(
         config.agent as Record<string, unknown>,
       );
@@ -510,46 +605,54 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       const agent = agentResult["multimodal-looker"] as AgentWithPermission;
       agent.permission = { ...agent.permission, task: "deny", look_at: "deny" };
     }
-    if (agentResult["atlas"]) {
-      const agent = agentResult["atlas"] as AgentWithPermission;
-      agent.permission = {
-        ...agent.permission,
-        task: "allow",
-        call_omo_agent: "deny",
-        "task_*": "allow",
-        teammate: "allow",
-      };
+    for (const key of ["build-loop", "atlas"] as const) {
+      if (agentResult[key]) {
+        const agent = agentResult[key] as AgentWithPermission;
+        agent.permission = {
+          ...agent.permission,
+          task: "allow",
+          call_omo_agent: "deny",
+          "task_*": "allow",
+          teammate: "allow",
+        };
+      }
     }
-    if (agentResult.sisyphus) {
-      const agent = agentResult.sisyphus as AgentWithPermission;
-      agent.permission = {
-        ...agent.permission,
-        call_omo_agent: "deny",
-        task: "allow",
-        question: questionPermission,
-        "task_*": "allow",
-        teammate: "allow",
-      };
+    for (const key of ["build", "sisyphus", "kord"] as const) {
+      if (agentResult[key]) {
+        const agent = agentResult[key] as AgentWithPermission;
+        agent.permission = {
+          ...agent.permission,
+          call_omo_agent: "deny",
+          task: "allow",
+          question: questionPermission,
+          "task_*": "allow",
+          teammate: "allow",
+        };
+      }
     }
-    if (agentResult.hephaestus) {
-      const agent = agentResult.hephaestus as AgentWithPermission;
-      agent.permission = {
-        ...agent.permission,
-        call_omo_agent: "deny",
-        task: "allow",
-        question: questionPermission,
-      };
+    for (const key of ["deep", "hephaestus"] as const) {
+      if (agentResult[key]) {
+        const agent = agentResult[key] as AgentWithPermission;
+        agent.permission = {
+          ...agent.permission,
+          call_omo_agent: "deny",
+          task: "allow",
+          question: questionPermission,
+        };
+      }
     }
-    if (agentResult["prometheus"]) {
-      const agent = agentResult["prometheus"] as AgentWithPermission;
-      agent.permission = {
-        ...agent.permission,
-        call_omo_agent: "deny",
-        task: "allow",
-        question: questionPermission,
-        "task_*": "allow",
-        teammate: "allow",
-      };
+    for (const key of ["plan", "prometheus"] as const) {
+      if (agentResult[key]) {
+        const agent = agentResult[key] as AgentWithPermission;
+        agent.permission = {
+          ...agent.permission,
+          call_omo_agent: "deny",
+          task: "allow",
+          question: questionPermission,
+          "task_*": "allow",
+          teammate: "allow",
+        };
+      }
     }
     if (agentResult.dev) {
       const agent = agentResult.dev as AgentWithPermission;

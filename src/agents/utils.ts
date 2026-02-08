@@ -72,11 +72,12 @@ import type { BrowserAutomationProvider } from "../config/schema";
 
 type AgentSource = AgentFactory | AgentConfig;
 
-const agentSources: Record<BuiltinAgentName, AgentSource> = {
-  sisyphus: createKordAgent,
+const agentSources: Partial<Record<BuiltinAgentName, AgentSource>> = {
+  build: createKordAgent,
+  deep: createKordWorkerAgent,
+  "build-loop": createAtlasAgent as unknown as AgentFactory,
+  kord: createKordAgent,
   dev: createDevAgent,
-  "sisyphus-junior": createDevAgent,
-  hephaestus: createKordWorkerAgent,
   oracle: createOracleAgent,
   librarian: createLibrarianAgent,
   explore: createExploreAgent,
@@ -92,20 +93,27 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   "data-engineer": createDataEngineerAgent,
   devops: createDevopsAgent,
   "ux-design-expert": createUxDesignExpertAgent,
-  // Note: Atlas is handled specially in createBuiltinAgents()
-  // because it needs OrchestratorContext, not just a model string
-  atlas: createAtlasAgent as unknown as AgentFactory,
 };
 
 const aliasToCanonicalAgent: Partial<
   Record<BuiltinAgentName, BuiltinAgentName>
 > = {
+  sisyphus: "build",
+  hephaestus: "deep",
+  atlas: "build-loop",
+  prometheus: "plan",
+  "aios-master": "kord",
   "sisyphus-junior": "dev",
 };
 
 const canonicalAgentAliases: Partial<
   Record<BuiltinAgentName, BuiltinAgentName[]>
 > = {
+  build: ["sisyphus"],
+  deep: ["hephaestus"],
+  "build-loop": ["atlas"],
+  plan: ["prometheus"],
+  kord: ["aios-master"],
   dev: ["sisyphus-junior"],
 };
 
@@ -170,7 +178,7 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   "data-engineer": DATA_ENGINEER_PROMPT_METADATA,
   devops: DEVOPS_PROMPT_METADATA,
   "ux-design-expert": UX_DESIGN_EXPERT_PROMPT_METADATA,
-  atlas: atlasPromptMetadata,
+  "build-loop": atlasPromptMetadata,
 };
 
 function isFactory(source: AgentSource): source is AgentFactory {
@@ -456,9 +464,11 @@ export async function createBuiltinAgents(
 
     if (canonicalAgentName !== agentName) continue;
 
-    if (canonicalAgentName === "sisyphus") continue;
-    if (canonicalAgentName === "hephaestus") continue;
-    if (canonicalAgentName === "atlas") continue;
+    if (canonicalAgentName === "build") continue;
+    if (canonicalAgentName === "deep") continue;
+    if (canonicalAgentName === "build-loop") continue;
+    if (canonicalAgentName === "kord") continue;
+    if (canonicalAgentName === "plan") continue;
     if (isAgentDisabledByName(canonicalAgentName, disabledAgents)) continue;
 
     const override = getAgentOverrideForName(
@@ -519,7 +529,7 @@ export async function createBuiltinAgents(
     config = applyOverrides(config, override, mergedCategories);
 
     // Store for later - will be added after sisyphus and hephaestus
-    pendingAgentConfigs.set(name, config);
+    pendingAgentConfigs.set(canonicalAgentName, config);
 
     const metadata = agentMetadata[canonicalAgentName];
     if (metadata) {
@@ -531,146 +541,160 @@ export async function createBuiltinAgents(
     }
   }
 
-  const sisyphusOverride = agentOverrides["sisyphus"];
-  const sisyphusRequirement = AGENT_MODEL_REQUIREMENTS["sisyphus"];
-  const hasSisyphusExplicitConfig = sisyphusOverride !== undefined;
-  const meetsSisyphusAnyModelRequirement =
-    !sisyphusRequirement?.requiresAnyModel ||
-    hasSisyphusExplicitConfig ||
+  const buildOverride = getAgentOverrideForName("build", agentOverrides);
+  const buildRequirement = AGENT_MODEL_REQUIREMENTS["build"];
+  const hasBuildExplicitConfig = buildOverride !== undefined;
+  const meetsBuildAnyModelRequirement =
+    !buildRequirement?.requiresAnyModel ||
+    hasBuildExplicitConfig ||
     isFirstRunNoCache ||
     isAnyFallbackModelAvailable(
-      sisyphusRequirement.fallbackChain,
+      buildRequirement.fallbackChain,
       availableModels,
     );
 
-  if (
-    !disabledAgents.includes("sisyphus") &&
-    meetsSisyphusAnyModelRequirement
-  ) {
-    let sisyphusResolution = applyModelResolution({
-      uiSelectedModel: sisyphusOverride?.model ? undefined : uiSelectedModel,
-      userModel: sisyphusOverride?.model,
-      requirement: sisyphusRequirement,
+  if (meetsBuildAnyModelRequirement) {
+    let buildResolution = applyModelResolution({
+      uiSelectedModel: buildOverride?.model ? undefined : uiSelectedModel,
+      userModel: buildOverride?.model,
+      requirement: buildRequirement,
       availableModels,
       systemDefaultModel,
     });
 
-    if (isFirstRunNoCache && !sisyphusOverride?.model && !uiSelectedModel) {
-      sisyphusResolution = getFirstFallbackModel(sisyphusRequirement);
+    if (isFirstRunNoCache && !buildOverride?.model && !uiSelectedModel) {
+      buildResolution = getFirstFallbackModel(buildRequirement);
     }
 
-    if (sisyphusResolution) {
-      const { model: sisyphusModel, variant: sisyphusResolvedVariant } =
-        sisyphusResolution;
+    if (buildResolution) {
+      const { model: buildModel, variant: buildResolvedVariant } =
+        buildResolution;
 
-      let sisyphusConfig = createKordAgent(
-        sisyphusModel,
+      let buildConfig = createKordAgent(
+        buildModel,
         availableAgents,
         undefined,
         availableSkills,
         availableCategories,
       );
 
-      if (sisyphusResolvedVariant) {
-        sisyphusConfig = {
-          ...sisyphusConfig,
-          variant: sisyphusResolvedVariant,
+      if (buildResolvedVariant) {
+        buildConfig = {
+          ...buildConfig,
+          variant: buildResolvedVariant,
         };
       }
 
-      sisyphusConfig = applyOverrides(
-        sisyphusConfig,
-        sisyphusOverride,
+      buildConfig = applyOverrides(
+        buildConfig,
+        buildOverride,
         mergedCategories,
       );
-      sisyphusConfig = applyEnvironmentContext(sisyphusConfig, directory);
+      buildConfig = applyEnvironmentContext(buildConfig, directory);
 
-      result["sisyphus"] = sisyphusConfig;
+      if (!isAgentDisabledByName("build", disabledAgents)) {
+        result["build"] = buildConfig;
+        for (const alias of canonicalAgentAliases.build ?? []) {
+          result[alias] = buildConfig;
+        }
+      }
+
+      if (
+        !isAgentDisabledByName("kord", disabledAgents) &&
+        !isAgentDisabledByName("build", disabledAgents)
+      ) {
+        result["kord"] = buildConfig;
+        for (const alias of canonicalAgentAliases.kord ?? []) {
+          result[alias] = buildConfig;
+        }
+      }
     }
   }
 
-  if (!disabledAgents.includes("hephaestus")) {
-    const hephaestusOverride = agentOverrides["hephaestus"];
-    const hephaestusRequirement = AGENT_MODEL_REQUIREMENTS["hephaestus"];
-    const hasHephaestusExplicitConfig = hephaestusOverride !== undefined;
+  {
+    const deepOverride = getAgentOverrideForName("deep", agentOverrides);
+    const deepRequirement = AGENT_MODEL_REQUIREMENTS["deep"];
+    const hasDeepExplicitConfig = deepOverride !== undefined;
 
     const hasRequiredProvider =
-      !hephaestusRequirement?.requiresProvider ||
-      hasHephaestusExplicitConfig ||
+      !deepRequirement?.requiresProvider ||
+      hasDeepExplicitConfig ||
       isFirstRunNoCache ||
-      isAnyProviderConnected(
-        hephaestusRequirement.requiresProvider,
-        availableModels,
-      );
+      isAnyProviderConnected(deepRequirement.requiresProvider, availableModels);
 
     if (hasRequiredProvider) {
-      let hephaestusResolution = applyModelResolution({
-        userModel: hephaestusOverride?.model,
-        requirement: hephaestusRequirement,
+      let deepResolution = applyModelResolution({
+        userModel: deepOverride?.model,
+        requirement: deepRequirement,
         availableModels,
         systemDefaultModel,
       });
 
-      if (isFirstRunNoCache && !hephaestusOverride?.model) {
-        hephaestusResolution = getFirstFallbackModel(hephaestusRequirement);
+      if (isFirstRunNoCache && !deepOverride?.model) {
+        deepResolution = getFirstFallbackModel(deepRequirement);
       }
 
-      if (hephaestusResolution) {
-        const { model: hephaestusModel, variant: hephaestusResolvedVariant } =
-          hephaestusResolution;
+      if (deepResolution) {
+        const { model: deepModel, variant: deepResolvedVariant } =
+          deepResolution;
 
-        let hephaestusConfig = createKordWorkerAgent(
-          hephaestusModel,
+        let deepConfig = createKordWorkerAgent(
+          deepModel,
           availableAgents,
           undefined,
           availableSkills,
           availableCategories,
         );
 
-        hephaestusConfig = {
-          ...hephaestusConfig,
-          variant: hephaestusResolvedVariant ?? "medium",
+        deepConfig = {
+          ...deepConfig,
+          variant: deepResolvedVariant ?? "medium",
         };
 
-        const hepOverrideCategory = (
-          hephaestusOverride as Record<string, unknown> | undefined
+        const deepOverrideCategory = (
+          deepOverride as Record<string, unknown> | undefined
         )?.category as string | undefined;
-        if (hepOverrideCategory) {
-          hephaestusConfig = applyCategoryOverride(
-            hephaestusConfig,
-            hepOverrideCategory,
+        if (deepOverrideCategory) {
+          deepConfig = applyCategoryOverride(
+            deepConfig,
+            deepOverrideCategory,
             mergedCategories,
           );
         }
 
-        if (directory && hephaestusConfig.prompt) {
+        if (directory && deepConfig.prompt) {
           const envContext = createEnvContext();
-          hephaestusConfig = {
-            ...hephaestusConfig,
-            prompt: hephaestusConfig.prompt + envContext,
+          deepConfig = {
+            ...deepConfig,
+            prompt: deepConfig.prompt + envContext,
           };
         }
 
-        if (hephaestusOverride) {
-          hephaestusConfig = mergeAgentConfig(
-            hephaestusConfig,
-            hephaestusOverride,
-          );
+        if (deepOverride) {
+          deepConfig = mergeAgentConfig(deepConfig, deepOverride);
         }
 
-        result["hephaestus"] = hephaestusConfig;
+        if (!isAgentDisabledByName("deep", disabledAgents)) {
+          result["deep"] = deepConfig;
+          for (const alias of canonicalAgentAliases.deep ?? []) {
+            result[alias] = deepConfig;
+          }
+        }
       }
     }
   }
 
-  // Add pending agents after sisyphus and hephaestus to maintain order
+  // Add pending agents after build/deep to maintain order
   for (const [name, config] of pendingAgentConfigs) {
     result[name] = config;
   }
 
-  if (!disabledAgents.includes("atlas")) {
-    const orchestratorOverride = agentOverrides["atlas"];
-    const atlasRequirement = AGENT_MODEL_REQUIREMENTS["atlas"];
+  if (!isAgentDisabledByName("build-loop", disabledAgents)) {
+    const orchestratorOverride = getAgentOverrideForName(
+      "build-loop",
+      agentOverrides,
+    );
+    const atlasRequirement = AGENT_MODEL_REQUIREMENTS["build-loop"];
 
     const atlasResolution = applyModelResolution({
       uiSelectedModel: orchestratorOverride?.model
@@ -706,7 +730,10 @@ export async function createBuiltinAgents(
         mergedCategories,
       );
 
-      result["atlas"] = orchestratorConfig;
+      result["build-loop"] = orchestratorConfig;
+      for (const alias of canonicalAgentAliases["build-loop"] ?? []) {
+        result[alias] = orchestratorConfig;
+      }
     }
   }
 

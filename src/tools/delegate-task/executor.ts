@@ -51,9 +51,25 @@ import { storeToolMetadata } from "../../features/tool-metadata-store";
 
 const DEV_AGENT = "dev";
 const LEGACY_DEV_ALIAS = "sisyphus-junior";
+const SUBAGENT_ALIAS_TO_CANONICAL: Record<string, string> = {
+  [LEGACY_DEV_ALIAS]: DEV_AGENT,
+  sisyphus: "build",
+  hephaestus: "deep",
+  atlas: "build-loop",
+  prometheus: "plan",
+  "aios-master": "kord",
+};
+const CANONICAL_TO_LEGACY_SUBAGENT: Record<string, string[]> = {
+  build: ["sisyphus"],
+  deep: ["hephaestus"],
+  "build-loop": ["atlas"],
+  plan: ["prometheus"],
+  kord: ["aios-master"],
+};
 
 function normalizeSubagentType(agentName: string): string {
-  return agentName.toLowerCase() === LEGACY_DEV_ALIAS ? DEV_AGENT : agentName;
+  const lowered = agentName.toLowerCase();
+  return SUBAGENT_ALIAS_TO_CANONICAL[lowered] ?? agentName;
 }
 
 export interface ExecutorContext {
@@ -1170,6 +1186,10 @@ export async function resolveSubagentExecution(
   }
 
   const agentName = normalizeSubagentType(args.subagent_type.trim());
+  const agentCandidates = new Set<string>([agentName.toLowerCase()]);
+  for (const legacyName of CANONICAL_TO_LEGACY_SUBAGENT[agentName] ?? []) {
+    agentCandidates.add(legacyName.toLowerCase());
+  }
 
   if (isPlanAgent(agentName) && isPlanAgent(parentAgent)) {
     return {
@@ -1197,13 +1217,13 @@ Create the work plan directly - that's your job as the planning agent.`,
 
     const callableAgents = agents.filter((a) => a.mode !== "primary");
 
-    const matchedAgent = callableAgents.find(
-      (agent) => agent.name.toLowerCase() === agentToUse.toLowerCase(),
+    const matchedAgent = callableAgents.find((agent) =>
+      agentCandidates.has(agent.name.toLowerCase()),
     );
     if (!matchedAgent) {
       const isPrimaryAgent = agents
         .filter((a) => a.mode === "primary")
-        .find((agent) => agent.name.toLowerCase() === agentToUse.toLowerCase());
+        .find((agent) => agentCandidates.has(agent.name.toLowerCase()));
       if (isPrimaryAgent) {
         return {
           agentToUse: "",

@@ -1,22 +1,34 @@
 export const AGENT_NAME_MAP: Record<string, string> = {
-  // Sisyphus variants → "sisyphus"
-  omo: "sisyphus",
-  OmO: "sisyphus",
-  Sisyphus: "sisyphus",
-  sisyphus: "sisyphus",
+  // Build runtime variants -> "build"
+  omo: "build",
+  OmO: "build",
+  Sisyphus: "build",
+  sisyphus: "build",
+  build: "build",
 
-  // Prometheus variants → "prometheus"
-  "OmO-Plan": "prometheus",
-  "omo-plan": "prometheus",
-  "Planner-Sisyphus": "prometheus",
-  "planner-sisyphus": "prometheus",
-  "Prometheus (Planner)": "prometheus",
-  prometheus: "prometheus",
+  // Plan runtime variants -> "plan"
+  "OmO-Plan": "plan",
+  "omo-plan": "plan",
+  "Planner-Sisyphus": "plan",
+  "planner-sisyphus": "plan",
+  "Prometheus (Planner)": "plan",
+  prometheus: "plan",
+  plan: "plan",
+  planner: "plan",
 
-  // Atlas variants → "atlas"
-  "orchestrator-sisyphus": "atlas",
-  Atlas: "atlas",
-  atlas: "atlas",
+  // Build-loop runtime variants -> "build-loop"
+  "orchestrator-sisyphus": "build-loop",
+  Atlas: "build-loop",
+  atlas: "build-loop",
+  "build-loop": "build-loop",
+
+  // Deep runtime variants -> "deep"
+  hephaestus: "deep",
+  deep: "deep",
+
+  // Kord runtime variants -> "kord"
+  kord: "kord",
+  "aios-master": "kord",
 
   // Metis variants → "metis"
   "plan-consultant": "metis",
@@ -34,7 +46,6 @@ export const AGENT_NAME_MAP: Record<string, string> = {
   "sisyphus-junior": "dev",
 
   // Already lowercase - passthrough
-  build: "build",
   oracle: "oracle",
   librarian: "librarian",
   explore: "explore",
@@ -49,17 +60,24 @@ export const AGENT_NAME_MAP: Record<string, string> = {
 };
 
 export const BUILTIN_AGENT_NAMES = new Set([
-  "sisyphus", // was "Sisyphus"
+  "build", // was "Sisyphus"
+  "plan", // was "Prometheus (Planner)"
+  "build-loop", // was "Atlas"
+  "deep", // was "hephaestus"
+  "kord",
+  "sisyphus", // compatibility alias
+  "prometheus", // compatibility alias
+  "atlas", // compatibility alias
+  "hephaestus", // compatibility alias
+  "aios-master", // compatibility alias
   "oracle",
   "librarian",
   "explore",
   "multimodal-looker",
   "metis", // was "Metis (Plan Consultant)"
   "momus", // was "Momus (Plan Reviewer)"
-  "prometheus", // was "Prometheus (Planner)"
-  "atlas", // was "Atlas"
   "dev",
-  "build",
+  "sisyphus-junior", // compatibility alias
   "pm",
   "po",
   "sm",

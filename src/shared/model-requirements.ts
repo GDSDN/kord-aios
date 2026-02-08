@@ -253,7 +253,10 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   devops: {
     fallbackChain: [
-      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.3-codex" },
+      {
+        providers: ["openai", "github-copilot", "opencode"],
+        model: "gpt-5.3-codex",
+      },
       { providers: ["github-copilot"], model: "grok-code-fast-1" },
       { providers: ["anthropic", "opencode"], model: "claude-sonnet-4-5" },
     ],
@@ -270,6 +273,12 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     ],
   },
 };
+
+AGENT_MODEL_REQUIREMENTS.build = AGENT_MODEL_REQUIREMENTS.sisyphus;
+AGENT_MODEL_REQUIREMENTS.plan = AGENT_MODEL_REQUIREMENTS.prometheus;
+AGENT_MODEL_REQUIREMENTS["build-loop"] = AGENT_MODEL_REQUIREMENTS.atlas;
+AGENT_MODEL_REQUIREMENTS.deep = AGENT_MODEL_REQUIREMENTS.hephaestus;
+AGENT_MODEL_REQUIREMENTS.kord = AGENT_MODEL_REQUIREMENTS.build;
 
 export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   "visual-engineering": {
