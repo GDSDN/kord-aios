@@ -165,6 +165,19 @@ describe("disabled_hooks schema", () => {
       expect(result.data.disabled_hooks).toEqual(["story-workflow-enforcer"]);
     }
   });
+
+  test("accepts quality-gate-validator hook name", () => {
+    const config = {
+      disabled_hooks: ["quality-gate-validator"],
+    };
+
+    const result = OhMyOpenCodeConfigSchema.safeParse(config);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.disabled_hooks).toEqual(["quality-gate-validator"]);
+    }
+  });
 });
 
 describe("AgentOverrideConfigSchema", () => {

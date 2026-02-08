@@ -92,6 +92,7 @@ export const HookNameSchema = z.enum([
   "preemptive-compaction",
   "rules-injector",
   "story-workflow-enforcer",
+  "quality-gate-validator",
   "background-notification",
   "auto-update-checker",
   "startup-toast",

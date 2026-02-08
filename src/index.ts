@@ -15,6 +15,7 @@ import {
   createAnthropicContextWindowLimitRecoveryHook,
   createRulesInjectorHook,
   createStoryWorkflowEnforcerHook,
+  createQualityGateValidatorHook,
   createBackgroundNotificationHook,
   createAutoUpdateCheckerHook,
   createKeywordDetectorHook,
@@ -287,6 +288,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     ? safeCreateHook(
         "story-workflow-enforcer",
         () => createStoryWorkflowEnforcerHook(ctx),
+        { enabled: safeHookEnabled },
+      )
+    : null;
+  const qualityGateValidator = isHookEnabled("quality-gate-validator")
+    ? safeCreateHook(
+        "quality-gate-validator",
+        () => createQualityGateValidatorHook(ctx),
         { enabled: safeHookEnabled },
       )
     : null;
@@ -1001,6 +1009,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await directoryReadmeInjector?.["tool.execute.before"]?.(input, output);
       await rulesInjector?.["tool.execute.before"]?.(input, output);
       await storyWorkflowEnforcer?.["tool.execute.before"]?.(input, output);
+      await qualityGateValidator?.["tool.execute.before"]?.(input, output);
       await tasksTodowriteDisabler?.["tool.execute.before"]?.(input, output);
       await prometheusMdOnly?.["tool.execute.before"]?.(input, output);
       await sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output);
@@ -1120,6 +1129,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await editErrorRecovery?.["tool.execute.after"](input, output);
       await delegateTaskRetry?.["tool.execute.after"](input, output);
       await atlasHook?.["tool.execute.after"]?.(input, output);
+      await qualityGateValidator?.["tool.execute.after"]?.(input, output);
       await taskResumeInfo?.["tool.execute.after"]?.(input, output);
     },
 

@@ -23,6 +23,7 @@ export { createThinkModeHook } from "./think-mode";
 export { createClaudeCodeHooksHook } from "./claude-code-hooks";
 export { createRulesInjectorHook } from "./rules-injector";
 export { createStoryWorkflowEnforcerHook } from "./story-workflow-enforcer";
+export { createQualityGateValidatorHook } from "./quality-gate-validator";
 export { createBackgroundNotificationHook } from "./background-notification";
 export { createAutoUpdateCheckerHook } from "./auto-update-checker";
 
