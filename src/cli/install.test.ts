@@ -96,6 +96,9 @@ describe("install CLI - binary check behavior", () => {
     const allCalls = mockConsoleLog.mock.calls.flat().join("\n");
     expect(allCalls).toContain("[!]"); // warning symbol
     expect(allCalls).toContain("OpenCode");
+    expect(allCalls).toContain("OpenCode Presence");
+    expect(allCalls).toContain("Open-AIOS Plugin/Config Setup");
+    expect(allCalls).toContain("Auth/Provider Setup");
   });
 
   test("non-TUI mode: should create opencode.json with plugin even when binary not found", async () => {
@@ -224,5 +227,52 @@ describe("install CLI - binary check behavior", () => {
     expect(exitCode).toBe(0);
     const allCalls = mockConsoleLog.mock.calls.flat().join("\n");
     expect(allCalls).toContain("bunx opencode");
+    expect(allCalls).toContain("open-aios mcp detect");
+    expect(allCalls).toContain("open-aios mcp status");
+  });
+
+  test("non-TUI mode: should display complete installer status summary with all sections", async () => {
+    // given OpenCode binary IS installed
+    detectOpenCodeAvailabilitySpy = spyOn(
+      configManager,
+      "detectOpenCodeAvailability",
+    ).mockResolvedValue({
+      method: "binary",
+      installed: true,
+      available: true,
+      version: "1.0.200",
+      command: "opencode",
+    });
+
+    globalThis.fetch = mock(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ latest: "3.0.0" }),
+      } as Response),
+    ) as unknown as typeof fetch;
+
+    const args: InstallArgs = {
+      tui: false,
+      claude: "yes",
+      openai: "no",
+      gemini: "no",
+      copilot: "no",
+      opencodeZen: "no",
+      zaiCodingPlan: "no",
+    };
+
+    const exitCode = await install(args);
+
+    expect(exitCode).toBe(0);
+    const allCalls = mockConsoleLog.mock.calls.flat().join("\n");
+
+    // Verify all installer status sections are present
+    expect(allCalls).toContain("OpenCode Presence");
+    expect(allCalls).toContain("Open-AIOS Plugin/Config Setup");
+    expect(allCalls).toContain("Auth/Provider Setup");
+    expect(allCalls).toContain("Installer Status");
+    expect(allCalls).toContain("Optional MCP Follow-up");
+    expect(allCalls).toContain("open-aios mcp detect");
+    expect(allCalls).toContain("open-aios mcp status");
   });
 });

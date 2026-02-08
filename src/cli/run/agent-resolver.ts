@@ -16,6 +16,7 @@ const AGENT_ALIASES: Record<string, string> = {
   atlas: "build-loop",
   hephaestus: "deep",
   "aios-master": "kord",
+  "sisyphus-junior": "dev",
   planner: "plan",
 };
 

@@ -10,6 +10,8 @@ export interface InitOptions {
   dryRun?: boolean;
 }
 
+type InitMode = "fresh" | "merge";
+
 const SKIP_PATTERNS = [
   /node_modules/,
   /dist/,
@@ -39,6 +41,20 @@ async function exists(p: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function detectInitMode(projectDir: string): Promise<InitMode> {
+  const hasOpenCodeDir = await exists(path.join(projectDir, ".opencode"));
+  const hasOpenCodeJson = await exists(path.join(projectDir, "opencode.json"));
+  const hasOpenCodeJsonc = await exists(
+    path.join(projectDir, "opencode.jsonc"),
+  );
+
+  if (hasOpenCodeDir || hasOpenCodeJson || hasOpenCodeJsonc) {
+    return "merge";
+  }
+
+  return "fresh";
 }
 
 function shouldSkip(relPath: string): boolean {
@@ -88,9 +104,22 @@ export async function initProject(options: InitOptions): Promise<number> {
   const projectDir = path.resolve(options.directory || process.cwd());
   const here = path.dirname(fileURLToPath(import.meta.url));
   const repoRoot = path.resolve(here, "../..");
+  const initMode = await detectInitMode(projectDir);
 
   console.log(pc.cyan(`[open-aios init] project: ${projectDir}`));
   console.log(pc.cyan(`[open-aios init] source: ${repoRoot}`));
+  if (initMode === "merge") {
+    console.log(
+      pc.cyan(
+        "[open-aios init] mode: merge (safe merge over existing OpenCode config)",
+      ),
+    );
+  } else {
+    console.log(pc.cyan("[open-aios init] mode: fresh project bootstrap"));
+  }
+  console.log(
+    pc.cyan("[open-aios init] story-driven assets: docs/stories and docs/prd"),
+  );
 
   let totalCopied = 0;
   let totalSkippedExisting = 0;
