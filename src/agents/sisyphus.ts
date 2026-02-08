@@ -1,6 +1,6 @@
 export {
-  createKordAgent,
-  createKordAgent as createSisyphusAgent,
-  KORD_PROMPT_METADATA,
-  KORD_PROMPT_METADATA as SISYPHUS_PROMPT_METADATA,
-} from "./kord";
+  createBuildAgent as createKordAgent,
+  createBuildAgent as createSisyphusAgent,
+  BUILD_PROMPT_METADATA as KORD_PROMPT_METADATA,
+  SISYPHUS_PROMPT_METADATA,
+} from "./build";

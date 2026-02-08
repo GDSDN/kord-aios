@@ -6,6 +6,12 @@
 
 ---
 
+## Current Active Story
+
+**Active Story:** `docs/stories/module-2-installer-fusion.md`
+
+---
+
 ## Executive Summary
 
 Open-AIOS fusion combines OMOC engine (40+ hooks, Bun runtime) with AIOS methodology (176+ skills, story-driven workflows). This task board organizes work into **autonomous execution waves**—each wave is self-contained with clear entry/exit criteria and verification commands.

@@ -1,1 +1,4 @@
-export { createKordWorkerAgent, createHephaestusAgent } from "./kord-worker";
+export {
+  createDeepAgent as createKordWorkerAgent,
+  createDeepAgent as createHephaestusAgent,
+} from "./deep";

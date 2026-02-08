@@ -7,6 +7,12 @@
 
 ---
 
+## Current Active Story
+
+**Active Story:** `docs/stories/module-2-installer-fusion.md`
+
+---
+
 ## Executive Summary
 
 This document details the complete migration from standalone OMOC and AIOS to the unified **Open-AIOS** framework. The migration follows a **4-wave execution model** with 10 modules, clear dependencies, and autonomous execution capability.

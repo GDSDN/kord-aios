@@ -19,13 +19,21 @@ export type {
   AvailableCategory,
   AvailableSkill,
 } from "./dynamic-agent-prompt-builder";
+// Canonical Open-AIOS ownership surfaces.
+export * from "./plan";
+export * from "./build";
+export * from "./build-loop";
+export * from "./deep";
+export * from "./kord/index";
+
+// Legacy compatibility aliases.
 export {
   createKordAgent,
   createSisyphusAgent,
   KORD_PROMPT_METADATA,
   SISYPHUS_PROMPT_METADATA,
-} from "./kord";
-export { createKordWorkerAgent, createHephaestusAgent } from "./kord-worker";
+} from "./sisyphus";
+export { createKordWorkerAgent, createHephaestusAgent } from "./hephaestus";
 export { createOracleAgent, ORACLE_PROMPT_METADATA } from "./oracle";
 export { createLibrarianAgent, LIBRARIAN_PROMPT_METADATA } from "./librarian";
 export { createExploreAgent, EXPLORE_PROMPT_METADATA } from "./explore";
@@ -73,8 +81,3 @@ export {
   PROMETHEUS_PLAN_TEMPLATE,
   PROMETHEUS_BEHAVIORAL_SUMMARY,
 } from "./prometheus";
-export * from "./plan";
-export * from "./build";
-export * from "./build-loop";
-export * from "./deep";
-export * from "./kord/index";
