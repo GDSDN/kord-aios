@@ -24,15 +24,19 @@ export * from "./plan";
 export * from "./build";
 export * from "./build-loop";
 export * from "./deep";
-export * from "./kord/index";
-
-// Legacy compatibility aliases.
+export {
+  createKordMasterAgent,
+  KORD_MASTER_PROMPT_METADATA,
+} from "./kord/index";
+// Re-export legacy kord exports for backward compatibility
 export {
   createKordAgent,
   createSisyphusAgent,
   KORD_PROMPT_METADATA,
   SISYPHUS_PROMPT_METADATA,
-} from "./sisyphus";
+} from "./kord/index";
+
+// Legacy compatibility aliases.
 export { createKordWorkerAgent, createHephaestusAgent } from "./hephaestus";
 export { createOracleAgent, ORACLE_PROMPT_METADATA } from "./oracle";
 export { createLibrarianAgent, LIBRARIAN_PROMPT_METADATA } from "./librarian";

@@ -12,6 +12,10 @@ import type {
   GitMasterConfig,
 } from "../config/schema";
 import { createKordAgent } from "./kord";
+import {
+  createKordMasterAgent,
+  KORD_MASTER_PROMPT_METADATA,
+} from "./kord/index";
 import { createOracleAgent, ORACLE_PROMPT_METADATA } from "./oracle";
 import { createLibrarianAgent, LIBRARIAN_PROMPT_METADATA } from "./librarian";
 import { createExploreAgent, EXPLORE_PROMPT_METADATA } from "./explore";
@@ -76,7 +80,7 @@ const agentSources: Partial<Record<BuiltinAgentName, AgentSource>> = {
   build: createKordAgent,
   deep: createKordWorkerAgent,
   "build-loop": createAtlasAgent as unknown as AgentFactory,
-  kord: createKordAgent,
+  kord: createKordMasterAgent,
   dev: createDevAgent,
   oracle: createOracleAgent,
   librarian: createLibrarianAgent,
@@ -179,6 +183,7 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   devops: DEVOPS_PROMPT_METADATA,
   "ux-design-expert": UX_DESIGN_EXPERT_PROMPT_METADATA,
   "build-loop": atlasPromptMetadata,
+  kord: KORD_MASTER_PROMPT_METADATA,
 };
 
 function isFactory(source: AgentSource): source is AgentFactory {
@@ -598,14 +603,57 @@ export async function createBuiltinAgents(
           result[alias] = buildConfig;
         }
       }
+    }
+  }
 
-      if (
-        !isAgentDisabledByName("kord", disabledAgents) &&
-        !isAgentDisabledByName("build", disabledAgents)
-      ) {
-        result["kord"] = buildConfig;
-        for (const alias of canonicalAgentAliases.kord ?? []) {
-          result[alias] = buildConfig;
+  // SEPARATE kord config using createKordMasterAgent (DISTINCT from build)
+  {
+    const kordOverride = getAgentOverrideForName("kord", agentOverrides);
+    const kordRequirement = AGENT_MODEL_REQUIREMENTS["kord"];
+
+    const meetsKordAnyModelRequirement =
+      !kordRequirement?.requiresAnyModel ||
+      kordOverride !== undefined ||
+      isFirstRunNoCache ||
+      isAnyFallbackModelAvailable(
+        kordRequirement.fallbackChain,
+        availableModels,
+      );
+
+    if (meetsKordAnyModelRequirement) {
+      let kordResolution = applyModelResolution({
+        uiSelectedModel: kordOverride?.model ? undefined : uiSelectedModel,
+        userModel: kordOverride?.model,
+        requirement: kordRequirement,
+        availableModels,
+        systemDefaultModel,
+      });
+
+      if (isFirstRunNoCache && !kordOverride?.model && !uiSelectedModel) {
+        kordResolution = getFirstFallbackModel(kordRequirement);
+      }
+
+      if (kordResolution) {
+        const { model: kordModel, variant: kordResolvedVariant } =
+          kordResolution;
+
+        let kordConfig = createKordMasterAgent(kordModel);
+
+        if (kordResolvedVariant) {
+          kordConfig = {
+            ...kordConfig,
+            variant: kordResolvedVariant,
+          };
+        }
+
+        kordConfig = applyOverrides(kordConfig, kordOverride, mergedCategories);
+        kordConfig = applyEnvironmentContext(kordConfig, directory);
+
+        if (!isAgentDisabledByName("kord", disabledAgents)) {
+          result["kord"] = kordConfig;
+          for (const alias of canonicalAgentAliases.kord ?? []) {
+            result[alias] = kordConfig;
+          }
         }
       }
     }

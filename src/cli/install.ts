@@ -121,6 +121,78 @@ function printWarning(message: string): void {
   console.log(`${SYMBOLS.warn} ${color.yellow(message)}`);
 }
 
+interface InstallStatusSummaryOptions {
+  availability: OpenCodeAvailability;
+  pluginConfigured: boolean;
+  omoConfigured: boolean;
+  authConfigured: boolean;
+  providerConfigured: boolean;
+  requiresAuthProviderSetup: boolean;
+}
+
+function statusSymbol(kind: "ok" | "warn" | "info"): string {
+  if (kind === "ok") return SYMBOLS.check;
+  if (kind === "warn") return SYMBOLS.warn;
+  return SYMBOLS.info;
+}
+
+function formatInstallStatusSummary(
+  options: InstallStatusSummaryOptions,
+): string {
+  const lines: string[] = [];
+
+  lines.push(color.bold(color.white("OpenCode Presence")));
+  if (options.availability.installed) {
+    const version = options.availability.version
+      ? ` ${options.availability.version}`
+      : "";
+    const command = options.availability.command
+      ? color.dim(` via ${options.availability.command}`)
+      : "";
+    lines.push(`${statusSymbol("ok")} Detected${version}${command}`);
+  } else if (options.availability.method === "bunx") {
+    lines.push(
+      `${statusSymbol("warn")} Not globally installed (${color.cyan("bunx opencode")} available)`,
+    );
+  } else {
+    lines.push(`${statusSymbol("warn")} Not detected on PATH`);
+  }
+
+  lines.push("");
+  lines.push(color.bold(color.white("Open-AIOS Plugin/Config Setup")));
+  lines.push(
+    `${options.pluginConfigured ? statusSymbol("ok") : statusSymbol("warn")} OpenCode plugin entry ${options.pluginConfigured ? "configured" : "not configured"}`,
+  );
+  lines.push(
+    `${options.omoConfigured ? statusSymbol("ok") : statusSymbol("warn")} Open-AIOS model config ${options.omoConfigured ? "written" : "not written"}`,
+  );
+
+  lines.push("");
+  lines.push(color.bold(color.white("Auth/Provider Setup")));
+  if (!options.requiresAuthProviderSetup) {
+    lines.push(
+      `${statusSymbol("info")} Skipped (Gemini provider setup not selected)`,
+    );
+  } else {
+    lines.push(
+      `${options.authConfigured ? statusSymbol("ok") : statusSymbol("warn")} Auth plugin setup ${options.authConfigured ? "configured" : "not configured"}`,
+    );
+    lines.push(
+      `${options.providerConfigured ? statusSymbol("ok") : statusSymbol("warn")} Provider mapping ${options.providerConfigured ? "configured" : "not configured"}`,
+    );
+  }
+
+  return lines.join("\n");
+}
+
+function formatMcpSetupGuidance(): string {
+  return (
+    `Recommended MCP check (non-destructive):\n` +
+    `  ${SYMBOLS.bullet} ${color.cyan("open-aios mcp detect")}\n` +
+    `  ${SYMBOLS.bullet} ${color.cyan("open-aios mcp status")}`
+  );
+}
+
 function printOpenCodeStatusForCli(availability: OpenCodeAvailability): void {
   if (availability.installed) {
     const versionLabel = availability.version ? ` ${availability.version}` : "";
@@ -506,6 +578,10 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
 
   const totalSteps = 6;
   let step = 1;
+  let pluginConfigured = false;
+  let omoConfigured = false;
+  let authConfigured = false;
+  let providerConfigured = false;
 
   printStep(step++, totalSteps, "Checking OpenCode installation...");
   const availability = await detectOpenCodeAvailability();
@@ -526,6 +602,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
     printError(`Failed: ${pluginResult.error}`);
     return 1;
   }
+  pluginConfigured = true;
   printSuccess(
     `Plugin ${isUpdate ? "verified" : "added"} ${SYMBOLS.arrow} ${color.dim(pluginResult.configPath)}`,
   );
@@ -537,6 +614,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
       printError(`Failed: ${authResult.error}`);
       return 1;
     }
+    authConfigured = true;
     printSuccess(
       `Auth plugins configured ${SYMBOLS.arrow} ${color.dim(authResult.configPath)}`,
     );
@@ -547,6 +625,7 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
       printError(`Failed: ${providerResult.error}`);
       return 1;
     }
+    providerConfigured = true;
     printSuccess(
       `Providers configured ${SYMBOLS.arrow} ${color.dim(providerResult.configPath)}`,
     );
@@ -560,9 +639,25 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
     printError(`Failed: ${omoResult.error}`);
     return 1;
   }
+  omoConfigured = true;
   printSuccess(
     `Config written ${SYMBOLS.arrow} ${color.dim(omoResult.configPath)}`,
   );
+
+  printBox(
+    formatInstallStatusSummary({
+      availability,
+      pluginConfigured,
+      omoConfigured,
+      authConfigured,
+      providerConfigured,
+      requiresAuthProviderSetup: config.hasGemini,
+    }),
+    "Installer Status",
+  );
+
+  printStep(step++, totalSteps, "Optional MCP setup guidance...");
+  printBox(formatMcpSetupGuidance(), "Optional MCP Follow-up");
 
   printBox(
     formatConfigSummary(config),
@@ -691,6 +786,11 @@ export async function install(args: InstallArgs): Promise<number> {
   const config = await runTuiMode(detected);
   if (!config) return 1;
 
+  let pluginConfigured = false;
+  let omoConfigured = false;
+  let authConfigured = false;
+  let providerConfigured = false;
+
   s.start("Adding Open-AIOS plugin to OpenCode config");
   const pluginResult = await addPluginToOpenCodeConfig(VERSION);
   if (!pluginResult.success) {
@@ -698,6 +798,7 @@ export async function install(args: InstallArgs): Promise<number> {
     p.outro(color.red("Installation failed."));
     return 1;
   }
+  pluginConfigured = true;
   s.stop(`Plugin added to ${color.cyan(pluginResult.configPath)}`);
 
   if (config.hasGemini) {
@@ -708,6 +809,7 @@ export async function install(args: InstallArgs): Promise<number> {
       p.outro(color.red("Installation failed."));
       return 1;
     }
+    authConfigured = true;
     s.stop(`Auth plugins added to ${color.cyan(authResult.configPath)}`);
 
     s.start("Adding provider configurations");
@@ -717,6 +819,7 @@ export async function install(args: InstallArgs): Promise<number> {
       p.outro(color.red("Installation failed."));
       return 1;
     }
+    providerConfigured = true;
     s.stop(`Provider config added to ${color.cyan(providerResult.configPath)}`);
   }
 
@@ -727,7 +830,22 @@ export async function install(args: InstallArgs): Promise<number> {
     p.outro(color.red("Installation failed."));
     return 1;
   }
+  omoConfigured = true;
   s.stop(`Config written to ${color.cyan(omoResult.configPath)}`);
+
+  p.note(
+    formatInstallStatusSummary({
+      availability,
+      pluginConfigured,
+      omoConfigured,
+      authConfigured,
+      providerConfigured,
+      requiresAuthProviderSetup: config.hasGemini,
+    }),
+    "Installer Status",
+  );
+
+  p.note(formatMcpSetupGuidance(), "Optional MCP Follow-up");
 
   if (!config.hasClaude) {
     console.log();

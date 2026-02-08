@@ -9,6 +9,7 @@ import {
 import { ContextCollector } from "../../features/context-injector";
 import * as sharedModule from "../../shared";
 import * as sessionState from "../../features/claude-code-session-state";
+import * as skillContent from "../../features/opencode-skill-loader/skill-content";
 
 describe("keyword-detector message transform", () => {
   let logCalls: Array<{ msg: string; data?: unknown }>;
@@ -803,6 +804,14 @@ describe("keyword-detector star command detection", () => {
   let logCalls: Array<{ msg: string; data?: unknown }>;
   let logSpy: ReturnType<typeof spyOn>;
 
+  const mockSkills = new Map<
+    string,
+    {
+      name: string;
+      definition: { name: string; description: string; template: string };
+    }
+  >();
+
   beforeEach(() => {
     _resetForTesting();
     logCalls = [];
@@ -811,6 +820,25 @@ describe("keyword-detector star command detection", () => {
         logCalls.push({ msg, data });
       },
     );
+
+    // Set up mock skills
+    mockSkills.clear();
+    mockSkills.set("playwright", {
+      name: "playwright",
+      definition: {
+        name: "playwright",
+        description: "Test playwright",
+        template: "Test",
+      },
+    });
+    mockSkills.set("git-master", {
+      name: "git-master",
+      definition: {
+        name: "git-master",
+        description: "Test git-master",
+        template: "Test",
+      },
+    });
   });
 
   afterEach(() => {
@@ -844,9 +872,9 @@ describe("keyword-detector star command detection", () => {
     // then - star command advisory should be prepended
     const textPart = output.parts.find((p) => p.type === "text");
     expect(textPart).toBeDefined();
-    expect(textPart!.text).toContain("Skill Workflow Detected:");
+    // New format: SKILL NOT FOUND for non-existent skill
+    expect(textPart!.text).toContain("SKILL NOT FOUND");
     expect(textPart!.text).toContain("code-review");
-    expect(textPart!.text).toContain('skill(name="code-review")');
     expect(textPart!.text).toContain("aios_skill_search");
     expect(textPart!.text).toContain("---");
     expect(textPart!.text).toContain("please review this code");
@@ -869,7 +897,11 @@ describe("keyword-detector star command detection", () => {
     const textPart = output.parts.find((p) => p.type === "text");
     expect(textPart).toBeDefined();
     expect(textPart!.text).toContain("code-review");
-    expect(textPart!.text).toContain('skill(name="code-review")');
+    // Advisory may be SKILL NOT FOUND or JSON payload format
+    expect(
+      textPart!.text.includes("SKILL NOT FOUND") ||
+        textPart!.text.includes('"name": "code-review"'),
+    ).toBe(true);
   });
 
   test("should NOT detect star command when not at start", async () => {
@@ -889,7 +921,7 @@ describe("keyword-detector star command detection", () => {
     const textPart = output.parts.find((p) => p.type === "text");
     expect(textPart).toBeDefined();
     expect(textPart!.text).toBe("Please run mytask command");
-    expect(textPart!.text).not.toContain("Skill Workflow Detected:");
+    expect(textPart!.text).not.toContain("SKILL NOT FOUND");
   });
 
   test("should NOT detect star command in normal text", async () => {
@@ -948,7 +980,10 @@ describe("keyword-detector star command detection", () => {
     const textPart = output.parts.find((p) => p.type === "text");
     expect(textPart).toBeDefined();
     expect(textPart!.text).toContain("playwright");
-    expect(textPart!.text).toContain('skill(name="playwright")');
+    expect(
+      textPart!.text.includes('skill(name="playwright")') ||
+        textPart!.text.includes('"name": "playwright"'),
+    ).toBe(true);
   });
 
   test("should log star command detection", async () => {

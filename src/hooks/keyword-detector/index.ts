@@ -19,10 +19,32 @@ import {
   subagentSessions,
 } from "../../features/claude-code-session-state";
 import type { ContextCollector } from "../../features/context-injector";
+import {
+  resolveSkillByName,
+  generateSkillExecutionMessage,
+  generateSkillNotFoundMessage,
+} from "./skill-resolver";
+import type { LoadedSkill } from "../../features/opencode-skill-loader/types";
 
 export * from "./detector";
 export * from "./constants";
 export * from "./types";
+
+/**
+ * Get cached skills for star command resolution.
+ * Uses builtin skills as fallback when discovery is unavailable.
+ */
+async function getAvailableSkillsForResolution(): Promise<LoadedSkill[]> {
+  try {
+    // Dynamic import to avoid circular dependencies
+    const { getAllSkills } =
+      await import("../../features/opencode-skill-loader/skill-content");
+    return await getAllSkills();
+  } catch {
+    // Fallback: return empty list, will trigger not-found path
+    return [];
+  }
+}
 
 export function createKeywordDetectorHook(
   ctx: PluginInput,
@@ -76,14 +98,40 @@ export function createKeywordDetectorHook(
           normalizedName: starCommand.normalizedName,
         });
 
-        // Build advisory message for skill routing
-        const advisoryMessage = `**Skill Workflow Detected:** \`${starCommand.normalizedName}\`
+        // TODO: Hook Limitation
+        // Hooks cannot directly invoke tools. We implement deterministic message
+        // transformation that provides explicit instructions for skill execution.
+        // Future enhancement: Add a tool that hooks can call to trigger skill execution.
 
-To execute this skill workflow, use:
-- \`skill(name="${starCommand.normalizedName}")\` - Direct skill execution
-- Or route through \`task(..., load_skills=["${starCommand.normalizedName}"])\` for agent delegation
+        // Resolve skill against available skills
+        const availableSkills = await getAvailableSkillsForResolution();
+        const resolution = resolveSkillByName(
+          starCommand.normalizedName,
+          availableSkills,
+        );
 
-Note: If no exact skill match exists, run \`aios_skill_search\` to find similar skills.`;
+        let advisoryMessage: string;
+
+        if (resolution.exactMatch) {
+          // Exact match found: provide deterministic execution instructions
+          advisoryMessage = generateSkillExecutionMessage(resolution.skillName);
+          log(`[keyword-detector] Skill resolved: ${resolution.skillName}`, {
+            sessionID: input.sessionID,
+          });
+        } else {
+          // No exact match: provide search suggestion
+          advisoryMessage = generateSkillNotFoundMessage(
+            starCommand.normalizedName,
+            resolution.suggestion,
+          );
+          log(
+            `[keyword-detector] Skill not found: ${starCommand.normalizedName}`,
+            {
+              sessionID: input.sessionID,
+              suggestion: resolution.suggestion,
+            },
+          );
+        }
 
         // Prepend star command advisory to the message
         const textPartIndex = output.parts.findIndex(
