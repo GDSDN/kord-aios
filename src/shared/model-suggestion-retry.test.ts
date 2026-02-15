@@ -1,5 +1,5 @@
 import { describe, it, expect, mock } from "bun:test"
-import { parseModelSuggestion, promptWithModelSuggestionRetry } from "./model-suggestion-retry"
+import { parseModelSuggestion, promptWithRetry } from "./prompt-retry"
 
 describe("parseModelSuggestion", () => {
   describe("structured NamedError format", () => {
@@ -210,14 +210,14 @@ describe("parseModelSuggestion", () => {
   })
 })
 
-describe("promptWithModelSuggestionRetry", () => {
+describe("promptWithRetry", () => {
   it("should succeed on first try without retry", async () => {
     // given a client where prompt succeeds
     const promptMock = mock(() => Promise.resolve())
     const client = { session: { prompt: promptMock } }
 
-    // when calling promptWithModelSuggestionRetry
-    await promptWithModelSuggestionRetry(client as any, {
+    // when calling promptWithRetry
+    await promptWithRetry(client as any, {
       path: { id: "session-1" },
       body: {
         parts: [{ type: "text", text: "hello" }],
@@ -243,8 +243,8 @@ describe("promptWithModelSuggestionRetry", () => {
       .mockResolvedValueOnce(undefined)
     const client = { session: { prompt: promptMock } }
 
-    // when calling promptWithModelSuggestionRetry
-    await promptWithModelSuggestionRetry(client as any, {
+    // when calling promptWithRetry
+    await promptWithRetry(client as any, {
       path: { id: "session-1" },
       body: {
         agent: "explore",
@@ -271,7 +271,7 @@ describe("promptWithModelSuggestionRetry", () => {
     // when calling promptWithModelSuggestionRetry
     // then should throw the original error
     await expect(
-      promptWithModelSuggestionRetry(client as any, {
+      promptWithRetry(client as any, {
         path: { id: "session-1" },
         body: {
           parts: [{ type: "text", text: "hello" }],
@@ -302,7 +302,7 @@ describe("promptWithModelSuggestionRetry", () => {
     // when calling promptWithModelSuggestionRetry
     // then should throw the retry error (not the original)
     await expect(
-      promptWithModelSuggestionRetry(client as any, {
+      promptWithRetry(client as any, {
         path: { id: "session-1" },
         body: {
           parts: [{ type: "text", text: "hello" }],
@@ -362,8 +362,8 @@ describe("promptWithModelSuggestionRetry", () => {
       .mockResolvedValueOnce(undefined)
     const client = { session: { prompt: promptMock } }
 
-    // when calling promptWithModelSuggestionRetry
-    await promptWithModelSuggestionRetry(client as any, {
+    // when calling promptWithRetry
+    await promptWithRetry(client as any, {
       path: { id: "session-1" },
       body: {
         parts: [{ type: "text", text: "hello" }],
@@ -388,7 +388,7 @@ describe("promptWithModelSuggestionRetry", () => {
     // when calling without model in body
     // then should throw without retrying
     await expect(
-      promptWithModelSuggestionRetry(client as any, {
+      promptWithRetry(client as any, {
         path: { id: "session-1" },
         body: {
           parts: [{ type: "text", text: "hello" }],
