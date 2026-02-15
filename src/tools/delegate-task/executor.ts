@@ -12,10 +12,10 @@ import { resolveMultipleSkillsAsync } from "../../features/opencode-skill-loader
 import { discoverSkills } from "../../features/opencode-skill-loader"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
-import { log, getAgentToolRestrictions, resolveModelPipeline, promptWithModelSuggestionRetry } from "../../shared"
+import { log, getAgentToolRestrictions, resolveModelPipeline, promptWithRetry } from "../../shared"
 import { fetchAvailableModels, isModelAvailable } from "../../shared/model-availability"
 import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
-import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 
 const DEV_JUNIOR_AGENT = "dev-junior"
@@ -305,7 +305,8 @@ export async function executeUnstableAgentTask(
   agentToUse: string,
   categoryModel: { providerID: string; modelID: string; variant?: string } | undefined,
   systemContent: string | undefined,
-  actualModel: string | undefined
+  actualModel: string | undefined,
+  fallbackChain?: any[]
 ): Promise<string> {
   const { manager, client } = executorCtx
 
@@ -322,6 +323,7 @@ export async function executeUnstableAgentTask(
       skills: args.load_skills.length > 0 ? args.load_skills : undefined,
       skillContent: systemContent,
       category: args.category,
+      fallbackChain: fallbackChain,
     })
 
     const timing = getTimingConfig()
@@ -456,7 +458,8 @@ export async function executeBackgroundTask(
   parentContext: ParentContext,
   agentToUse: string,
   categoryModel: { providerID: string; modelID: string; variant?: string } | undefined,
-  systemContent: string | undefined
+  systemContent: string | undefined,
+  fallbackChain?: any[]
 ): Promise<string> {
   const { manager } = executorCtx
 
@@ -473,6 +476,7 @@ export async function executeBackgroundTask(
       skills: args.load_skills.length > 0 ? args.load_skills : undefined,
       skillContent: systemContent,
       category: args.category,
+      fallbackChain: fallbackChain,
     })
 
     // OpenCode TUI's `Task` tool UI calculates toolcalls by looking up
@@ -539,7 +543,8 @@ export async function executeSyncTask(
   agentToUse: string,
   categoryModel: { providerID: string; modelID: string; variant?: string } | undefined,
   systemContent: string | undefined,
-  modelInfo?: ModelFallbackInfo
+  modelInfo?: ModelFallbackInfo,
+  fallbackChain?: any[]
 ): Promise<string> {
   const { client, directory, onSyncSessionCreated } = executorCtx
   const toastManager = getTaskToastManager()
@@ -621,7 +626,7 @@ export async function executeSyncTask(
 
     try {
       const allowTask = isPlanAgent(agentToUse)
-      await promptWithModelSuggestionRetry(client, {
+      await promptWithRetry(client, {
         path: { id: sessionID },
         body: {
           agent: agentToUse,
@@ -635,7 +640,7 @@ export async function executeSyncTask(
           ...(categoryModel ? { model: { providerID: categoryModel.providerID, modelID: categoryModel.modelID } } : {}),
           ...(categoryModel?.variant ? { variant: categoryModel.variant } : {}),
         },
-      })
+      }, fallbackChain)
     } catch (promptError) {
       if (toastManager && taskId !== undefined) {
         toastManager.removeTask(taskId)
@@ -788,6 +793,7 @@ export interface CategoryResolutionResult {
   modelInfo: ModelFallbackInfo | undefined
   actualModel: string | undefined
   isUnstableAgent: boolean
+  fallbackChain?: any[]
   error?: string
 }
 
@@ -911,6 +917,8 @@ export async function resolveCategoryExecution(
     }
   }
 
+  const fallbackChain = requirement?.fallbackChain
+
   if (!categoryModel && actualModel) {
     const parsedModel = parseModelString(actualModel)
     categoryModel = parsedModel ?? undefined
@@ -948,15 +956,17 @@ Available categories: ${categoryNames.join(", ")}`,
     modelInfo,
     actualModel,
     isUnstableAgent,
+    fallbackChain,
   }
 }
+
 
 export async function resolveSubagentExecution(
   args: DelegateTaskArgs,
   executorCtx: ExecutorContext,
   parentAgent: string | undefined,
   categoryExamples: string
-): Promise<{ agentToUse: string; categoryModel: { providerID: string; modelID: string } | undefined; error?: string }> {
+): Promise<{ agentToUse: string; categoryModel: { providerID: string; modelID: string } | undefined; fallbackChain?: any[]; error?: string }> {
   const { client } = executorCtx
 
   if (!args.subagent_type?.trim()) {
@@ -1043,5 +1053,7 @@ Create the work plan directly - that's your job as the planning agent.`,
     // Proceed anyway - session.prompt will fail with clearer error if agent doesn't exist
   }
 
-  return { agentToUse, categoryModel }
+  const fallbackChain = AGENT_MODEL_REQUIREMENTS[agentToUse]?.fallbackChain
+
+  return { agentToUse, categoryModel, fallbackChain }
 }

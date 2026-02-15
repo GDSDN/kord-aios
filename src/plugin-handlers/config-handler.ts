@@ -209,7 +209,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       librarian?: { tools?: Record<string, unknown> };
       vision?: { tools?: Record<string, unknown> };
       builder?: { tools?: Record<string, unknown> };
-      kord?: { tools?: Record<string, unknown> };@de
+      kord?: { tools?: Record<string, unknown> };
     };
     const configAgent = config.agent as AgentConfig | undefined;
 
