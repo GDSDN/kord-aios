@@ -5,7 +5,7 @@ import type {
   LaunchInput,
   ResumeInput,
 } from "./types"
-import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry } from "../../shared"
+import { log, getAgentToolRestrictions, promptWithRetry } from "../../shared"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import { isInsideTmux } from "../../shared/tmux"
@@ -140,6 +140,7 @@ export class BackgroundManager {
       parentAgent: input.parentAgent,
       model: input.model,
       category: input.category,
+      fallbackChain: input.fallbackChain,
     }
 
     this.tasks.set(task.id, task)
@@ -319,7 +320,7 @@ export class BackgroundManager {
       : undefined
     const launchVariant = input.model?.variant
 
-    promptWithModelSuggestionRetry(this.client, {
+    promptWithRetry(this.client, {
       path: { id: sessionID },
       body: {
         agent: input.agent,
