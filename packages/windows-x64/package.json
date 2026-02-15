@@ -1,0 +1,22 @@
+{
+  "name": "kord-aios-windows-x64",
+  "version": "3.3.0",
+  "description": "Platform-specific binary for kord-aios (windows-x64)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GDSDN/kord-aios"
+  },
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "bin"
+  ],
+  "bin": {
+    "kord-aios": "./bin/kord-aios.exe"
+  }
+}

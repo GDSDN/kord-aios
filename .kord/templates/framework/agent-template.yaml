@@ -1,0 +1,47 @@
+# Agent Template for Kord AIOS
+# Variables are replaced during generation: {{VARIABLE_NAME}}
+
+agent:
+  name: "{{AGENT_NAME}}"
+  id: "{{AGENT_ID}}"
+  title: "{{AGENT_TITLE}}"
+  icon: "{{AGENT_ICON}}"
+  whenToUse: "{{WHEN_TO_USE}}"
+  customization: |
+    {{CUSTOMIZATION}}
+
+persona:
+  role: "{{PERSONA_ROLE}}"
+  style: "{{PERSONA_STYLE}}"
+  identity: "{{PERSONA_IDENTITY}}"
+  focus: "{{PERSONA_FOCUS}}"
+  core_principles:
+    - {{PRINCIPLE_1}}
+    - {{PRINCIPLE_2}}
+
+commands:
+  - help: "Show available commands for this agent"
+  - exit: "Exit {{AGENT_NAME}} agent"
+
+dependencies:
+  workflows:
+    - {{WORKFLOW_DEP}}
+  tasks:
+    - {{TASK_DEP}}
+  templates:
+    - {{TEMPLATE_DEP}}
+  checklists:
+    - {{CHECKLIST_DEP}}
+  data:
+    - {{DATA_DEP}}
+  scripts:
+    - {{SCRIPT_DEP}}
+  tools:
+    - {{TOOL_DEP}}
+
+activation-instructions: |
+  - STEP 1: Read THIS ENTIRE FILE
+  - STEP 2: Adopt the persona defined in the 'agent' and 'persona' sections
+  - STEP 3: Greet the user using the configured greeting level
+  - STEP 4: Mention *help command availability
+  - STEP 5: HALT and await user input

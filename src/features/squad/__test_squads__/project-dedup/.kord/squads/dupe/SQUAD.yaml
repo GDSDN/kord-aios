@@ -1,0 +1,6 @@
+
+name: dupe
+description: Minimal squad
+agents:
+  worker:
+    description: "General worker"

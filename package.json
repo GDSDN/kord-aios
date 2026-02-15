@@ -1,0 +1,98 @@
+{
+  "name": "kord-aios",
+  "version": "3.3.0",
+  "description": "Kord AIOS: multi-model orchestration with story-driven development methodology",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "bin": {
+    "kord-aios": "./bin/kord-aios.js"
+  },
+  "files": [
+    "dist",
+    "bin/kord-aios.js",
+    "bin/platform.js",
+    "assets",
+    "postinstall.mjs"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./schema.json": "./assets/kord-opencode.schema.json"
+  },
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi && tsc --emitDeclarationOnly && bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi && bun run build:schema",
+    "build:all": "bun run build && bun run build:binaries",
+    "build:binaries": "bun run script/build-binaries.ts",
+    "build:schema": "bun run script/build-schema.ts",
+    "clean": "rm -rf dist",
+    "postinstall": "node postinstall.mjs",
+    "prepublishOnly": "bun run clean && bun run build",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "sync:aios-layer": "node script/sync-aios-layer.mjs",
+    "migration:status": "node -e \"console.log('See docs/migration/kord-aios-task-board.md')\"",
+    "sync:upstream": "git fetch upstream && git rebase upstream/master",
+    "audit:omoc-drift": "node script/audit-omoc-drift.mjs",
+    "audit:hooks": "node script/audit-hooks.mjs",
+    "validate": "bun run script/validate-wave6.ts"
+  },
+  "keywords": [
+    "opencode",
+    "plugin",
+    "oracle",
+    "librarian",
+    "agents",
+    "ai",
+    "llm"
+  ],
+  "author": "GDSDN + Kord AIOS Contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GDSDN/kord-aios.git"
+  },
+  "bugs": {
+    "url": "https://github.com/GDSDN/kord-aios/issues"
+  },
+  "homepage": "https://github.com/GDSDN/kord-aios#readme",
+  "dependencies": {
+    "@ast-grep/cli": "^0.40.0",
+    "@ast-grep/napi": "^0.40.0",
+    "@clack/prompts": "^0.11.0",
+    "@code-yeongyu/comment-checker": "^0.6.1",
+    "@modelcontextprotocol/sdk": "^1.25.1",
+    "@opencode-ai/plugin": "^1.1.19",
+    "@opencode-ai/sdk": "^1.1.19",
+    "commander": "^14.0.2",
+    "detect-libc": "^2.0.0",
+    "js-yaml": "^4.1.1",
+    "jsonc-parser": "^3.3.1",
+    "picocolors": "^1.1.1",
+    "picomatch": "^4.0.2",
+    "vscode-jsonrpc": "^8.2.0",
+    "zod": "^4.1.8"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/picomatch": "^3.0.2",
+    "bun-types": "1.3.9",
+    "typescript": "^5.7.3"
+  },
+  "optionalDependencies": {
+    "kord-aios-darwin-arm64": "3.3.0",
+    "kord-aios-darwin-x64": "3.3.0",
+    "kord-aios-linux-arm64": "3.3.0",
+    "kord-aios-linux-arm64-musl": "3.3.0",
+    "kord-aios-linux-x64": "3.3.0",
+    "kord-aios-linux-x64-musl": "3.3.0",
+    "kord-aios-windows-x64": "3.3.0"
+  },
+  "trustedDependencies": [
+    "@ast-grep/cli",
+    "@ast-grep/napi",
+    "@code-yeongyu/comment-checker"
+  ]
+}

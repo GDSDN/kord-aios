@@ -1,0 +1,32 @@
+{
+  "generatedAt": "2026-02-07T19:25:18.637Z",
+  "base": "v3.3.0",
+  "totals": {
+    "changed": 9,
+    "engineChanges": 3,
+    "layerChanges": 4
+  },
+  "committedDiff": [],
+  "workingTree": [
+    "package.json",
+    "src/cli/index.ts",
+    "src/cli/run/agent-resolver.ts",
+    "docs/migration/",
+    "layer/",
+    "script/audit-hooks.mjs",
+    "script/audit-omoc-drift.mjs",
+    "script/sync-aios-layer.mjs",
+    "src/cli/init.ts"
+  ],
+  "engineChanges": [
+    "src/cli/index.ts",
+    "src/cli/run/agent-resolver.ts",
+    "src/cli/init.ts"
+  ],
+  "layerChanges": [
+    "docs/migration/",
+    "script/audit-hooks.mjs",
+    "script/audit-omoc-drift.mjs",
+    "script/sync-aios-layer.mjs"
+  ]
+}

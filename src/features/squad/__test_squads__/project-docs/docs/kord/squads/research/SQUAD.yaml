@@ -1,0 +1,6 @@
+
+name: research
+description: Minimal squad
+agents:
+  worker:
+    description: "General worker"

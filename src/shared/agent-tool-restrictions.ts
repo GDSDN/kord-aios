@@ -1,0 +1,57 @@
+/**
+ * Agent tool restrictions for session.prompt calls.
+ * OpenCode SDK's session.prompt `tools` parameter expects boolean values.
+ * true = tool allowed, false = tool denied.
+ */
+
+const EXPLORATION_AGENT_DENYLIST: Record<string, boolean> = {
+  write: false,
+  edit: false,
+  task: false,
+  call_kord_agent: false,
+}
+
+const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
+  explore: EXPLORATION_AGENT_DENYLIST,
+
+  librarian: EXPLORATION_AGENT_DENYLIST,
+
+  architect: {
+    write: false,
+    edit: false,
+    task: false,
+    call_kord_agent: false,
+  },
+
+  analyst: {
+    write: false,
+    edit: false,
+    task: false,
+  },
+
+  qa: {
+    write: false,
+    edit: false,
+    task: false,
+  },
+
+  "vision": {
+    read: true,
+  },
+
+  "dev-junior": {
+    task: false,
+  },
+}
+
+export function getAgentToolRestrictions(agentName: string): Record<string, boolean> {
+  return AGENT_RESTRICTIONS[agentName]
+    ?? Object.entries(AGENT_RESTRICTIONS).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
+    ?? {}
+}
+
+export function hasAgentToolRestrictions(agentName: string): boolean {
+  const restrictions = AGENT_RESTRICTIONS[agentName]
+    ?? Object.entries(AGENT_RESTRICTIONS).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
+  return restrictions !== undefined && Object.keys(restrictions).length > 0
+}

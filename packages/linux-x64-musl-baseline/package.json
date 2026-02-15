@@ -1,0 +1,25 @@
+{
+  "name": "kord-aios-linux-x64-musl-baseline",
+  "version": "3.1.1",
+  "description": "Platform-specific binary for kord-aios (linux-x64-musl-baseline, no AVX2)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GDSDN/kord-aios"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "libc": [
+    "musl"
+  ],
+  "files": [
+    "bin"
+  ],
+  "bin": {
+    "kord-aios": "./bin/kord-aios"
+  }
+}

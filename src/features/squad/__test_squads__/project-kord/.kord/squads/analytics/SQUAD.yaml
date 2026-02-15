@@ -1,0 +1,6 @@
+
+name: analytics
+description: Minimal squad
+agents:
+  worker:
+    description: "General worker"

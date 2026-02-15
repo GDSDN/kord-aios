@@ -1,0 +1,26 @@
+{
+  "name": "kord-scripts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone computation scripts for Kord",
+  "type": "commonjs",
+  "scripts": {
+    "code-quality-improver": "node code-quality-improver.js --help",
+    "refactoring-suggester": "node refactoring-suggester.js --help",
+    "performance-analyzer": "node performance-analyzer.js --help",
+    "test-generator": "node test-generator.js --help",
+    "pattern-learner": "node pattern-learner.js --help"
+  },
+  "dependencies": {
+    "@babel/generator": "^7.26.0",
+    "@babel/parser": "^7.26.0",
+    "@babel/traverse": "^7.26.0",
+    "@babel/types": "^7.26.0",
+    "@jest/globals": "^29.7.0",
+    "chalk": "^5.3.0",
+    "eslint": "^8.57.0",
+    "js-yaml": "^4.1.0",
+    "jscodeshift": "^0.14.0",
+    "prettier": "^3.3.3"
+  }
+}

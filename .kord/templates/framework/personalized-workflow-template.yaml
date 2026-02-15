@@ -1,0 +1,37 @@
+workflow:
+  name: "{{workflow_name}}"
+  id: "{{workflow_id}}"
+  description: "{{description}}"
+  version: "{{version}}"
+
+  agents:
+    - id: "{{agent_id}}"
+      name: "{{agent_name}}"
+      role: "{{agent_role}}"
+      archetype: "{{archetype}}"
+
+  steps:
+    - step: 1
+      name: "{{step_name}}"
+      agent: "{{agent_id}}"
+      task: "{{task_name}}"
+      parameters:
+        {{param_name}}: "{{param_value}}"
+      validation:
+        - criterion: "{{criterion}}"
+          required: true
+
+output_template:
+  format: markdown
+  structure: |
+    ## Workflow Execution Report
+
+    **Workflow:** {{workflow_name}}
+    **Started:** {{started_at}}
+    **Completed:** {{completed_at}}
+
+    ### Metrics
+    - Duration: {{duration}}
+    - Tokens: {{tokens_used}}
+
+    {{signature_closing}}

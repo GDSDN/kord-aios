@@ -1,0 +1,25 @@
+{
+  "name": "kord-aios-linux-arm64",
+  "version": "3.3.0",
+  "description": "Platform-specific binary for kord-aios (linux-arm64)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GDSDN/kord-aios"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "files": [
+    "bin"
+  ],
+  "bin": {
+    "kord-aios": "./bin/kord-aios"
+  }
+}

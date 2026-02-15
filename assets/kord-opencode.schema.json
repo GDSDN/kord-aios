@@ -1,0 +1,6 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/GDSDN/kord-aios/master/assets/kord-opencode.schema.json",
+  "title": "Kord AIOS Configuration",
+  "description": "Configuration schema for kord-opencode plugin"
+}

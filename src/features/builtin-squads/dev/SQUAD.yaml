@@ -1,0 +1,33 @@
+name: dev
+description: Software development team — the default squad for code-related work
+version: 1.0.0
+
+agents:
+  dev-junior:
+    description: "Implementation specialist — writes code, tests, and fixes bugs"
+    mode: subagent
+    skills:
+      - git-master
+      - frontend-ui-ux
+
+categories:
+  quick:
+    description: "Fast fixes, small changes, one-file edits"
+  visual:
+    description: "UI/UX work, styling, layout, responsive design"
+  ultrabrain:
+    description: "Complex logic, algorithms, architecture, multi-file refactors"
+  artistry:
+    description: "Creative coding, animations, data visualization"
+
+default_executor: dev-junior
+contract_type: story
+
+plan_template: |
+  # Plan: {title}
+  Squad: dev
+  Contract Type: story
+
+  ## Tasks
+
+  - [ ] **Task 1** (executor: @dev-junior, verify: tests)
