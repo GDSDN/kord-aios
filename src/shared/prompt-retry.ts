@@ -25,16 +25,95 @@ function extractMessage(error: unknown): string {
   return String(error)
 }
 
+function hasStructuredQuotaSignal(error: unknown, seen = new Set<unknown>()): boolean {
+  if (error == null) return false
+
+  if (typeof error === "number") {
+    return error === 429 || error === 402
+  }
+
+  if (typeof error === "string") {
+    const value = error.toLowerCase()
+    return (
+      value === "429" ||
+      value === "402" ||
+      value.includes("rate_limit") ||
+      value.includes("ratelimit") ||
+      value.includes("insufficient_quota") ||
+      value.includes("insufficient_credits")
+    )
+  }
+
+  if (typeof error !== "object") {
+    return false
+  }
+
+  if (seen.has(error)) {
+    return false
+  }
+  seen.add(error)
+
+  const obj = error as Record<string, unknown>
+
+  const numericCandidates = [obj.status, obj.statusCode, obj.httpStatusCode]
+  for (const candidate of numericCandidates) {
+    if (typeof candidate === "number" && (candidate === 429 || candidate === 402)) {
+      return true
+    }
+    if (typeof candidate === "string" && (candidate.trim() === "429" || candidate.trim() === "402")) {
+      return true
+    }
+  }
+
+  const codeCandidates = [obj.code, obj.type, obj.errorCode, obj.reason, obj.name]
+  for (const candidate of codeCandidates) {
+    if (typeof candidate === "string") {
+      const normalized = candidate.toLowerCase()
+      if (
+        normalized.includes("rate_limit") ||
+        normalized.includes("too_many_requests") ||
+        normalized.includes("ratelimit") ||
+        normalized.includes("insufficient_quota") ||
+        normalized.includes("insufficient_credits") ||
+        normalized.includes("quota_exceeded")
+      ) {
+        return true
+      }
+    }
+  }
+
+  for (const value of Object.values(obj)) {
+    if (hasStructuredQuotaSignal(value, seen)) {
+      return true
+    }
+  }
+
+  return false
+}
+
 function isQuotaError(error: unknown): boolean {
   const msg = extractMessage(error).toLowerCase()
-  return (
+  return hasStructuredQuotaSignal(error) || (
     msg.includes("rate limit") ||
+    msg.includes("rate-limited") ||
+    msg.includes("too many requests") ||
+    msg.includes("resource exhausted") ||
     msg.includes("quota exceeded") ||
     msg.includes("insufficient quota") ||
+    msg.includes("quota") ||
     msg.includes("429") ||
     msg.includes("capacity") ||
     msg.includes("overloaded")
   )
+}
+
+function isTimeoutError(error: unknown): boolean {
+  const msg = extractMessage(error).toLowerCase()
+  return msg.includes("timed out") || msg.includes("timeout")
+}
+
+function isRetryableModelError(error: unknown): boolean {
+  return isQuotaError(error) || isTimeoutError(error)
 }
 
 export function parseModelSuggestion(error: unknown): ModelSuggestionInfo | null {
@@ -84,6 +163,7 @@ export function parseModelSuggestion(error: unknown): ModelSuggestionInfo | null
 
 interface PromptBody {
   model?: { providerID: string; modelID: string; variant?: string }
+  variant?: string
   [key: string]: unknown
 }
 
@@ -98,8 +178,10 @@ export async function promptWithRetry(
   args: PromptArgs,
   fallbackChain?: FallbackEntry[]
 ): Promise<void> {
-  const currentModel = args.body.model 
-    ? `${args.body.model.providerID}/${args.body.model.modelID}`
+  const currentProviderID = args.body.model?.providerID
+  const currentModelID = args.body.model?.modelID
+  const currentModel = currentProviderID && currentModelID
+    ? `${currentProviderID}/${currentModelID}`
     : "unknown/default"
 
   try {
@@ -120,33 +202,59 @@ export async function promptWithRetry(
           model: {
             providerID: suggestion.providerID,
             modelID: suggestion.suggestion,
-            // Preserve variant if it existed
-            ...(args.body.model?.variant ? { variant: args.body.model.variant } : {}),
           },
         },
       } as Parameters<typeof client.session.prompt>[0])
       return
     }
 
-    // 2. Handle Quota/Rate Limit Errors
-    if (isQuotaError(error) && fallbackChain && fallbackChain.length > 0) {
-      log("[prompt-retry] Quota/Rate limit error detected", { model: currentModel, error: extractMessage(error) })
-
-      // Filter out the current model to avoid infinite loop on same model
-      // (Though usually currentModel comes from outside the chain or is the first one)
-      const candidates = fallbackChain.filter(entry => {
-        // Construct full model strings to compare
-        const entryModels = entry.providers.map(p => `${p}/${entry.model}`)
-        return !entryModels.includes(currentModel)
+    // 2. Handle Retryable Errors (quota/rate-limit/timeout)
+    if (isRetryableModelError(error) && fallbackChain && fallbackChain.length > 0) {
+      const retryReason = isTimeoutError(error) ? "timeout" : "quota"
+      log("[prompt-retry] Retryable model error detected", {
+        model: currentModel,
+        error: extractMessage(error),
+        reason: retryReason,
       })
 
-      for (const entry of candidates) {
+      const sessionID = args.path?.id
+      const abortSession = async (stage: string): Promise<void> => {
+        if (!sessionID || typeof client.session.abort !== "function") return
+        try {
+          await client.session.abort({ path: { id: sessionID } })
+          log("[prompt-retry] Aborted session before fallback", { sessionID, stage })
+        } catch (abortError) {
+          log("[prompt-retry] Failed to abort session before fallback", {
+            sessionID,
+            stage,
+            error: extractMessage(abortError),
+          })
+        }
+      }
+
+      await abortSession("initial")
+
+      const attemptedFallbacks = new Set<string>()
+
+      for (const entry of fallbackChain) {
         // Try each provider for this fallback entry
         for (const provider of entry.providers) {
+          // Skip only the exact currently-failed provider/model pair.
+          if (currentProviderID === provider && currentModelID === entry.model) {
+            continue
+          }
+
           const fallbackModelStr = `${provider}/${entry.model}`
+
+          if (attemptedFallbacks.has(fallbackModelStr)) {
+            continue
+          }
+          attemptedFallbacks.add(fallbackModelStr)
+
           log("[prompt-retry] Attempting fallback", { fallbackModel: fallbackModelStr })
 
           try {
+            const variantToUse = entry.variant ?? args.body.variant
             await client.session.prompt({
               ...args,
               body: {
@@ -154,19 +262,18 @@ export async function promptWithRetry(
                 model: {
                   providerID: provider,
                   modelID: entry.model,
-                  ...(entry.variant ? { variant: entry.variant } : {}),
                 },
+                ...(variantToUse ? { variant: variantToUse } : {}),
               },
             } as Parameters<typeof client.session.prompt>[0])
-            
             log("[prompt-retry] Fallback successful", { model: fallbackModelStr })
             return // Success! Exit function
           } catch (fallbackError) {
-            log("[prompt-retry] Fallback failed", { 
-              model: fallbackModelStr, 
-              error: extractMessage(fallbackError) 
+            log("[prompt-retry] Fallback failed", {
+              model: fallbackModelStr,
+              error: extractMessage(fallbackError)
             })
-            // Continue to next provider/candidate
+            await abortSession("fallback")
           }
         }
       }

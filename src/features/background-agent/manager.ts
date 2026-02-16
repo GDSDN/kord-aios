@@ -335,7 +335,7 @@ export class BackgroundManager {
         },
         parts: [{ type: "text", text: input.prompt }],
       },
-    }).catch((error) => {
+    }, input.fallbackChain).catch((error) => {
       log("[background-agent] promptAsync error:", error)
       const existingTask = this.findBySession(sessionID)
       if (existingTask) {
@@ -580,7 +580,7 @@ export class BackgroundManager {
       : undefined
     const resumeVariant = existingTask.model?.variant
 
-    this.client.session.prompt({
+    promptWithRetry(this.client, {
       path: { id: existingTask.sessionID },
       body: {
         agent: existingTask.agent,
@@ -594,7 +594,7 @@ export class BackgroundManager {
         },
         parts: [{ type: "text", text: input.prompt }],
       },
-    }).catch((error) => {
+    }, existingTask.fallbackChain).catch((error) => {
       log("[background-agent] resume prompt error:", error)
       existingTask.status = "error"
       const errorMessage = error instanceof Error ? error.message : String(error)

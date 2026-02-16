@@ -20,6 +20,17 @@ import { storeToolMetadata } from "../../features/tool-metadata-store"
 
 const DEV_JUNIOR_AGENT = "dev-junior"
 
+function resolveAgentFallbackChain(agentName: string): { providers: string[]; model: string; variant?: string }[] | undefined {
+  const direct = AGENT_MODEL_REQUIREMENTS[agentName]?.fallbackChain
+  if (direct) {
+    return direct
+  }
+
+  const normalized = agentName.toLowerCase()
+  const matched = Object.entries(AGENT_MODEL_REQUIREMENTS).find(([name]) => name.toLowerCase() === normalized)
+  return matched?.[1]?.fallbackChain
+}
+
 export interface ExecutorContext {
   manager: BackgroundManager
   client: OpencodeClient
@@ -1053,7 +1064,7 @@ Create the work plan directly - that's your job as the planning agent.`,
     // Proceed anyway - session.prompt will fail with clearer error if agent doesn't exist
   }
 
-  const fallbackChain = AGENT_MODEL_REQUIREMENTS[agentToUse]?.fallbackChain
+  const fallbackChain = resolveAgentFallbackChain(agentToUse)
 
   return { agentToUse, categoryModel, fallbackChain }
 }

@@ -2907,6 +2907,72 @@ describe("kord-task", () => {
       // then - no model should be passed to session.prompt
       expect(promptBody.model).toBeUndefined()
     }, { timeout: 20000 })
+
+    test("case-insensitive subagent fallback chain should retry on quota errors", async () => {
+      // given - registered agent name casing differs from AGENT_MODEL_REQUIREMENTS key
+      const { createDelegateTask } = require("./tools")
+      let promptCalls = 0
+      let secondPromptBody: any
+
+      const mockManager = { launch: async () => ({}) }
+
+      const mockClient = {
+        app: {
+          agents: async () => ({
+            data: [
+              { name: "Architect", mode: "subagent", model: { providerID: "openai", modelID: "gpt-5.2" } },
+            ],
+          }),
+        },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_architect_retry" } }),
+          prompt: async (input: any) => {
+            promptCalls += 1
+            if (promptCalls === 1) {
+              throw new Error("429 rate limit exceeded")
+            }
+            secondPromptBody = input.body
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Retry success" }] }],
+          }),
+          status: async () => ({ data: { "ses_architect_retry": { type: "idle" } } }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "kord",
+        abort: new AbortController().signal,
+      }
+
+      // when
+      const result = await tool.execute(
+        {
+          description: "Retry architect",
+          prompt: "Review architecture with fallback",
+          subagent_type: "architect",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      // then
+      expect(promptCalls).toBe(2)
+      expect(secondPromptBody.model.providerID).toBe("github-copilot")
+      expect(secondPromptBody.model.modelID).toBe("gpt-5.2")
+      expect(result).toContain("Task completed")
+    }, { timeout: 20000 })
   })
 
   describe("plan subagent task permission", () => {

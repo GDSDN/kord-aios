@@ -1,3 +1,5 @@
+import type { FallbackEntry } from "../../shared/model-requirements"
+
 export type BackgroundTaskStatus =
   | "pending"
   | "running"
@@ -40,6 +42,8 @@ export interface BackgroundTask {
   isUnstableAgent?: boolean
   /** Category used for this task (e.g., 'quick', 'visual-engineering') */
   category?: string
+  /** Candidate models to try when quota/rate-limit errors occur */
+  fallbackChain?: FallbackEntry[]
 
   /** Last message count for stability detection */
   lastMsgCount?: number
@@ -60,6 +64,7 @@ export interface LaunchInput {
   skills?: string[]
   skillContent?: string
   category?: string
+  fallbackChain?: FallbackEntry[]
 }
 
 export interface ResumeInput {
