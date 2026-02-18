@@ -16,6 +16,8 @@
  * - Explicit decision criteria needed (model won't infer)
  */
 
+import { SKILLS_PROTOCOL_SECTION } from "../prompt-snippets"
+
 export function buildGptKordJuniorPrompt(
   useTaskSystem: boolean,
   promptAppend?: string
@@ -111,10 +113,12 @@ Task NOT complete without evidence:
 - Match user's communication style.
 - Dense > verbose.
 - Use structured output (bullets, tables) over prose.
-</style_spec>`
+ </style_spec>`
 
-  if (!promptAppend) return prompt
-  return prompt + "\n\n" + promptAppend
+  const promptWithSkills = prompt + SKILLS_PROTOCOL_SECTION
+
+  if (!promptAppend) return promptWithSkills
+  return promptWithSkills + "\n\n" + promptAppend
 }
 
 function buildGptTaskDisciplineSection(useTaskSystem: boolean): string {

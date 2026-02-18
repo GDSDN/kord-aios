@@ -7,6 +7,8 @@
  * - Extended reasoning context for complex tasks
  */
 
+import { SKILLS_PROTOCOL_SECTION } from "../prompt-snippets"
+
 export function buildDefaultKordJuniorPrompt(
   useTaskSystem: boolean,
   promptAppend?: string
@@ -55,10 +57,12 @@ Task NOT complete without:
 - Start immediately. No acknowledgments.
 - Match user's communication style.
 - Dense > verbose.
-</Style>`
+ </Style>`
 
-  if (!promptAppend) return prompt
-  return prompt + "\n\n" + promptAppend
+  const promptWithSkills = prompt + SKILLS_PROTOCOL_SECTION
+
+  if (!promptAppend) return promptWithSkills
+  return promptWithSkills + "\n\n" + promptAppend
 }
 
 function buildTodoDisciplineSection(useTaskSystem: boolean): string {
