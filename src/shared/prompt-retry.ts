@@ -4,6 +4,8 @@ import type { FallbackEntry } from "./model-requirements"
 
 type Client = ReturnType<typeof createOpencodeClient>
 
+type SDKResult<T> = T & { error?: unknown }
+
 export interface ModelSuggestionInfo {
   providerID: string
   modelID: string
@@ -162,7 +164,12 @@ export function parseModelSuggestion(error: unknown): ModelSuggestionInfo | null
 }
 
 interface PromptBody {
-  model?: { providerID: string; modelID: string; variant?: string }
+  parts: Array<unknown>
+  agent?: string
+  noReply?: boolean
+  system?: string
+  tools?: Record<string, boolean>
+  model?: { providerID: string; modelID: string }
   variant?: string
   [key: string]: unknown
 }
@@ -185,7 +192,12 @@ export async function promptWithRetry(
     : "unknown/default"
 
   try {
-    await client.session.prompt(args as Parameters<typeof client.session.prompt>[0])
+    const result = (await client.session.prompt(
+      args as Parameters<typeof client.session.prompt>[0]
+    )) as SDKResult<unknown>
+    if (result && typeof result === "object" && "error" in result && result.error) {
+      throw result.error
+    }
   } catch (error) {
     // 1. Handle Model Not Found (Suggestion)
     const suggestion = parseModelSuggestion(error)
@@ -195,7 +207,7 @@ export async function promptWithRetry(
         suggested: suggestion.suggestion,
       })
 
-      await client.session.prompt({
+      const suggestedResult = (await client.session.prompt({
         ...args,
         body: {
           ...args.body,
@@ -204,7 +216,15 @@ export async function promptWithRetry(
             modelID: suggestion.suggestion,
           },
         },
-      } as Parameters<typeof client.session.prompt>[0])
+      } as Parameters<typeof client.session.prompt>[0])) as SDKResult<unknown>
+      if (
+        suggestedResult &&
+        typeof suggestedResult === "object" &&
+        "error" in suggestedResult &&
+        suggestedResult.error
+      ) {
+        throw suggestedResult.error
+      }
       return
     }
 
@@ -255,7 +275,7 @@ export async function promptWithRetry(
 
           try {
             const variantToUse = entry.variant ?? args.body.variant
-            await client.session.prompt({
+            const fallbackResult = (await client.session.prompt({
               ...args,
               body: {
                 ...args.body,
@@ -265,7 +285,15 @@ export async function promptWithRetry(
                 },
                 ...(variantToUse ? { variant: variantToUse } : {}),
               },
-            } as Parameters<typeof client.session.prompt>[0])
+            } as Parameters<typeof client.session.prompt>[0])) as SDKResult<unknown>
+            if (
+              fallbackResult &&
+              typeof fallbackResult === "object" &&
+              "error" in fallbackResult &&
+              fallbackResult.error
+            ) {
+              throw fallbackResult.error
+            }
             log("[prompt-retry] Fallback successful", { model: fallbackModelStr })
             return // Success! Exit function
           } catch (fallbackError) {
@@ -283,5 +311,61 @@ export async function promptWithRetry(
     // If no handling matched or all fallbacks failed, rethrow original error
     throw error
   }
+}
+
+export interface CreateSessionArgs {
+  body: Record<string, unknown>
+  query?: Record<string, unknown>
+}
+
+export async function createSessionWithRetry(
+  client: Client,
+  args: CreateSessionArgs,
+  options?: { maxAttempts?: number; baseDelayMs?: number; maxDelayMs?: number }
+): Promise<{ id: string }>{
+  const maxAttempts = options?.maxAttempts ?? 3
+  const baseDelayMs = options?.baseDelayMs ?? 750
+  const maxDelayMs = options?.maxDelayMs ?? 8000
+
+  let lastError: unknown
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const result = (await client.session.create({
+        body: args.body,
+        ...(args.query ? { query: args.query } : {}),
+      } as Parameters<typeof client.session.create>[0])) as SDKResult<{
+        data?: { id?: string }
+      }>
+
+      if (result && typeof result === "object" && "error" in result && result.error) {
+        throw result.error
+      }
+
+      const id = (result as unknown as { data?: { id?: string } })?.data?.id
+      if (!id) {
+        throw new Error("Failed to create session: API returned no session ID")
+      }
+
+      return { id }
+    } catch (error) {
+      lastError = error
+      const retryable = isRetryableModelError(error)
+      if (!retryable || attempt === maxAttempts - 1) {
+        throw error
+      }
+
+      const delay = Math.min(baseDelayMs * Math.pow(2, attempt), maxDelayMs)
+      log("[prompt-retry] createSession retryable error", {
+        attempt: attempt + 1,
+        maxAttempts,
+        delayMs: delay,
+        error: extractMessage(error),
+      })
+      await new Promise((r) => setTimeout(r, delay))
+    }
+  }
+
+  // Should be unreachable.
+  throw lastError instanceof Error ? lastError : new Error(extractMessage(lastError))
 }
 
