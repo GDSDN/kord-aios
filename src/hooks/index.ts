@@ -42,4 +42,5 @@ export { createWriteExistingFileGuardHook } from "./write-existing-file-guard";
 export { createAgentAuthorityHook } from "./agent-authority";
 export { createStoryLifecycleHook } from "./story-lifecycle";
 export { createQualityGateHook } from "./quality-gate";
+export { createAutoQaGateHook } from "./auto-qa-gate";
 export { createDecisionLoggerHook } from "./decision-logger";

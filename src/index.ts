@@ -36,6 +36,7 @@ import {
   createAgentAuthorityHook,
   createStoryLifecycleHook,
   createQualityGateHook,
+  createAutoQaGateHook,
   createDecisionLoggerHook,
   createStopContinuationGuardHook,
   createCompactionContextInjector,
@@ -309,6 +310,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     : null;
   const qualityGate = isHookEnabled("quality-gate")
     ? createQualityGateHook(ctx, pluginConfig.quality_gate?.max_iterations)
+    : null;
+  const autoQaGate = isHookEnabled("auto-qa-gate")
+    ? createAutoQaGateHook(ctx, pluginConfig.experimental?.auto_qa_gate)
     : null;
   const decisionLogger = isHookEnabled("decision-logger")
     ? createDecisionLoggerHook(ctx, pluginConfig.decision_logger)

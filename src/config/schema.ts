@@ -127,6 +127,7 @@ export const HookNameSchema = z.enum([
   "agent-authority",
   "story-lifecycle",
   "quality-gate",
+  "auto-qa-gate",
   "decision-logger",
   "anthropic-effort",
 ])
@@ -314,6 +315,17 @@ export const ExperimentalConfigSchema = z.object({
   dynamic_context_pruning: DynamicContextPruningConfigSchema.optional(),
   /** Enable experimental task system for Todowrite disabler hook */
   task_system: z.boolean().optional(),
+
+  /**
+   * Optional auto QA gate after `task()` when relevant files changed.
+   * Disabled by default to avoid extra runtime cost.
+   */
+  auto_qa_gate: z.object({
+    enabled: z.boolean().default(false),
+    path_prefixes: z.array(z.string()).default(["src/", "assets/"]),
+    commands: z.array(z.string()).default(["bun test", "bun run typecheck", "bun run build"]),
+    max_output_chars: z.number().min(200).max(20000).default(4000),
+  }).optional(),
 })
 
 export const SkillSourceSchema = z.union([
