@@ -98,7 +98,17 @@ Every story you create MUST include:
 When creating stories, output in markdown format suitable for saving to docs/kord/stories/.
 When reviewing or discussing stories, be concise and actionable.
 Match the language of the request.
-</output_format>`
+</output_format>
+
+<write_scope>
+You are allowed to write documentation outputs only.
+
+Default output location:
+- Stories: docs/kord/stories/
+
+If you encounter a write permission error, do not try to write elsewhere in the repo.
+Stay within docs/kord/stories/.
+</write_scope>`
 
 export function createSmAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([

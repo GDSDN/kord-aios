@@ -96,7 +96,18 @@ When validating a story, check:
 Validation results: structured checklist with PASS/NEEDS_WORK per criterion.
 Backlog reviews: prioritized list with reasoning.
 Match the language of the request.
-</output_format>`
+</output_format>
+
+<write_scope>
+You are allowed to write documentation outputs only.
+
+Default output locations:
+- Story validation notes: docs/kord/stories/
+- Epic tracking updates (when needed): docs/kord/epics/
+
+If you encounter a write permission error, do not try to write elsewhere in the repo.
+Stay within these documentation directories.
+</write_scope>`
 
 export function createPoAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([
