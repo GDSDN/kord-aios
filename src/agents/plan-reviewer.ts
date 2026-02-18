@@ -2,6 +2,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { isGptModel } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 
 const MODE: AgentMode = "subagent"
 
@@ -196,7 +197,7 @@ export function createPlanReviewerAgent(model: string): AgentConfig {
     model,
     temperature: 0.1,
     ...restrictions,
-    prompt: PLAN_REVIEWER_SYSTEM_PROMPT,
+    prompt: PLAN_REVIEWER_SYSTEM_PROMPT + SKILLS_PROTOCOL_SECTION,
   } as AgentConfig
 
   if (isGptModel(model)) {

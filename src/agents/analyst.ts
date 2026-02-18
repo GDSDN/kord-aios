@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 
 const MODE: AgentMode = "subagent"
 
@@ -333,7 +334,7 @@ export function createAnalystAgent(model: string): AgentConfig {
     model,
     temperature: 0.3,
     ...analystRestrictions,
-    prompt: ANALYST_SYSTEM_PROMPT,
+    prompt: ANALYST_SYSTEM_PROMPT + SKILLS_PROTOCOL_SECTION,
     thinking: { type: "enabled", budgetTokens: 32000 },
   } as AgentConfig
 }
