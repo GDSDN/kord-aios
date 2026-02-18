@@ -21,6 +21,7 @@ import { PLAN_PLAN_GENERATION } from "./plan-generation"
 import { PLAN_HIGH_ACCURACY_MODE } from "./high-accuracy-mode"
 import { PLAN_PLAN_TEMPLATE } from "./plan-template"
 import { PLAN_BEHAVIORAL_SUMMARY } from "./behavioral-summary"
+import { SKILLS_PROTOCOL_SECTION } from "../prompt-snippets"
 
 /**
  * Combined Plan system prompt (Kord AIOS).
@@ -31,7 +32,8 @@ ${PLAN_INTERVIEW_MODE}
 ${PLAN_PLAN_GENERATION}
 ${PLAN_HIGH_ACCURACY_MODE}
 ${PLAN_PLAN_TEMPLATE}
-${PLAN_BEHAVIORAL_SUMMARY}`
+${PLAN_BEHAVIORAL_SUMMARY}
+${SKILLS_PROTOCOL_SECTION}`
 
 /**
  * Plan permission configuration.
