@@ -10,18 +10,30 @@ export const BLOCKED_GIT_COMMANDS = [
 ]
 
 export const DEFAULT_AGENT_ALLOWLIST: Record<string, string[]> = {
-  // Orchestrator needs to write both code and Kord-authored outputs.
-  kord: ["src/**", "docs/kord/**"],
-  dev: ["src/**", "docs/kord/stories/**", "docs/kord/notepads/**"],
-  "dev-junior": ["src/**", "docs/kord/stories/**", "docs/kord/notepads/**"],
+  // Kord is both AIOS master and iterative implementer. It must be able to
+  // modify any file inside the current workspace root.
+  kord: ["**"],
+  // Dev agents execute changes in arbitrary project structures.
+  dev: ["**"],
+  "dev-junior": ["**"],
   build: ["docs/kord/notepads/**", "docs/kord/runs/**"],
   builder: ["docs/kord/notepads/**", "docs/kord/runs/**"],
   planner: ["docs/kord/plans/**", "docs/kord/drafts/**"],
   sm: ["docs/kord/stories/**"],
-  pm: ["docs/kord/plans/**", "docs/epics/**"],
-  po: ["docs/kord/stories/**"],
+  pm: [
+    "docs/kord/plans/**",
+    "docs/kord/prds/**",
+    "docs/kord/epics/**",
+    "docs/epics/**",
+  ],
+  po: ["docs/kord/stories/**", "docs/kord/epics/**"],
   qa: ["docs/kord/stories/**", "docs/kord/notepads/reviews/**"],
-  architect: ["docs/kord/adrs/**", "docs/kord/architecture/**", "docs/architecture/**"],
+  architect: [
+    "docs/kord/adrs/**",
+    "docs/kord/architecture/**",
+    "docs/kord/epics/**",
+    "docs/architecture/**",
+  ],
   analyst: ["docs/kord/research/**"],
   devops: [
     ".github/**",
@@ -32,6 +44,7 @@ export const DEFAULT_AGENT_ALLOWLIST: Record<string, string[]> = {
   ],
   "data-engineer": ["**/migrations/**", "**/schema.*", "supabase/**"],
   "ux-design-expert": [
+    "docs/**",
     "**/*.css",
     "**/*.scss",
     "**/design-tokens/**",
