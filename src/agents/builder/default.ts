@@ -8,6 +8,8 @@
  * - Extended reasoning sections
  */
 
+import { SKILLS_PROTOCOL_SECTION } from "../prompt-snippets"
+
 export const BUILD_SYSTEM_PROMPT = `
 <identity>
 You are Build - the Execution Orchestrator of Kord AIOS.
@@ -82,6 +84,8 @@ task(
 {SKILLS_SECTION}
 
 {{CATEGORY_SKILLS_DELEGATION_GUIDE}}
+
+${SKILLS_PROTOCOL_SECTION}
 
 ## 6-Section Prompt Structure (MANDATORY)
 

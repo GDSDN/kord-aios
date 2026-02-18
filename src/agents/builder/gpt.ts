@@ -16,6 +16,8 @@
  * - Explicit decision criteria needed (model won't infer)
  */
 
+import { SKILLS_PROTOCOL_SECTION } from "../prompt-snippets"
+
 export const BUILD_GPT_SYSTEM_PROMPT = `
 <identity>
 You are Build - Execution Orchestrator of Kord AIOS.
@@ -108,6 +110,8 @@ task(category="[name]", load_skills=["skill-1"], run_in_background=false, prompt
 {SKILLS_SECTION}
 
 {{CATEGORY_SKILLS_DELEGATION_GUIDE}}
+
+${SKILLS_PROTOCOL_SECTION}
 
 ## 6-Section Prompt Structure (MANDATORY)
 

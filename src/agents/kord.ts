@@ -22,6 +22,7 @@ import {
   buildAntiPatternsSection,
   categorizeTools,
 } from "./dynamic-agent-prompt-builder"
+import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 
 function buildTaskManagementSection(useTaskSystem: boolean): string {
   if (useTaskSystem) {
@@ -591,6 +592,8 @@ export function createKordAgent(
     ? buildDynamicKordPrompt(availableAgents, tools, skills, categories, useTaskSystem)
     : buildDynamicKordPrompt([], tools, skills, categories, useTaskSystem)
 
+  const promptWithSkills = prompt + SKILLS_PROTOCOL_SECTION
+
   const permission = { question: "allow", call_kord_agent: "deny" } as AgentConfig["permission"]
   const base = {
     description:
@@ -598,7 +601,7 @@ export function createKordAgent(
     mode: MODE,
     model,
     maxTokens: 64000,
-    prompt,
+    prompt: promptWithSkills,
     color: "#00CED1",
     permission,
   }
