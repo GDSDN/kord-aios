@@ -1538,6 +1538,36 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       expect(updatedTask?.sessionID).toBeTruthy()
     })
 
+    test("should transition pending→error when startTask fails", async () => {
+      // given
+      const config = { defaultConcurrency: 5 }
+      manager.shutdown()
+      manager = new BackgroundManager({ client: mockClient, directory: tmpdir() } as unknown as PluginInput, config)
+
+      // Make session creation fail (non-retryable)
+      ;(mockClient.session as unknown as { create: () => Promise<unknown> }).create = async () => ({
+        error: { statusCode: 400, message: "bad request" },
+      })
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "parent-session",
+        parentMessageID: "parent-message",
+      }
+
+      // when
+      const task = await manager.launch(input)
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      // then
+      const updatedTask = manager.getTask(task.id)
+      expect(updatedTask?.status).toBe("error")
+      expect(updatedTask?.completedAt).toBeInstanceOf(Date)
+      expect(updatedTask?.sessionID).toBeUndefined()
+    })
+
     test("should set startedAt when transitioning to running", async () => {
       // given
       const config = { defaultConcurrency: 5 }

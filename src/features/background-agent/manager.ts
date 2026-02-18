@@ -5,7 +5,7 @@ import type {
   LaunchInput,
   ResumeInput,
 } from "./types"
-import { log, getAgentToolRestrictions, promptWithRetry } from "../../shared"
+import { log, getAgentToolRestrictions, promptWithRetry, createSessionWithRetry } from "../../shared"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import { isInsideTmux } from "../../shared/tmux"
@@ -202,6 +202,19 @@ export class BackgroundManager {
           await this.startTask(item)
         } catch (error) {
           log("[background-agent] Error starting task:", error)
+
+          // Ensure the task doesn't remain pending forever.
+          if (item.task.status === "pending") {
+            item.task.status = "error"
+            item.task.error = this.getErrorText(error)
+            item.task.completedAt = new Date()
+            this.cleanupPendingByParent(item.task)
+            this.markForNotification(item.task)
+            this.notifyParentSession(item.task).catch((err) => {
+              log("[background-agent] Failed to notify on startTask error:", err)
+            })
+          }
+
           // Release concurrency slot if startTask failed and didn't release it itself
           // This prevents slot leaks when errors occur after acquire but before task.concurrencyKey is set
           if (!item.task.concurrencyKey) {
@@ -236,28 +249,20 @@ export class BackgroundManager {
     const parentDirectory = parentSession?.data?.directory ?? this.directory
     log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${parentDirectory}`)
 
-    const createResult = await this.client.session.create({
+    const created = await createSessionWithRetry(this.client, {
       body: {
         parentID: input.parentSessionID,
         title: `${input.description} (@${input.agent} subagent)`,
         permission: [
           { permission: "question", action: "deny" as const, pattern: "*" },
         ],
-      } as any,
+      },
       query: {
         directory: parentDirectory,
       },
     })
 
-    if (createResult.error) {
-      throw new Error(`Failed to create background session: ${createResult.error}`)
-    }
-
-    if (!createResult.data?.id) {
-      throw new Error("Failed to create background session: API returned no session ID")
-    }
-
-    const sessionID = createResult.data.id
+    const sessionID = created.id
     subagentSessions.add(sessionID)
 
     log("[background-agent] tmux callback check", {
