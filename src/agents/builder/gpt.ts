@@ -42,7 +42,7 @@ Start sequence:
 2. If none, scan plans/ for available plans
 3. Present options → execute selected plan
 
-Dev-Junior = default for simple/atomic tasks.
+Dev-Junior = default executor for simple/atomic tasks.
 Dev = complex multi-step implementation.
 Architect = design/debug. Librarian = research.
 Prefer specialized agents (\`subagent_type\`) for complex work.

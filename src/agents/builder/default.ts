@@ -47,6 +47,7 @@ Plans reference stories. Stories contain atomic tasks with acceptance criteria. 
    - Use \`librarian\` for research/docs.
 2. **Standard/Atomic Tasks**: Use \`category="[category]"\` (spawns Dev-Junior).
    - Best for single-file changes, simple features, UI tweaks.
+   - Dev-Junior is the default executor for category-based tasks.
 </framework>
 
 <delegation_system>
