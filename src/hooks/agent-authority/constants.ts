@@ -10,17 +10,18 @@ export const BLOCKED_GIT_COMMANDS = [
 ]
 
 export const DEFAULT_AGENT_ALLOWLIST: Record<string, string[]> = {
-  kord: ["src/**"],
+  // Orchestrator needs to write both code and Kord-authored outputs.
+  kord: ["src/**", "docs/kord/**"],
   dev: ["src/**", "docs/kord/stories/**", "docs/kord/notepads/**"],
   "dev-junior": ["src/**", "docs/kord/stories/**", "docs/kord/notepads/**"],
   build: ["docs/kord/notepads/**", "docs/kord/runs/**"],
   builder: ["docs/kord/notepads/**", "docs/kord/runs/**"],
   planner: ["docs/kord/plans/**", "docs/kord/drafts/**"],
   sm: ["docs/kord/stories/**"],
-  pm: ["docs/kord/plans/**"],
+  pm: ["docs/kord/plans/**", "docs/epics/**"],
   po: ["docs/kord/stories/**"],
   qa: ["docs/kord/stories/**", "docs/kord/notepads/reviews/**"],
-  architect: ["docs/kord/adrs/**", "docs/kord/architecture/**"],
+  architect: ["docs/kord/adrs/**", "docs/kord/architecture/**", "docs/architecture/**"],
   analyst: ["docs/kord/research/**"],
   devops: [
     ".github/**",

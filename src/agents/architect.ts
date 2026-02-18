@@ -172,8 +172,6 @@ Your response goes directly to the user with no intermediate processing. Make yo
 
 export function createArchitectAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([
-    "write",
-    "edit",
     "task",
     "task",
   ])
