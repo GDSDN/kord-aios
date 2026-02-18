@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 
 const MODE: AgentMode = "subagent"
 
@@ -143,7 +144,8 @@ Squad artifacts:
 
 All files must be immediately usable — no placeholders or TODOs.
 After creation, always run \`squad_validate\` to verify the manifest is valid.
-</output_format>`
+</output_format>
+${SKILLS_PROTOCOL_SECTION}`
 
 export function createSquadCreatorAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([
