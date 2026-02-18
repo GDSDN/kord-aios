@@ -262,28 +262,32 @@ describe("EPIC-10: Agent architecture refinement", () => {
 
   //#region S04: Agent communication
   describe("S04: Agent communication — inter-agent clarification", () => {
-    test("PM collaboration mentions call_kord_agent for SM", () => {
+    test("PM collaboration delegates to SM without tool calls", () => {
       //#given
       const agent = createPmAgent(TEST_MODEL)
 
       //#then
-      expect(agent.prompt).toContain("call_kord_agent")
+      expect(agent.prompt).toContain("**@sm**")
+      expect(agent.prompt).not.toContain("call_kord_agent")
     })
 
-    test("SM collaboration mentions call_kord_agent for PM/PO", () => {
+    test("SM collaboration references PM/PO without tool calls", () => {
       //#given
       const agent = createSmAgent(TEST_MODEL)
 
       //#then
-      expect(agent.prompt).toContain("call_kord_agent")
+      expect(agent.prompt).toContain("**@pm**")
+      expect(agent.prompt).toContain("**@po**")
+      expect(agent.prompt).not.toContain("call_kord_agent")
     })
 
-    test("PO collaboration mentions call_kord_agent for SM", () => {
+    test("PO collaboration references SM without tool calls", () => {
       //#given
       const agent = createPoAgent(TEST_MODEL)
 
       //#then
-      expect(agent.prompt).toContain("call_kord_agent")
+      expect(agent.prompt).toContain("**@sm**")
+      expect(agent.prompt).not.toContain("call_kord_agent")
     })
   })
   //#endregion

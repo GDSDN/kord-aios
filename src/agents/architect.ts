@@ -2,6 +2,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { isGptModel } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 
 const MODE: AgentMode = "subagent"
 
@@ -179,7 +180,9 @@ Default output locations:
 
 If you encounter a write permission error, do not try to write elsewhere in the repo.
 Stay within these documentation directories.
-</write_scope>`
+</write_scope>
+
+${SKILLS_PROTOCOL_SECTION}`
 
 export function createArchitectAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([

@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 
 const MODE: AgentMode = "subagent"
 
@@ -87,7 +88,7 @@ Every PRD you create MUST include:
 </constraints>
 
 <collaboration>
-- **@sm**: Delegate story creation after PRD is complete. Use call_kord_agent for story-level clarifications when needed.
+- **@sm**: Delegate story creation after PRD is complete.
 - **@po**: Provide strategic direction, receive backlog feedback
 - **@architect**: Collaborate on technical feasibility and architecture
 - **@analyst**: Delegate deep research and competitive analysis
@@ -110,7 +111,9 @@ Default output locations:
 
 If you encounter a write permission error, do not try to write elsewhere in the repo.
 Stay within these documentation directories.
-</write_scope>`
+</write_scope>
+
+${SKILLS_PROTOCOL_SECTION}`
 
 export function createPmAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([
