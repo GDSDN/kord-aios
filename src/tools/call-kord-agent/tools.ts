@@ -4,7 +4,8 @@ import { join } from "node:path"
 import { ALLOWED_AGENTS, CALL_KORD_AGENT_DESCRIPTION } from "./constants"
 import type { CallKordAgentArgs } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
-import { log, getAgentToolRestrictions } from "../../shared"
+import { log, getAgentToolRestrictions, promptWithRetry, createSessionWithRetry } from "../../shared"
+import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { consumeNewMessages } from "../../shared/session-cursor"
 import { findFirstMessageWithAgent, findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
@@ -178,22 +179,23 @@ async function executeSync(
     log(`[call_kord_agent] Parent session dir: ${parentSession?.data?.directory}, fallback: ${ctx.directory}`)
     const parentDirectory = parentSession?.data?.directory ?? ctx.directory
 
-    const createResult = await ctx.client.session.create({
-      body: {
-        parentID: toolContext.sessionID,
-        title: `${args.description} (@${args.subagent_type} subagent)`,
-        permission: [
-          { permission: "question", action: "deny" as const, pattern: "*" },
-        ],
-      } as any,
-      query: {
-        directory: parentDirectory,
-      },
-    })
-
-    if (createResult.error) {
-      log(`[call_kord_agent] Session create error:`, createResult.error)
-      const errorStr = String(createResult.error)
+    try {
+      const created = await createSessionWithRetry(ctx.client, {
+        body: {
+          parentID: toolContext.sessionID,
+          title: `${args.description} (@${args.subagent_type} subagent)`,
+          permission: [
+            { permission: "question", action: "deny" as const, pattern: "*" },
+          ],
+        },
+        query: {
+          directory: parentDirectory,
+        },
+      })
+      sessionID = created.id
+    } catch (createErr) {
+      log(`[call_kord_agent] Session create error:`, createErr)
+      const errorStr = String(createErr)
       if (errorStr.toLowerCase().includes("unauthorized")) {
         return `Error: Failed to create session (Unauthorized). This may be due to:
 1. OAuth token restrictions (e.g., Claude Code credentials are restricted to Claude Code only)
@@ -202,12 +204,11 @@ async function executeSync(
 
 Try using a different provider or API key authentication.
 
-Original error: ${createResult.error}`
+ Original error: ${errorStr}`
       }
-      return `Error: Failed to create session: ${createResult.error}`
+      return `Error: Failed to create session: ${errorStr}`
     }
 
-    sessionID = createResult.data.id
     log(`[call_kord_agent] Created session: ${sessionID}`)
   }
 
@@ -220,7 +221,8 @@ Original error: ${createResult.error}`
   log(`[call_kord_agent] Prompt text:`, args.prompt.substring(0, 100))
 
   try {
-    await ctx.client.session.prompt({
+    const fallbackChain = AGENT_MODEL_REQUIREMENTS[args.subagent_type]?.fallbackChain
+    await promptWithRetry(ctx.client, {
       path: { id: sessionID },
       body: {
         agent: args.subagent_type,
@@ -230,7 +232,7 @@ Original error: ${createResult.error}`
         },
         parts: [{ type: "text", text: args.prompt }],
       },
-    })
+    }, fallbackChain)
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
     log(`[call_kord_agent] Prompt error:`, errorMessage)
