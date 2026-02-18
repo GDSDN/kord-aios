@@ -12,7 +12,7 @@ import { resolveMultipleSkillsAsync } from "../../features/opencode-skill-loader
 import { discoverSkills } from "../../features/opencode-skill-loader"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
-import { log, getAgentToolRestrictions, resolveModelPipeline, promptWithRetry } from "../../shared"
+import { log, getAgentToolRestrictions, resolveModelPipeline, promptWithRetry, createSessionWithRetry } from "../../shared"
 import { fetchAvailableModels, isModelAvailable } from "../../shared/model-availability"
 import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
@@ -222,20 +222,21 @@ export async function executeSyncContinuation(
         : undefined
     }
 
-    await client.session.prompt({
+    const fallbackChain = resumeAgent ? resolveAgentFallbackChain(resumeAgent) : undefined
+    await promptWithRetry(client, {
       path: { id: args.session_id! },
       body: {
         ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
         ...(resumeModel !== undefined ? { model: resumeModel } : {}),
-          tools: {
-            ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
-            task: false,
-            call_kord_agent: true,
-            question: false,
-          },
+        tools: {
+          ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
+          task: false,
+          call_kord_agent: true,
+          question: false,
+        },
         parts: [{ type: "text", text: args.prompt }],
       },
-    })
+    }, fallbackChain)
   } catch (promptError) {
     if (toastManager) {
       toastManager.removeTask(taskId)
@@ -568,24 +569,20 @@ export async function executeSyncTask(
       : null
     const parentDirectory = parentSession?.data?.directory ?? directory
 
-    const createResult = await client.session.create({
+    const created = await createSessionWithRetry(client, {
       body: {
         parentID: parentContext.sessionID,
         title: `${args.description} (@${agentToUse} subagent)`,
         permission: [
           { permission: "question", action: "deny" as const, pattern: "*" },
         ],
-      } as any,
+      },
       query: {
         directory: parentDirectory,
       },
     })
 
-    if (createResult.error) {
-      return `Failed to create session: ${createResult.error}`
-    }
-
-    const sessionID = createResult.data.id
+    const sessionID = created.id
     syncSessionID = sessionID
     subagentSessions.add(sessionID)
 
@@ -996,24 +993,11 @@ Dev-Junior is spawned automatically when you specify a category. Pick the approp
     }
   }
 
-  // Explicitly block native build/plan agents to prevent confusion
-  if (agentName.toLowerCase() === "build" || agentName.toLowerCase() === "plan") {
-    return {
-      agentToUse: "",
-      categoryModel: undefined,
-      error: `Cannot delegate to native agent "${agentName}".
-      
-Use the Kord equivalents instead:
-- For orchestration: You are the Builder. Delegate to subagents (dev, architect, etc).
-- For planning: You are executing a plan. Do not call Plan recursively.`,
-    }
-  }
-
   if (isPlanAgent(agentName) && isPlanAgent(parentAgent)) {
     return {
       agentToUse: "",
       categoryModel: undefined,
-    error: `You are plan. You cannot delegate to plan via task.
+      error: `You are plan. You cannot delegate to plan via task.
 
 Create the work plan directly - that's your job as the planning agent.`,
     }
