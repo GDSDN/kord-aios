@@ -33,6 +33,45 @@ describe("createAgentAuthorityHook", () => {
     await expect(result).resolves.toBeUndefined()
   })
 
+  test("allows Kord (uppercase) writing to src", async () => {
+    //#given
+    updateSessionAgent("ses_Kord", "Kord")
+    const input = { tool: "Write", sessionID: "ses_Kord", callID: "call_k1" }
+    const output = { args: { filePath: "src/feature.ts", content: "hello" } }
+
+    //#when
+    const result = hook["tool.execute.before"]?.(input as any, output as any)
+
+    //#then
+    await expect(result).resolves.toBeUndefined()
+  })
+
+  test("does not enforce allowlist for OpenCode native agent general", async () => {
+    //#given
+    updateSessionAgent("ses_general", "general")
+    const input = { tool: "Write", sessionID: "ses_general", callID: "call_g1" }
+    const output = { args: { filePath: "src/feature.ts", content: "hello" } }
+
+    //#when
+    const result = hook["tool.execute.before"]?.(input as any, output as any)
+
+    //#then
+    await expect(result).resolves.toBeUndefined()
+  })
+
+  test("does not enforce allowlist for OpenCode native agent plan", async () => {
+    //#given
+    updateSessionAgent("ses_plan", "plan")
+    const input = { tool: "Write", sessionID: "ses_plan", callID: "call_p1" }
+    const output = { args: { filePath: "src/feature.ts", content: "hello" } }
+
+    //#when
+    const result = hook["tool.execute.before"]?.(input as any, output as any)
+
+    //#then
+    await expect(result).resolves.toBeUndefined()
+  })
+
   test("allows dev writing when filePath contains line breaks", async () => {
     //#given
     updateSessionAgent("ses_dev_wrap", "dev")

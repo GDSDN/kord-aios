@@ -56,6 +56,20 @@ function sanitizeFilePath(value: string): string {
   return filePath
 }
 
+function normalizeAgentKey(agentName: string): string {
+  return agentName.trim().toLowerCase()
+}
+
+const OPENCODE_NATIVE_AGENTS = new Set([
+  "general",
+  "plan",
+  "build",
+  "explore",
+  "summary",
+  "title",
+  "compaction",
+])
+
 function escapeRegexExceptAsterisk(value: string): string {
   return value.replace(/[.+?^${}()|[\]\\]/g, "\\$&")
 }
@@ -143,9 +157,16 @@ export function createAgentAuthorityHook(ctx: PluginInput, config?: AgentAuthori
       output: { args: Record<string, unknown> }
     ): Promise<void> => {
       const toolName = input.tool?.toLowerCase()
-      const agentName = getAgentFromSession(input.sessionID, ctx.directory)
+      const rawAgentName = getAgentFromSession(input.sessionID, ctx.directory)
+      const agentName = rawAgentName ? normalizeAgentKey(rawAgentName) : undefined
 
       if (!agentName) {
+        return
+      }
+
+      // OMOC's approach: do not enforce our internal authority allowlist on
+      // OpenCode's native agents. They are not part of our agent JTBD model.
+      if (OPENCODE_NATIVE_AGENTS.has(agentName)) {
         return
       }
 
