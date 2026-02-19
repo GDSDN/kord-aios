@@ -45,6 +45,15 @@ export interface BackgroundTask {
   /** Candidate models to try when quota/rate-limit errors occur */
   fallbackChain?: FallbackEntry[]
 
+  /** Skill content injected as `system` (if any) */
+  skillContent?: string
+
+  /** When session entered `retry` (used for stuck detection) */
+  retrySince?: Date
+
+  /** Models attempted due to retry-stuck fallback */
+  retryFallbackTriedModels?: string[]
+
   /** Last message count for stability detection */
   lastMsgCount?: number
   /** Number of consecutive polls with stable message count */

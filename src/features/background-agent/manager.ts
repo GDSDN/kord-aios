@@ -15,6 +15,7 @@ import {
   MIN_RUNTIME_BEFORE_STALE_MS,
   MIN_STABILITY_TIME_MS,
   POLLING_INTERVAL_MS,
+  RETRY_FIRST_OUTPUT_TIMEOUT_MS,
   TASK_CLEANUP_DELAY_MS,
   TASK_TTL_MS,
 } from "./constants"
@@ -292,6 +293,7 @@ export class BackgroundManager {
     task.status = "running"
     task.startedAt = new Date()
     task.sessionID = sessionID
+    task.skillContent = input.skillContent
     task.progress = {
       toolCalls: 0,
       lastUpdate: new Date(),
@@ -1393,6 +1395,10 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
       try {
         const sessionStatus = allStatuses[sessionID]
+
+        if (sessionStatus?.type !== "retry") {
+          task.retrySince = undefined
+        }
         
         // Don't skip if session not in status - fall through to message-based detection
         if (sessionStatus?.type === "idle") {
@@ -1425,6 +1431,101 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
             info?: { role?: string }
             parts?: Array<{ type?: string; tool?: string; name?: string; text?: string }>
           }>
+
+          const hasAssistantOrToolMessage = messages.some(
+            (m) => m.info?.role === "assistant" || m.info?.role === "tool"
+          )
+
+          if (hasAssistantOrToolMessage) {
+            task.retrySince = undefined
+          }
+
+          // Detect and recover from sessions stuck in `retry` without output.
+          // This happens when the provider accepts the request but can't execute
+          // (e.g., out of credits), and no error is thrown to trigger fallback.
+          if (sessionStatus?.type === "retry" && !hasAssistantOrToolMessage) {
+            task.retrySince ??= new Date()
+            const retryElapsed = Date.now() - task.retrySince.getTime()
+
+            if (retryElapsed >= RETRY_FIRST_OUTPUT_TIMEOUT_MS) {
+              const tried = new Set(task.retryFallbackTriedModels ?? [])
+              const currentModel = task.model
+                ? `${task.model.providerID}/${task.model.modelID}`
+                : undefined
+              if (currentModel) tried.add(currentModel)
+
+              const chain = task.fallbackChain ?? []
+              let next:
+                | { providerID: string; modelID: string; variant?: string }
+                | undefined
+
+              for (const entry of chain) {
+                for (const providerID of entry.providers) {
+                  const key = `${providerID}/${entry.model}`
+                  if (tried.has(key)) continue
+                  next = {
+                    providerID,
+                    modelID: entry.model,
+                    ...(entry.variant ? { variant: entry.variant } : {}),
+                  }
+                  break
+                }
+                if (next) break
+              }
+
+              if (!next) {
+                task.status = "error"
+                task.error = `Session stuck in retry with no output after ${Math.floor(RETRY_FIRST_OUTPUT_TIMEOUT_MS / 1000)}s; exhausted fallback models.`
+                task.completedAt = new Date()
+                this.cleanupPendingByParent(task)
+                this.markForNotification(task)
+                this.notifyParentSession(task).catch((err) => {
+                  log("[background-agent] Failed to notify on retry-stuck error:", err)
+                })
+                if (task.concurrencyKey) {
+                  this.concurrencyManager.release(task.concurrencyKey)
+                  task.concurrencyKey = undefined
+                }
+                continue
+              }
+
+              log("[background-agent] Session stuck in retry; attempting model fallback", {
+                taskId: task.id,
+                sessionID,
+                from: currentModel ?? "unknown",
+                to: `${next.providerID}/${next.modelID}`,
+              })
+
+              await this.client.session.abort({ path: { id: sessionID } }).catch(() => {})
+
+              await promptWithRetry(
+                this.client,
+                {
+                  path: { id: sessionID },
+                  body: {
+                    agent: task.agent,
+                    model: { providerID: next.providerID, modelID: next.modelID },
+                    ...(next.variant ? { variant: next.variant } : {}),
+                    system: task.skillContent,
+                    tools: {
+                      ...getAgentToolRestrictions(task.agent),
+                      task: false,
+                      call_kord_agent: true,
+                      question: false,
+                    },
+                    parts: [{ type: "text", text: task.prompt }],
+                  },
+                },
+                undefined
+              ).catch((error) => {
+                log("[background-agent] Retry-stuck fallback prompt error:", error)
+              })
+
+              task.model = { providerID: next.providerID, modelID: next.modelID, ...(next.variant ? { variant: next.variant } : {}) }
+              task.retryFallbackTriedModels = Array.from(new Set([...(task.retryFallbackTriedModels ?? []), `${next.providerID}/${next.modelID}`]))
+              task.retrySince = new Date()
+            }
+          }
           const assistantMsgs = messages.filter(
             (m) => m.info?.role === "assistant"
           )
