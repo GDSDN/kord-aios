@@ -1,10 +1,15 @@
 export const SKILLS_PROTOCOL_SECTION = `
 
 <skills_protocol>
-Skills are methodology payloads (step-by-step execution blueprints).
+The \`skill\` tool is your methodology catalog — its description lists every available skill with name and purpose.
 
-- If you were delegated work without the methodology you need, load exactly ONE relevant skill via the skill tool.
-- If the skill tool is unavailable in your toolset, explicitly name the skill(s) you would use and why, so the delegator can re-run with task(load_skills=[...]).
-- Avoid loading many skills at once. Prefer 1-2 skills total and split work into smaller delegations when needed.
+**Before starting any task**, scan the \`skill\` tool's \`<available_skills>\` list. If a skill matches your current domain, load it before proceeding:
+\`\`\`
+skill("skill-name")
+\`\`\`
+Prefer 1–2 skills per task. If more are needed, ask the delegator to split into smaller delegations.
+
+**If the \`skill\` tool is not in your toolset**, name the skill you need and signal:
+> "Re-delegate with \`task(load_skills=['skill-name'])\`."
 </skills_protocol>
 `
