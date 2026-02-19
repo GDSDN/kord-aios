@@ -3,6 +3,7 @@ import { log } from "./logger"
 import type { FallbackEntry } from "./model-requirements"
 
 type Client = ReturnType<typeof createOpencodeClient>
+const DEFAULT_PROMPT_TIMEOUT_MS = 30_000
 
 type SDKResult<T> = T & { error?: unknown }
 
@@ -180,11 +181,51 @@ interface PromptArgs {
   [key: string]: unknown
 }
 
+interface PromptRetryOptions {
+  promptTimeoutMs?: number
+}
+
+function createPromptTimeoutError(sessionID: string | undefined, timeoutMs: number): Error {
+  const suffix = sessionID ? ` for session ${sessionID}` : ""
+  return new Error(`session.prompt timed out after ${timeoutMs}ms${suffix}`)
+}
+
+async function callPromptWithTimeout(
+  client: Client,
+  args: PromptArgs,
+  timeoutMs: number
+): Promise<void> {
+  const promptInput = args as Parameters<typeof client.session.prompt>[0]
+  const sessionID = args.path?.id
+
+  const result = await new Promise<SDKResult<unknown>>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(createPromptTimeoutError(sessionID, timeoutMs))
+    }, timeoutMs)
+
+    client.session.prompt(promptInput)
+      .then((value) => {
+        clearTimeout(timer)
+        resolve(value as SDKResult<unknown>)
+      })
+      .catch((error) => {
+        clearTimeout(timer)
+        reject(error)
+      })
+  })
+
+  if (result && typeof result === "object" && "error" in result && result.error) {
+    throw result.error
+  }
+}
+
 export async function promptWithRetry(
   client: Client,
   args: PromptArgs,
-  fallbackChain?: FallbackEntry[]
+  fallbackChain?: FallbackEntry[],
+  options?: PromptRetryOptions
 ): Promise<void> {
+  const promptTimeoutMs = options?.promptTimeoutMs ?? DEFAULT_PROMPT_TIMEOUT_MS
   const currentProviderID = args.body.model?.providerID
   const currentModelID = args.body.model?.modelID
   const currentModel = currentProviderID && currentModelID
@@ -192,12 +233,7 @@ export async function promptWithRetry(
     : "unknown/default"
 
   try {
-    const result = (await client.session.prompt(
-      args as Parameters<typeof client.session.prompt>[0]
-    )) as SDKResult<unknown>
-    if (result && typeof result === "object" && "error" in result && result.error) {
-      throw result.error
-    }
+    await callPromptWithTimeout(client, args, promptTimeoutMs)
   } catch (error) {
     // 1. Handle Model Not Found (Suggestion)
     const suggestion = parseModelSuggestion(error)
@@ -207,7 +243,7 @@ export async function promptWithRetry(
         suggested: suggestion.suggestion,
       })
 
-      const suggestedResult = (await client.session.prompt({
+      await callPromptWithTimeout(client, {
         ...args,
         body: {
           ...args.body,
@@ -216,15 +252,7 @@ export async function promptWithRetry(
             modelID: suggestion.suggestion,
           },
         },
-      } as Parameters<typeof client.session.prompt>[0])) as SDKResult<unknown>
-      if (
-        suggestedResult &&
-        typeof suggestedResult === "object" &&
-        "error" in suggestedResult &&
-        suggestedResult.error
-      ) {
-        throw suggestedResult.error
-      }
+      }, promptTimeoutMs)
       return
     }
 
@@ -275,7 +303,7 @@ export async function promptWithRetry(
 
           try {
             const variantToUse = entry.variant ?? args.body.variant
-            const fallbackResult = (await client.session.prompt({
+            await callPromptWithTimeout(client, {
               ...args,
               body: {
                 ...args.body,
@@ -285,15 +313,7 @@ export async function promptWithRetry(
                 },
                 ...(variantToUse ? { variant: variantToUse } : {}),
               },
-            } as Parameters<typeof client.session.prompt>[0])) as SDKResult<unknown>
-            if (
-              fallbackResult &&
-              typeof fallbackResult === "object" &&
-              "error" in fallbackResult &&
-              fallbackResult.error
-            ) {
-              throw fallbackResult.error
-            }
+            }, promptTimeoutMs)
             log("[prompt-retry] Fallback successful", { model: fallbackModelStr })
             return // Success! Exit function
           } catch (fallbackError) {

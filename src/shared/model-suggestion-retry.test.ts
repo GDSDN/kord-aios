@@ -439,6 +439,35 @@ describe("promptWithRetry", () => {
     })
   })
 
+  it("should fallback when initial prompt hangs and times out", async () => {
+    // given first prompt never resolves and second prompt succeeds
+    const promptMock = mock()
+      .mockImplementationOnce(() => new Promise(() => {}))
+      .mockResolvedValueOnce(undefined)
+    const abortMock = mock().mockResolvedValue(undefined)
+    const client = { session: { prompt: promptMock, abort: abortMock } }
+
+    // when
+    await promptWithRetry(client as unknown as Client, {
+      path: { id: "session-1" },
+      body: {
+        parts: [{ type: "text", text: "hello" }],
+        model: { providerID: "openai", modelID: "gpt-5.2" },
+      },
+    }, [
+      { providers: ["opencode"], model: "gpt-5.2" },
+    ], { promptTimeoutMs: 10 })
+
+    // then
+    expect(promptMock).toHaveBeenCalledTimes(2)
+    expect(abortMock).toHaveBeenCalledTimes(1)
+    const fallbackCall = promptMock.mock.calls[1][0]
+    expect(fallbackCall.body.model).toEqual({
+      providerID: "opencode",
+      modelID: "gpt-5.2",
+    })
+  })
+
   it("should propagate variant from fallback entry when retrying after quota", async () => {
     // given
     const promptMock = mock()
