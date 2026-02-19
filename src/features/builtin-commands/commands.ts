@@ -59,8 +59,8 @@ ${REFACTOR_TEMPLATE}
     argumentHint: "<refactoring-target> [--scope=<file|module|project>] [--strategy=<safe|aggressive>]",
   },
   "start-work": {
-    description: "(builtin) Start Kord work session from Plan plan",
-    agent: "build",
+    description: "(builtin) Start Kord work session from Plan",
+    agent: "builder",
     template: `<command-instruction>
 ${START_WORK_TEMPLATE}
 </command-instruction>

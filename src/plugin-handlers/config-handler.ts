@@ -341,6 +341,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
             .filter(([key]) => {
               if (key === "build") return false;
               if (key === "plan" && shouldDemotePlan) return false;
+              if (key === "general") return false;
               // Filter out agents that Kord AIOS provides to prevent
               // OpenCode defaults from overwriting user config in kord-aios.json
               // See: https://github.com/kord-aios/kord-aios/issues/472
@@ -372,6 +373,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         ...projectAgents,
         ...pluginAgents,
         ...filteredConfigAgents,
+        general: { mode: "subagent", hidden: true },
         build: { ...migratedBuild, mode: "subagent", hidden: true },
         ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
       };
