@@ -15,7 +15,7 @@ import { subagentSessions, getSessionAgent } from "../../features/claude-code-se
 import { log, getAgentToolRestrictions, resolveModelPipeline, promptWithRetry, createSessionWithRetry } from "../../shared"
 import { fetchAvailableModels, isModelAvailable } from "../../shared/model-availability"
 import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
-import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS, type FallbackEntry } from "../../shared/model-requirements"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 
 const DEV_JUNIOR_AGENT = "dev-junior"
@@ -318,7 +318,7 @@ export async function executeUnstableAgentTask(
   categoryModel: { providerID: string; modelID: string; variant?: string } | undefined,
   systemContent: string | undefined,
   actualModel: string | undefined,
-  fallbackChain?: any[]
+  fallbackChain?: FallbackEntry[]
 ): Promise<string> {
   const { manager, client } = executorCtx
 
@@ -471,7 +471,7 @@ export async function executeBackgroundTask(
   agentToUse: string,
   categoryModel: { providerID: string; modelID: string; variant?: string } | undefined,
   systemContent: string | undefined,
-  fallbackChain?: any[]
+  fallbackChain?: FallbackEntry[]
 ): Promise<string> {
   const { manager } = executorCtx
 
@@ -556,7 +556,7 @@ export async function executeSyncTask(
   categoryModel: { providerID: string; modelID: string; variant?: string } | undefined,
   systemContent: string | undefined,
   modelInfo?: ModelFallbackInfo,
-  fallbackChain?: any[]
+  fallbackChain?: FallbackEntry[]
 ): Promise<string> {
   const { client, directory, onSyncSessionCreated } = executorCtx
   const toastManager = getTaskToastManager()
@@ -677,6 +677,11 @@ export async function executeSyncTask(
     let lastMsgCount = 0
     let stablePolls = 0
     let pollCount = 0
+    let retrySince: number | undefined
+    const triedModels = new Set<string>()
+    if (categoryModel?.providerID && categoryModel?.modelID) {
+      triedModels.add(`${categoryModel.providerID}/${categoryModel.modelID}`)
+    }
 
     log("[task] Starting poll loop", { sessionID, agentToUse })
 
@@ -705,7 +710,104 @@ export async function executeSyncTask(
         })
       }
 
+      if (sessionStatus?.type === "retry") {
+        retrySince ??= Date.now()
+
+        // If the session produces any assistant/tool output, do not treat it as stuck.
+        const messagesCheck = await client.session.messages({ path: { id: sessionID } })
+        const msgs = ((messagesCheck as { data?: unknown }).data ?? messagesCheck) as Array<{ info?: { role?: string } }>
+        const hasAssistantOrToolMessage = msgs.some(
+          (m) => m.info?.role === "assistant" || m.info?.role === "tool"
+        )
+        if (hasAssistantOrToolMessage) {
+          retrySince = undefined
+        } else {
+          const retryElapsed = Date.now() - retrySince
+          if (retryElapsed >= syncTiming.FIRST_OUTPUT_TIMEOUT_MS) {
+            const chain = (fallbackChain ?? []) as FallbackEntry[]
+            const candidates: Array<{ providerID: string; modelID: string; variant?: string }> = []
+            for (const entry of chain) {
+              for (const providerID of entry.providers) {
+                candidates.push({
+                  providerID,
+                  modelID: entry.model,
+                  ...(entry.variant ? { variant: entry.variant } : {}),
+                })
+              }
+            }
+
+            const pickNext = () => {
+              for (const c of candidates) {
+                const key = `${c.providerID}/${c.modelID}`
+                if (triedModels.has(key)) continue
+                return { candidate: c, key }
+              }
+              return null
+            }
+
+            let switched = false
+            while (true) {
+              const nextPick = pickNext()
+              if (!nextPick) break
+              const { candidate, key } = nextPick
+              triedModels.add(key)
+
+              log("[task] Session stuck in retry; attempting model fallback", {
+                sessionID,
+                agent: agentToUse,
+                to: key,
+              })
+
+              await client.session.abort({ path: { id: sessionID } }).catch(() => {})
+
+              try {
+                const allowTask = isPlanAgent(agentToUse)
+                await promptWithRetry(
+                  client,
+                  {
+                    path: { id: sessionID },
+                    body: {
+                      agent: agentToUse,
+                      system: systemContent,
+                      tools: {
+                        task: allowTask,
+                        call_kord_agent: true,
+                        question: false,
+                      },
+                      parts: [{ type: "text", text: args.prompt }],
+                      model: { providerID: candidate.providerID, modelID: candidate.modelID },
+                      ...(candidate.variant ? { variant: candidate.variant } : {}),
+                    },
+                  },
+                  undefined
+                )
+                switched = true
+                retrySince = Date.now()
+                break
+              } catch (error) {
+                log("[task] Retry-stuck fallback prompt error", {
+                  sessionID,
+                  model: key,
+                  error: String(error),
+                })
+                continue
+              }
+            }
+
+            if (!switched) {
+              if (toastManager && taskId) toastManager.removeTask(taskId)
+              return `Session stuck in retry with no output after ${Math.floor(syncTiming.FIRST_OUTPUT_TIMEOUT_MS / 1000)}s; exhausted fallback models.\n\nSession ID: ${sessionID}`
+            }
+          }
+        }
+
+        stablePolls = 0
+        lastMsgCount = 0
+        continue
+      }
+
       if (sessionStatus && sessionStatus.type !== "idle") {
+        retrySince = undefined
         stablePolls = 0
         lastMsgCount = 0
         continue
