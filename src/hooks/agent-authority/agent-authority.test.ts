@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
+import { pathToFileURL } from "node:url"
 import { createAgentAuthorityHook } from "./index"
 import { updateSessionAgent, _resetForTesting } from "../../features/claude-code-session-state"
 
@@ -24,6 +25,57 @@ describe("createAgentAuthorityHook", () => {
     updateSessionAgent("ses_dev", "dev")
     const input = { tool: "Write", sessionID: "ses_dev", callID: "call_1" }
     const output = { args: { filePath: "src/feature.ts", content: "hello" } }
+
+    //#when
+    const result = hook["tool.execute.before"]?.(input as any, output as any)
+
+    //#then
+    await expect(result).resolves.toBeUndefined()
+  })
+
+  test("allows dev writing when filePath contains line breaks", async () => {
+    //#given
+    updateSessionAgent("ses_dev_wrap", "dev")
+    const input = { tool: "Write", sessionID: "ses_dev_wrap", callID: "call_1b" }
+    const output = {
+      args: {
+        filePath: "src/components/\n      members/InviteMemberModal.tsx",
+        content: "hello",
+      },
+    }
+
+    //#when
+    const result = hook["tool.execute.before"]?.(input as any, output as any)
+
+    //#then
+    await expect(result).resolves.toBeUndefined()
+  })
+
+  test("allows dev writing when filePath is a file:// URI", async () => {
+    //#given
+    updateSessionAgent("ses_dev_uri", "dev")
+    const input = { tool: "Write", sessionID: "ses_dev_uri", callID: "call_1c" }
+    const fileUrl = pathToFileURL(join(tempDir, "src/feature.ts")).toString()
+    const output = { args: { filePath: fileUrl, content: "hello" } }
+
+    //#when
+    const result = hook["tool.execute.before"]?.(input as any, output as any)
+
+    //#then
+    await expect(result).resolves.toBeUndefined()
+  })
+
+  test("allows kord writing when filePath contains line breaks", async () => {
+    //#given
+    updateSessionAgent("ses_kord_wrap", "kord")
+    const input = { tool: "Edit", sessionID: "ses_kord_wrap", callID: "call_1d" }
+    const output = {
+      args: {
+        filePath: "src/components/\n      members/InviteMemberModal.tsx",
+        oldString: "",
+        newString: "log",
+      },
+    }
 
     //#when
     const result = hook["tool.execute.before"]?.(input as any, output as any)

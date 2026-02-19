@@ -16,6 +16,46 @@ function normalizePath(filePath: string): string {
   return filePath.replace(/\\/g, "/")
 }
 
+function sanitizeFilePath(value: string): string {
+  // Trim first to avoid accidental leading/trailing whitespace from tool args.
+  let filePath = value.trim()
+
+  // Some UIs/LSPs wrap long paths with line breaks and indentation.
+  // Paths should not contain line terminators in practice, so remove them.
+  filePath = filePath.replace(/[\r\n\u2028\u2029]+[ \t]*/g, "")
+
+  // Strip remaining ASCII control characters (e.g., ANSI escapes) that can
+  // accidentally appear in tool args and break glob matching.
+  filePath = filePath.replace(/[\x00-\x1F\x7F]/g, "")
+
+  // Normalize file:// URIs (commonly produced by LSPs) into filesystem paths.
+  if (filePath.startsWith("file://")) {
+    try {
+      const url = new URL(filePath)
+      if (url.protocol === "file:") {
+        let pathname = url.pathname
+        try {
+          pathname = decodeURIComponent(pathname)
+        } catch (err) {
+          // Keep raw pathname if decoding fails.
+          void err
+        }
+
+        // On Windows, URL.pathname comes as /C:/path...
+        if (process.platform === "win32" && /^\/[A-Za-z]:\//.test(pathname)) {
+          pathname = pathname.slice(1)
+        }
+        filePath = pathname
+      }
+    } catch (err) {
+      // If parsing fails, fall back to the original string.
+      void err
+    }
+  }
+
+  return filePath
+}
+
 function escapeRegexExceptAsterisk(value: string): string {
   return value.replace(/[.+?^${}()|[\]\\]/g, "\\$&")
 }
@@ -25,7 +65,7 @@ function matchesPattern(pathValue: string, pattern: string): boolean {
   const normalized = normalizePath(pathValue)
   const normalizedPattern = normalizePath(pattern)
   const escaped = escapeRegexExceptAsterisk(normalizedPattern)
-  const regex = new RegExp(`^${escaped.replace(/\*\*/g, "\0GLOBSTAR\0").replace(/\*/g, "[^/]*").replace(/\0GLOBSTAR\0/g, ".*")}$`, "i")
+  const regex = new RegExp(`^${escaped.replace(/\*\*/g, "\0GLOBSTAR\0").replace(/\*/g, "[^/]*").replace(/\0GLOBSTAR\0/g, ".*")}$`, "is")
   return regex.test(normalized)
 }
 
@@ -76,7 +116,10 @@ function resolveAllowlist(config?: AgentAuthorityConfig): Record<string, string[
 }
 
 function extractFilePath(args: Record<string, unknown>): string | undefined {
-  return (args.filePath ?? args.path ?? args.file_path ?? args.file) as string | undefined
+  const raw = (args.filePath ?? args.path ?? args.file_path ?? args.file) as unknown
+  if (typeof raw !== "string") return undefined
+
+  return sanitizeFilePath(raw)
 }
 
 function resolveRelativePath(workspaceRoot: string, filePath: string): string | null {
