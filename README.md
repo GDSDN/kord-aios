@@ -1,8 +1,9 @@
 > [!TIP]
 >
 > **Kord AIOS** — multi-model agent orchestration meets story-driven development methodology.
+> Built on [Oh-My-Opencode](https://github.com/code-yeongyu/oh-my-opencode) + [Synkra AIOS](https://github.com/SynkraAI/aios-core).
 > 20+ specialized agents, squads, 149 skills, background tasks, LSP/AST tooling.
-> Built on [OpenCode](https://github.com/sst/opencode). npm package: `kord-aios`.
+> npm package: `kord-aios`.
 >
 > ✅ Official repository: https://github.com/GDSDN/kord-aios
 
@@ -30,7 +31,9 @@
 
 ## What is Kord AIOS?
 
-Kord AIOS is an [OpenCode](https://github.com/sst/opencode) plugin that transforms your terminal into a full AI development team. Instead of one agent doing everything, Kord orchestrates 20+ specialized agents — each with the right model for the right job — working in parallel on your codebase.
+**Kord AIOS** is a version of [Synkra AIOS](https://github.com/SynkraAI/aios-core) built on top of [Oh-My-Opencode](https://github.com/code-yeongyu/oh-my-opencode) — combining the best of both worlds: Synkra's proven agent methodology with Oh-My-Opencode's powerful plugin runtime.
+
+Kord transforms your terminal into a full AI development team. Instead of one agent doing everything, Kord orchestrates 20+ specialized agents — each with the right model for the right job — working in parallel on your codebase.
 
 Kord AIOS combines:
 - **Engine**: OpenCode-native plugin runtime with background agents, parallel execution, LSP/AST tooling, Claude Code compatibility.
