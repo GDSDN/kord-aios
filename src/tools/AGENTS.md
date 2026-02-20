@@ -59,6 +59,28 @@ Claude Code compatible task management.
 - **task_list**: Lists active tasks. Filters out completed/deleted by default.
 - **task_update**: Updates task fields. Supports additive `addBlocks`/`addBlockedBy`.
 
+## DELEGATE-TASK FALLBACK
+
+The `task` tool implements robust model fallback for delegated subagents:
+
+### Sync Flow
+- Uses `resolveAgentFallbackChain` to get user-configured (kord-aios.json) or hardcoded fallback
+- Calls `buildFallbackCandidates` to filter by connected/unhealthy/available
+- Implements `promptWithRetry` with deferred error detection (catches billing errors post-prompt)
+- On timeout/no-output: iterates fallback candidates until success or exhaustion
+- Sync SLA handoff to background on prolonged execution
+
+### Background Flow
+- Background spawner passes `fallbackChain` to `promptWithRetry` on resume
+- Manager retry-stuck uses filtered candidates from `buildFallbackCandidates`
+- Provider health bans applied on quota failures
+
+### Error Classification
+Recognizes as retryable:
+- `timeout`, `rate_limit`, `429`, `quota exceeded`
+- `insufficient_balance`, `insufficient balance`, `billing`
+- `CreditsError`, `resource exhausted`
+
 ## HOW TO ADD
 
 1. Create `src/tools/[name]/` with standard files

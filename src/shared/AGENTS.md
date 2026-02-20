@@ -17,6 +17,11 @@ shared/
 ├── model-availability.ts  # Provider model fetching & fuzzy matching (357 lines)
 ├── model-sanitizer.ts     # Model name sanitization
 ├── model-suggestion-retry.ts # Model suggestion on failure
+├── model-resolution-pipeline.ts # Dynamic routing + fallback resolution
+├── agent-fallback.ts      # Resolves agent fallback from kord-aios.json (105 lines)
+├── fallback-candidates.ts  # Builds filtered fallback candidates (131 lines)
+├── provider-health.ts     # Provider health tracking with TTL bans
+├── prompt-retry.ts       # Prompt retry with deferred error detection
 ├── jsonc-parser.ts        # JSONC parsing with comment support
 ├── frontmatter.ts         # YAML frontmatter extraction (JSON_SCHEMA only) - 9 imports
 ├── data-path.ts           # XDG-compliant storage resolution
@@ -64,6 +69,10 @@ shared/
 | Token Truncation | `dynamicTruncate(ctx, sessionId, output)` |
 | Config Parsing | `readJsoncFile<T>(path)`, `parseJsonc(text)` |
 | Model Resolution | `resolveModelWithFallback(client, reqs, override)` |
+| Agent Fallback Chain | `resolveAgentFallbackChain(agentName, { userAgentOverrides })` |
+| Fallback Candidates | `buildFallbackCandidates({ fallbackChain, client, excludeModels })` |
+| Provider Health | `markProviderUnhealthy()`, `isProviderHealthy()` |
+| Prompt Retry | `promptWithRetry(client, args, fallbackChain)` |
 | Version Gating | `isOpenCodeVersionAtLeast(version)` |
 | YAML Metadata | `parseFrontmatter(content)` |
 | Tool Security | `createAgentToolAllowlist(tools)` |
@@ -86,6 +95,53 @@ const model = resolveModelWithFallback({
 if (isSystemDirective(message)) return  // Skip system-generated
 const directive = createSystemDirective("TODO CONTINUATION")
 ```
+
+## FALLBACK ARCHITECTURE
+
+The fallback system ensures resilient model selection across provider failures:
+
+### User Config → Hardcode Precedence
+```typescript
+// kord-aios.json agents.data-engineer.fallback has highest priority
+const chain = resolveAgentFallbackChain("data-engineer", {
+  userAgentOverrides: pluginConfig.agents,
+})
+// Returns user config if present, otherwise falls back to hardcoded chain
+```
+
+### Fallback Candidate Filtering
+```typescript
+const { candidates, diagnostics } = await buildFallbackCandidates({
+  client,
+  fallbackChain: chain,
+  connectedProviders: /* from cache or live */,
+  excludeModels: triedModels,
+  allowModelListMiss: true, // Allow fallback even if model list stale
+})
+// Filters: disconnected providers, unhealthy providers, unavailable models, already-tried
+```
+
+### Provider Health Tracking
+```typescript
+// On quota/billing errors:
+markProviderUnhealthy("openai", "quota") // TTL-ban for duration
+
+// Before fallback attempt:
+if (!isProviderHealthy(providerID)) skip
+```
+
+### Deferred Error Detection
+```typescript
+// promptWithRetry detects billing errors that arrive AFTER prompt returns
+// Polls session messages for 2s post-prompt to catch deferred CreditsError
+// Enables fallback on insufficient_balance that appears in message updates
+```
+
+### Sync → Background Handoff
+```typescript
+// When sync SLA exceeded but session still active:
+handoffSyncSessionToBackground({ sessionID, fallbackChain, ... })
+// Preserves prompt/model/fallbackChain for background retry
 
 ## ANTI-PATTERNS
 - **Raw JSON.parse**: Use `jsonc-parser.ts` for comment support
