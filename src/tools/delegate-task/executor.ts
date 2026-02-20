@@ -1,5 +1,5 @@
 import type { BackgroundManager } from "../../features/background-agent"
-import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider } from "../../config/schema"
+import type { AgentOverrides, CategoriesConfig, GitMasterConfig, BrowserAutomationProvider } from "../../config/schema"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import type { DelegateTaskArgs, ToolContextWithMetadata, OpencodeClient } from "./types"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS, isPlanAgent } from "./constants"
@@ -15,27 +15,19 @@ import { subagentSessions, getSessionAgent } from "../../features/claude-code-se
 import { log, getAgentToolRestrictions, resolveModelPipeline, promptWithRetry, createSessionWithRetry } from "../../shared"
 import { fetchAvailableModels, isModelAvailable } from "../../shared/model-availability"
 import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
-import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS, type FallbackEntry } from "../../shared/model-requirements"
+import { buildFallbackCandidates } from "../../shared/fallback-candidates"
+import { resolveAgentFallbackChain } from "../../shared/agent-fallback"
+import { CATEGORY_MODEL_REQUIREMENTS, type FallbackEntry } from "../../shared/model-requirements"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 
 const DEV_JUNIOR_AGENT = "dev-junior"
-
-function resolveAgentFallbackChain(agentName: string): { providers: string[]; model: string; variant?: string }[] | undefined {
-  const direct = AGENT_MODEL_REQUIREMENTS[agentName]?.fallbackChain
-  if (direct) {
-    return direct
-  }
-
-  const normalized = agentName.toLowerCase()
-  const matched = Object.entries(AGENT_MODEL_REQUIREMENTS).find(([name]) => name.toLowerCase() === normalized)
-  return matched?.[1]?.fallbackChain
-}
 
 export interface ExecutorContext {
   manager: BackgroundManager
   client: OpencodeClient
   directory: string
   userCategories?: CategoriesConfig
+  userAgentOverrides?: AgentOverrides
   gitMasterConfig?: GitMasterConfig
   kordJuniorModel?: string
   browserProvider?: BrowserAutomationProvider
@@ -52,6 +44,137 @@ export interface ParentContext {
 interface SessionMessage {
   info?: { role?: string; time?: { created?: number }; agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
   parts?: Array<{ type?: string; text?: string }>
+}
+
+function extractAssistantText(messages: SessionMessage[]): string {
+  const assistantMessages = messages
+    .filter((m) => m.info?.role === "assistant")
+    .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
+
+  for (const message of assistantMessages) {
+    const textParts = message.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
+    const text = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n").trim()
+    if (text.length > 0) {
+      return text
+    }
+  }
+
+  return ""
+}
+
+function isNoTextSentinel(text: string): boolean {
+  return text.trim().toLowerCase() === "(no text output)"
+}
+
+async function fetchSessionMessages(client: OpencodeClient, sessionID: string): Promise<SessionMessage[]> {
+  const messagesResult = await client.session.messages({
+    path: { id: sessionID },
+  })
+
+  if ((messagesResult as { error?: unknown }).error) {
+    throw new Error(`Error fetching result: ${(messagesResult as { error: unknown }).error}`)
+  }
+
+  return ((messagesResult as { data?: unknown }).data ?? messagesResult) as SessionMessage[]
+}
+
+function collectTriedModelsFromMessages(messages: SessionMessage[], triedModels: Set<string>): void {
+  for (const message of messages) {
+    const info = message.info
+    const providerID = info?.model?.providerID ?? info?.providerID
+    const modelID = info?.model?.modelID ?? info?.modelID
+    if (providerID && modelID) {
+      triedModels.add(`${providerID}/${modelID}`)
+    }
+  }
+}
+
+async function waitForStableMessages(
+  client: OpencodeClient,
+  sessionID: string,
+  timing: ReturnType<typeof getTimingConfig>,
+): Promise<SessionMessage[]> {
+  const pollStart = Date.now()
+  let lastMsgCount = 0
+  let stablePolls = 0
+  const maxRecoveryPollMs = Math.min(timing.MAX_POLL_TIME_MS, timing.FIRST_OUTPUT_TIMEOUT_MS)
+
+  while (Date.now() - pollStart < maxRecoveryPollMs) {
+    await new Promise((resolve) => setTimeout(resolve, timing.POLL_INTERVAL_MS))
+
+    const elapsed = Date.now() - pollStart
+    const statusResult = typeof client.session.status === "function"
+      ? await client.session.status()
+      : { data: {} }
+    const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
+    const sessionStatus = allStatuses[sessionID]
+
+    if (sessionStatus && sessionStatus.type !== "idle") {
+      stablePolls = 0
+      lastMsgCount = 0
+      continue
+    }
+
+    if (elapsed < timing.MIN_STABILITY_TIME_MS) {
+      continue
+    }
+
+    const messages = await fetchSessionMessages(client, sessionID)
+    const currentMsgCount = messages.length
+    if (currentMsgCount === lastMsgCount) {
+      stablePolls++
+      if (stablePolls >= timing.STABILITY_POLLS_REQUIRED) {
+        return messages
+      }
+    } else {
+      stablePolls = 0
+      lastMsgCount = currentMsgCount
+    }
+  }
+
+  return fetchSessionMessages(client, sessionID)
+}
+
+async function handoffSyncSessionToBackground(input: {
+  manager: BackgroundManager
+  sessionID: string
+  parentSessionID: string
+  parentMessageID: string
+  description: string
+  prompt: string
+  agent?: string
+  parentAgent?: string
+  model?: { providerID: string; modelID: string; variant?: string }
+  fallbackChain?: FallbackEntry[]
+  skillContent?: string
+}): Promise<string> {
+  const existing = input.manager.findBySession(input.sessionID)
+  const tracked = await input.manager.trackTask({
+    taskId: existing?.id ?? `bg_sync_${input.sessionID.slice(0, 8)}`,
+    sessionID: input.sessionID,
+    parentSessionID: input.parentSessionID,
+    parentMessageID: input.parentMessageID,
+    description: input.description,
+    agent: input.agent,
+    parentAgent: input.parentAgent,
+    model: input.model,
+    fallbackChain: input.fallbackChain,
+    prompt: input.prompt,
+    skillContent: input.skillContent,
+  })
+
+  return `Sync execution exceeded SLA and was handed off to background monitoring.
+
+Task ID: ${tracked.id}
+Session ID: ${input.sessionID}
+Status: ${tracked.status}
+
+Follow up with: \`background_output(task_id="${tracked.id}")\`
+
+<task_metadata>
+task_id: ${tracked.id}
+session_id: ${input.sessionID}
+</task_metadata>`
 }
 
 export async function resolveSkillContent(
@@ -167,10 +290,13 @@ export async function executeSyncContinuation(
   ctx: ToolContextWithMetadata,
   executorCtx: ExecutorContext
 ): Promise<string> {
-  const { client } = executorCtx
+  const { client, manager } = executorCtx
   const toastManager = getTaskToastManager()
   const taskId = `resume_sync_${args.session_id!.slice(0, 8)}`
   const startTime = new Date()
+  let resumeAgent: string | undefined
+  let resumeModel: { providerID: string; modelID: string } | undefined
+  let fallbackChain: FallbackEntry[] | undefined
 
   if (toastManager) {
     toastManager.addTask({
@@ -199,9 +325,6 @@ export async function executeSyncContinuation(
   }
 
   try {
-    let resumeAgent: string | undefined
-    let resumeModel: { providerID: string; modelID: string } | undefined
-
     try {
       const messagesResp = await client.session.messages({ path: { id: args.session_id! } })
       const messages = (messagesResp.data ?? []) as SessionMessage[]
@@ -222,7 +345,11 @@ export async function executeSyncContinuation(
         : undefined
     }
 
-    const fallbackChain = resumeAgent ? resolveAgentFallbackChain(resumeAgent) : undefined
+    fallbackChain = resumeAgent
+      ? resolveAgentFallbackChain(resumeAgent, {
+          userAgentOverrides: executorCtx.userAgentOverrides,
+        })
+      : undefined
     await promptWithRetry(client, {
       path: { id: args.session_id! },
       body: {
@@ -254,6 +381,35 @@ export async function executeSyncContinuation(
     await new Promise(resolve => setTimeout(resolve, timing.POLL_INTERVAL_MS))
 
     const elapsed = Date.now() - pollStart
+    const statusResult = typeof client.session.status === "function"
+      ? await client.session.status()
+      : { data: {} }
+    const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
+    const sessionStatus = allStatuses[args.session_id!]
+
+    if (elapsed >= timing.SYNC_HANDOFF_SLA_MS && sessionStatus?.type !== "idle") {
+      if (toastManager) {
+        toastManager.removeTask(taskId)
+      }
+      try {
+        return await handoffSyncSessionToBackground({
+          manager,
+          sessionID: args.session_id!,
+          parentSessionID: ctx.sessionID,
+          parentMessageID: ctx.messageID,
+          description: args.description,
+          prompt: args.prompt,
+          agent: resumeAgent,
+          parentAgent: ctx.agent,
+          model: resumeModel,
+          fallbackChain,
+        })
+      } catch (handoffError) {
+        const message = handoffError instanceof Error ? handoffError.message : String(handoffError)
+        return `Sync execution exceeded SLA, but background handoff failed: ${message}\n\nSession ID: ${args.session_id}`
+      }
+    }
+
     if (elapsed < timing.SESSION_CONTINUATION_STABILITY_MS) continue
 
     const messagesCheck = await client.session.messages({ path: { id: args.session_id! } })
@@ -281,21 +437,18 @@ export async function executeSyncContinuation(
   }
 
   const messages = ((messagesResult as { data?: unknown }).data ?? messagesResult) as SessionMessage[]
-  const assistantMessages = messages
-    .filter((m) => m.info?.role === "assistant")
-    .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
-  const lastMessage = assistantMessages[0]
-
   if (toastManager) {
     toastManager.removeTask(taskId)
   }
 
-  if (!lastMessage) {
+  const textContent = extractAssistantText(messages)
+  if (!textContent) {
     return `No assistant response found.\n\nSession ID: ${args.session_id}`
   }
+  if (isNoTextSentinel(textContent)) {
+    return `Subagent produced no text output. This usually indicates provider-side failure after fallback routing.\n\nSession ID: ${args.session_id}`
+  }
 
-  const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
-  const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
   const duration = formatDuration(startTime)
 
   return `Task continued and completed in ${duration}.
@@ -558,7 +711,7 @@ export async function executeSyncTask(
   modelInfo?: ModelFallbackInfo,
   fallbackChain?: FallbackEntry[]
 ): Promise<string> {
-  const { client, directory, onSyncSessionCreated } = executorCtx
+  const { client, manager, directory, onSyncSessionCreated } = executorCtx
   const toastManager = getTaskToastManager()
   let taskId: string | undefined
   let syncSessionID: string | undefined
@@ -698,12 +851,37 @@ export async function executeSyncTask(
       const statusResult = await client.session.status()
       const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
       const sessionStatus = allStatuses[sessionID]
+      const elapsed = Date.now() - pollStart
+
+      if (elapsed >= syncTiming.SYNC_HANDOFF_SLA_MS && sessionStatus?.type !== "idle") {
+        if (toastManager && taskId) {
+          toastManager.removeTask(taskId)
+        }
+        try {
+          return await handoffSyncSessionToBackground({
+            manager,
+            sessionID,
+            parentSessionID: parentContext.sessionID,
+            parentMessageID: parentContext.messageID,
+            description: args.description,
+            prompt: args.prompt,
+            agent: agentToUse,
+            parentAgent: parentContext.agent,
+            model: categoryModel,
+            fallbackChain,
+            skillContent: systemContent,
+          })
+        } catch (handoffError) {
+          const message = handoffError instanceof Error ? handoffError.message : String(handoffError)
+          return `Sync execution exceeded SLA, but background handoff failed: ${message}\n\nSession ID: ${sessionID}`
+        }
+      }
 
       if (pollCount % 10 === 0) {
       log("[task] Poll status", {
           sessionID,
           pollCount,
-          elapsed: Math.floor((Date.now() - pollStart) / 1000) + "s",
+          elapsed: Math.floor(elapsed / 1000) + "s",
           sessionStatus: sessionStatus?.type ?? "not_in_status",
           stablePolls,
           lastMsgCount,
@@ -725,22 +903,34 @@ export async function executeSyncTask(
           const retryElapsed = Date.now() - retrySince
           if (retryElapsed >= syncTiming.FIRST_OUTPUT_TIMEOUT_MS) {
             const chain = (fallbackChain ?? []) as FallbackEntry[]
-            const candidates: Array<{ providerID: string; modelID: string; variant?: string }> = []
-            for (const entry of chain) {
-              for (const providerID of entry.providers) {
-                candidates.push({
-                  providerID,
-                  modelID: entry.model,
-                  ...(entry.variant ? { variant: entry.variant } : {}),
-                })
-              }
-            }
+            const connectedProviders = readConnectedProvidersCache()
+            const { candidates, diagnostics } = await buildFallbackCandidates({
+              client,
+              fallbackChain: chain,
+              connectedProviders,
+              excludeModels: triedModels,
+              allowModelListMiss: true,
+            })
+
+            log("[task] Session stuck in retry loop", {
+              sessionID,
+              agent: agentToUse,
+              retryElapsed,
+              chainLength: chain.length,
+              candidateCount: candidates.length,
+              connectedProviders: diagnostics.connectedProviders,
+              connectedProvidersKnown: diagnostics.connectedProvidersKnown,
+              availableModelCount: diagnostics.availableModelCount,
+              skippedDisconnected: diagnostics.skippedDisconnected,
+              skippedUnavailable: diagnostics.skippedUnavailable,
+              skippedUnhealthy: diagnostics.skippedUnhealthy,
+            })
 
             const pickNext = () => {
-              for (const c of candidates) {
-                const key = `${c.providerID}/${c.modelID}`
+              for (const candidate of candidates) {
+                const key = `${candidate.providerID}/${candidate.modelID}`
                 if (triedModels.has(key)) continue
-                return { candidate: c, key }
+                return { candidate, key }
               }
               return null
             }
@@ -813,7 +1003,6 @@ export async function executeSyncTask(
         continue
       }
 
-      const elapsed = Date.now() - pollStart
       if (elapsed < syncTiming.MIN_STABILITY_TIME_MS) {
         continue
       }
@@ -838,27 +1027,99 @@ export async function executeSyncTask(
     log("[task] Poll timeout reached", { sessionID, pollCount, lastMsgCount, stablePolls })
     }
 
-    const messagesResult = await client.session.messages({
-      path: { id: sessionID },
-    })
-
-    if (messagesResult.error) {
-      return `Error fetching result: ${messagesResult.error}\n\nSession ID: ${sessionID}`
+    let messages: SessionMessage[]
+    try {
+      messages = await fetchSessionMessages(client, sessionID)
+    } catch (error) {
+      return `${error instanceof Error ? error.message : String(error)}\n\nSession ID: ${sessionID}`
     }
 
-    const messages = ((messagesResult as { data?: unknown }).data ?? messagesResult) as SessionMessage[]
+    collectTriedModelsFromMessages(messages, triedModels)
 
-    const assistantMessages = messages
-      .filter((m) => m.info?.role === "assistant")
-      .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
-    const lastMessage = assistantMessages[0]
+    let textContent = extractAssistantText(messages)
+    if (!textContent || isNoTextSentinel(textContent)) {
+      const chain = (fallbackChain ?? []) as FallbackEntry[]
+      const attemptedRecoveryModels: string[] = []
 
-    if (!lastMessage) {
-      return `No assistant response found.\n\nSession ID: ${sessionID}`
+      while (chain.length > 0) {
+        const connectedProviders = readConnectedProvidersCache()
+        const { candidates } = await buildFallbackCandidates({
+          client,
+          fallbackChain: chain,
+          connectedProviders,
+          excludeModels: triedModels,
+          allowModelListMiss: true,
+        })
+
+        const next = candidates[0]
+        if (!next) {
+          break
+        }
+
+        const modelKey = `${next.providerID}/${next.modelID}`
+        attemptedRecoveryModels.push(modelKey)
+        triedModels.add(modelKey)
+
+        log("[task] No-output detected; attempting next fallback model", {
+          sessionID,
+          agent: agentToUse,
+          model: modelKey,
+        })
+
+        await client.session.abort({ path: { id: sessionID } }).catch(() => {})
+
+        try {
+          const allowTask = isPlanAgent(agentToUse)
+          await promptWithRetry(
+            client,
+            {
+              path: { id: sessionID },
+              body: {
+                agent: agentToUse,
+                system: systemContent,
+                tools: {
+                  task: allowTask,
+                  call_kord_agent: true,
+                  question: false,
+                },
+                parts: [{ type: "text", text: args.prompt }],
+                model: { providerID: next.providerID, modelID: next.modelID },
+                ...(next.variant ? { variant: next.variant } : {}),
+              },
+            },
+            undefined,
+          )
+        } catch (error) {
+          log("[task] No-output recovery fallback failed", {
+            sessionID,
+            model: modelKey,
+            error: String(error),
+          })
+          continue
+        }
+
+        messages = await waitForStableMessages(client, sessionID, syncTiming)
+        collectTriedModelsFromMessages(messages, triedModels)
+        textContent = extractAssistantText(messages)
+        if (textContent && !isNoTextSentinel(textContent)) {
+          break
+        }
+      }
+
+      if (!textContent) {
+        const attempted = attemptedRecoveryModels.length > 0
+          ? ` Attempted recovery models: ${attemptedRecoveryModels.join(", ")}.`
+          : ""
+        return `No assistant response found.${attempted}\n\nSession ID: ${sessionID}`
+      }
+
+      if (isNoTextSentinel(textContent)) {
+        const attempted = attemptedRecoveryModels.length > 0
+          ? ` Attempted recovery models: ${attemptedRecoveryModels.join(", ")}.`
+          : ""
+        return `Subagent produced no text output after fallback recovery.${attempted}\n\nSession ID: ${sessionID}`
+      }
     }
-
-    const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
-    const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
 
     const duration = formatDuration(startTime)
 
@@ -920,6 +1181,15 @@ export async function resolveCategoryExecution(
     connectedProviders: connectedProviders ?? undefined,
   })
 
+  log("[task] resolveCategoryExecution start", {
+    category: args.category,
+    connectedProviders,
+    availableModelsCount: availableModels.size,
+    inheritedModel,
+    systemDefaultModel,
+    kordJuniorModel
+  })
+
   const resolved = resolveCategoryConfig(args.category!, {
     userCategories,
     inheritedModel,
@@ -940,6 +1210,13 @@ export async function resolveCategoryExecution(
   }
 
   const requirement = CATEGORY_MODEL_REQUIREMENTS[args.category!]
+  const categoryConfig = userCategories?.[args.category!]
+  const categoryFallbackSlots = categoryConfig?.fallback_slots?.map((slot: string) => {
+    const parts = slot.split("/")
+    return parts.length >= 2
+      ? { providers: [parts[0]], model: parts.slice(1).join("/") }
+      : { providers: [], model: slot }
+  })
   let actualModel: string | undefined
   let modelInfo: ModelFallbackInfo | undefined
   let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
@@ -958,14 +1235,6 @@ export async function resolveCategoryExecution(
         : { model: actualModel, type: "system-default", source: "system-default" }
     }
   } else {
-    const categoryConfig = userCategories?.[args.category!]
-    const categoryFallbackSlots = categoryConfig?.fallback_slots?.map((slot: string) => {
-      const parts = slot.split("/")
-      return parts.length >= 2
-        ? { providers: [parts[0]], model: parts.slice(1).join("/") }
-        : { providers: [], model: slot }
-    })
-
     const resolution = resolveModelPipeline({
       intent: {
         userModel: explicitCategoryModel ?? overrideModel,
@@ -1027,7 +1296,10 @@ export async function resolveCategoryExecution(
     }
   }
 
-  const fallbackChain = requirement?.fallbackChain
+  const agentFallbackChain = resolveAgentFallbackChain(DEV_JUNIOR_AGENT, {
+    userAgentOverrides: executorCtx.userAgentOverrides,
+  })
+  const fallbackChain = categoryFallbackSlots ?? agentFallbackChain ?? requirement?.fallbackChain
 
   if (!categoryModel && actualModel) {
     const parsedModel = parseModelString(actualModel)
@@ -1150,7 +1422,9 @@ Create the work plan directly - that's your job as the planning agent.`,
     // Proceed anyway - session.prompt will fail with clearer error if agent doesn't exist
   }
 
-  const fallbackChain = resolveAgentFallbackChain(agentToUse)
+  const fallbackChain = resolveAgentFallbackChain(agentToUse, {
+    userAgentOverrides: executorCtx.userAgentOverrides,
+  })
 
   return { agentToUse, categoryModel, fallbackChain }
 }

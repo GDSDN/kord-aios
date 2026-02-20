@@ -222,7 +222,7 @@ export async function resumeTask(
     : undefined
   const resumeVariant = task.model?.variant
 
-  client.session.prompt({
+  promptWithRetry(client, {
     path: { id: task.sessionID },
     body: {
       agent: task.agent,
@@ -236,7 +236,7 @@ export async function resumeTask(
       },
       parts: [{ type: "text", text: input.prompt }],
     },
-  }).catch((error) => {
+  }, task.fallbackChain).catch((error) => {
     log("[background-agent] resume prompt error:", error)
     onTaskError(task, error instanceof Error ? error : new Error(String(error)))
   })

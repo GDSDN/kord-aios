@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
-import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider } from "../../config/schema"
+import type { AgentOverrides, CategoriesConfig, GitMasterConfig, BrowserAutomationProvider } from "../../config/schema"
 import type {
   AvailableCategory,
   AvailableSkill,
@@ -55,6 +55,7 @@ export interface DelegateTaskToolOptions {
   disabledSkills?: Set<string>
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]
+  userAgentOverrides?: AgentOverrides
   onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
 }
 

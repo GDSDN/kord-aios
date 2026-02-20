@@ -1,9 +1,13 @@
 import type { createOpencodeClient } from "@opencode-ai/sdk"
 import { log } from "./logger"
+import { buildFallbackCandidates } from "./fallback-candidates"
 import type { FallbackEntry } from "./model-requirements"
+import { markProviderUnhealthy } from "./provider-health"
 
 type Client = ReturnType<typeof createOpencodeClient>
 const DEFAULT_PROMPT_TIMEOUT_MS = 30_000
+const DEFERRED_ERROR_CHECK_INTERVAL_MS = 250
+const DEFERRED_ERROR_CHECK_ATTEMPTS = 8
 
 type SDKResult<T> = T & { error?: unknown }
 
@@ -43,7 +47,11 @@ function hasStructuredQuotaSignal(error: unknown, seen = new Set<unknown>()): bo
       value.includes("rate_limit") ||
       value.includes("ratelimit") ||
       value.includes("insufficient_quota") ||
-      value.includes("insufficient_credits")
+      value.includes("insufficient_credits") ||
+      value.includes("insufficient_balance") ||
+      value.includes("insufficient balance") ||
+      value.includes("creditserror") ||
+      value.includes("billing")
     )
   }
 
@@ -75,10 +83,13 @@ function hasStructuredQuotaSignal(error: unknown, seen = new Set<unknown>()): bo
       if (
         normalized.includes("rate_limit") ||
         normalized.includes("too_many_requests") ||
-        normalized.includes("ratelimit") ||
-        normalized.includes("insufficient_quota") ||
-        normalized.includes("insufficient_credits") ||
-        normalized.includes("quota_exceeded")
+          normalized.includes("ratelimit") ||
+          normalized.includes("insufficient_quota") ||
+          normalized.includes("insufficient_credits") ||
+          normalized.includes("quota_exceeded") ||
+          normalized.includes("insufficient_balance") ||
+          normalized.includes("insufficient balance") ||
+          normalized.includes("creditserror")
       ) {
         return true
       }
@@ -103,6 +114,8 @@ function isQuotaError(error: unknown): boolean {
     msg.includes("resource exhausted") ||
     msg.includes("quota exceeded") ||
     msg.includes("insufficient quota") ||
+    msg.includes("insufficient balance") ||
+    msg.includes("billing") ||
     msg.includes("quota") ||
     msg.includes("429") ||
     msg.includes("capacity") ||
@@ -117,6 +130,111 @@ function isTimeoutError(error: unknown): boolean {
 
 function isRetryableModelError(error: unknown): boolean {
   return isQuotaError(error) || isTimeoutError(error)
+}
+
+type SessionMessageSnapshot = {
+  count: number
+  lastSerialized: string
+  latestCreated: number
+}
+
+function safeSerialize(value: unknown): string {
+  try {
+    return JSON.stringify(value) ?? ""
+  } catch {
+    return ""
+  }
+}
+
+function extractCreatedTime(message: unknown): number {
+  if (!message || typeof message !== "object") return 0
+  const info = (message as { info?: { time?: { created?: number } } }).info
+  return typeof info?.time?.created === "number" ? info.time.created : 0
+}
+
+function createSnapshot(messages: unknown[]): SessionMessageSnapshot {
+  const last = messages.length > 0 ? messages[messages.length - 1] : undefined
+  return {
+    count: messages.length,
+    lastSerialized: safeSerialize(last),
+    latestCreated: messages.reduce<number>((max, msg) => Math.max(max, extractCreatedTime(msg)), 0),
+  }
+}
+
+async function readSessionMessages(client: Client, sessionID: string): Promise<unknown[]> {
+  if (!sessionID || typeof client.session.messages !== "function") {
+    return []
+  }
+
+  try {
+    const response = await client.session.messages({ path: { id: sessionID } })
+    const data = (response as { data?: unknown }).data ?? response
+    return Array.isArray(data) ? data : []
+  } catch {
+    return []
+  }
+}
+
+function collectDeltaMessages(messages: unknown[], snapshot: SessionMessageSnapshot): unknown[] {
+  const delta: unknown[] = []
+
+  if (messages.length > snapshot.count) {
+    delta.push(...messages.slice(snapshot.count))
+  }
+
+  const last = messages.length > 0 ? messages[messages.length - 1] : undefined
+  if (last && safeSerialize(last) !== snapshot.lastSerialized) {
+    delta.push(last)
+  }
+
+  for (const message of messages) {
+    if (extractCreatedTime(message) > snapshot.latestCreated) {
+      delta.push(message)
+    }
+  }
+
+  return Array.from(new Set(delta))
+}
+
+async function detectDeferredPromptError(
+  client: Client,
+  sessionID: string,
+  snapshot: SessionMessageSnapshot,
+): Promise<unknown | null> {
+  for (let attempt = 0; attempt < DEFERRED_ERROR_CHECK_ATTEMPTS; attempt++) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, DEFERRED_ERROR_CHECK_INTERVAL_MS))
+    }
+
+    const messages = await readSessionMessages(client, sessionID)
+    const deltaMessages = collectDeltaMessages(messages, snapshot)
+    const deferredError = deltaMessages.find((message) => isQuotaError(message))
+    if (deferredError) {
+      return deferredError
+    }
+  }
+
+  return null
+}
+
+async function callPromptAndDetectDeferredErrors(
+  client: Client,
+  args: PromptArgs,
+  timeoutMs: number,
+): Promise<void> {
+  const sessionID = args.path?.id
+  const snapshot = sessionID ? createSnapshot(await readSessionMessages(client, sessionID)) : null
+
+  await callPromptWithTimeout(client, args, timeoutMs)
+
+  if (!sessionID || !snapshot) {
+    return
+  }
+
+  const deferredError = await detectDeferredPromptError(client, sessionID, snapshot)
+  if (deferredError) {
+    throw deferredError
+  }
 }
 
 export function parseModelSuggestion(error: unknown): ModelSuggestionInfo | null {
@@ -233,8 +351,12 @@ export async function promptWithRetry(
     : "unknown/default"
 
   try {
-    await callPromptWithTimeout(client, args, promptTimeoutMs)
+    await callPromptAndDetectDeferredErrors(client, args, promptTimeoutMs)
   } catch (error) {
+    if (isQuotaError(error) && currentProviderID) {
+      markProviderUnhealthy(currentProviderID, "quota")
+    }
+
     // 1. Handle Model Not Found (Suggestion)
     const suggestion = parseModelSuggestion(error)
     if (suggestion && args.body.model) {
@@ -282,50 +404,75 @@ export async function promptWithRetry(
 
       await abortSession("initial")
 
-      const attemptedFallbacks = new Set<string>()
+      const currentModelKey = currentProviderID && currentModelID
+        ? `${currentProviderID}/${currentModelID}`
+        : undefined
+      const excludeModels = new Set<string>()
+      if (currentModelKey) {
+        excludeModels.add(currentModelKey)
+      }
 
-      for (const entry of fallbackChain) {
-        // Try each provider for this fallback entry
-        for (const provider of entry.providers) {
-          // Skip only the exact currently-failed provider/model pair.
-          if (currentProviderID === provider && currentModelID === entry.model) {
-            continue
-          }
+      const { candidates, diagnostics } = await buildFallbackCandidates({
+        client,
+        fallbackChain,
+        excludeModels,
+        allowModelListMiss: true,
+      })
 
-          const fallbackModelStr = `${provider}/${entry.model}`
+      log("[prompt-retry] Fallback candidate diagnostics", {
+        model: currentModel,
+        reason: retryReason,
+        candidateCount: candidates.length,
+        connectedProvidersKnown: diagnostics.connectedProvidersKnown,
+        connectedProviders: diagnostics.connectedProviders,
+        availableModelCount: diagnostics.availableModelCount,
+        skippedDisconnected: diagnostics.skippedDisconnected,
+        skippedUnavailable: diagnostics.skippedUnavailable,
+        skippedUnhealthy: diagnostics.skippedUnhealthy,
+      })
 
-          if (attemptedFallbacks.has(fallbackModelStr)) {
-            continue
-          }
-          attemptedFallbacks.add(fallbackModelStr)
+      const attemptedFallbacks: string[] = []
 
-          log("[prompt-retry] Attempting fallback", { fallbackModel: fallbackModelStr })
+      for (const candidate of candidates) {
+        const fallbackModelStr = `${candidate.providerID}/${candidate.modelID}`
+        attemptedFallbacks.push(fallbackModelStr)
 
-          try {
-            const variantToUse = entry.variant ?? args.body.variant
-            await callPromptWithTimeout(client, {
-              ...args,
-              body: {
-                ...args.body,
-                model: {
-                  providerID: provider,
-                  modelID: entry.model,
-                },
-                ...(variantToUse ? { variant: variantToUse } : {}),
+        log("[prompt-retry] Attempting fallback", { fallbackModel: fallbackModelStr })
+
+        try {
+          const variantToUse = candidate.variant ?? args.body.variant
+          await callPromptAndDetectDeferredErrors(client, {
+            ...args,
+            body: {
+              ...args.body,
+              model: {
+                providerID: candidate.providerID,
+                modelID: candidate.modelID,
               },
-            }, promptTimeoutMs)
-            log("[prompt-retry] Fallback successful", { model: fallbackModelStr })
-            return // Success! Exit function
-          } catch (fallbackError) {
-            log("[prompt-retry] Fallback failed", {
-              model: fallbackModelStr,
-              error: extractMessage(fallbackError)
-            })
-            await abortSession("fallback")
+              ...(variantToUse ? { variant: variantToUse } : {}),
+            },
+          }, promptTimeoutMs)
+          log("[prompt-retry] Fallback successful", { model: fallbackModelStr })
+          return
+        } catch (fallbackError) {
+          if (isQuotaError(fallbackError)) {
+            markProviderUnhealthy(candidate.providerID, "quota")
           }
+
+          log("[prompt-retry] Fallback failed", {
+            model: fallbackModelStr,
+            error: extractMessage(fallbackError),
+          })
+          await abortSession("fallback")
         }
       }
-      log("[prompt-retry] All fallbacks failed")
+
+      const attemptedText = attemptedFallbacks.length > 0
+        ? attemptedFallbacks.join(", ")
+        : "none"
+      throw new Error(
+        `Retryable model error (${retryReason}) and fallback candidates exhausted. Current model: ${currentModel}. Attempted: ${attemptedText}`,
+      )
     }
 
     // If no handling matched or all fallbacks failed, rethrow original error

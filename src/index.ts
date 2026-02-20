@@ -422,7 +422,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     : null;
   const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
 
-  const callKordAgent = createCallKordAgent(ctx, backgroundManager);
+  const callKordAgent = createCallKordAgent(ctx, backgroundManager, {
+    userAgentOverrides: pluginConfig.agents,
+  });
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
     (agent) => agent.toLowerCase() === "vision",
   );
@@ -489,6 +491,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     client: ctx.client,
     directory: ctx.directory,
     userCategories: pluginConfig.categories,
+    userAgentOverrides: pluginConfig.agents,
     gitMasterConfig: pluginConfig.git_master,
     kordJuniorModel: pluginConfig.agents?.["dev-junior"]?.model,
     browserProvider,

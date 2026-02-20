@@ -4,8 +4,9 @@ import { join } from "node:path"
 import { ALLOWED_AGENTS, CALL_KORD_AGENT_DESCRIPTION } from "./constants"
 import type { CallKordAgentArgs } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
+import type { AgentOverrides } from "../../config/schema"
 import { log, getAgentToolRestrictions, promptWithRetry, createSessionWithRetry } from "../../shared"
-import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+import { resolveAgentFallbackChain } from "../../shared/agent-fallback"
 import { consumeNewMessages } from "../../shared/session-cursor"
 import { findFirstMessageWithAgent, findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
@@ -35,7 +36,8 @@ type ToolContextWithMetadata = {
 
 export function createCallKordAgent(
   ctx: PluginInput,
-  backgroundManager: BackgroundManager
+  backgroundManager: BackgroundManager,
+  options?: { userAgentOverrides?: AgentOverrides },
 ): ToolDefinition {
   const agentDescriptions = ALLOWED_AGENTS.map(
     (name) => `- ${name}: Specialized agent for ${name} tasks`
@@ -76,7 +78,7 @@ export function createCallKordAgent(
         return await executeBackground(args, toolCtx, backgroundManager)
       }
 
-      return await executeSync(args, toolCtx, ctx)
+      return await executeSync(args, toolCtx, ctx, options)
     },
   })
 }
@@ -154,7 +156,8 @@ Use \`background_output\` tool with task_id="${task.id}" to check progress:
 async function executeSync(
   args: CallKordAgentArgs,
   toolContext: ToolContextWithMetadata,
-  ctx: PluginInput
+  ctx: PluginInput,
+  options?: { userAgentOverrides?: AgentOverrides },
 ): Promise<string> {
   let sessionID: string
 
@@ -221,7 +224,9 @@ Try using a different provider or API key authentication.
   log(`[call_kord_agent] Prompt text:`, args.prompt.substring(0, 100))
 
   try {
-    const fallbackChain = AGENT_MODEL_REQUIREMENTS[args.subagent_type]?.fallbackChain
+    const fallbackChain = resolveAgentFallbackChain(args.subagent_type, {
+      userAgentOverrides: options?.userAgentOverrides,
+    })
     await promptWithRetry(ctx.client, {
       path: { id: sessionID },
       body: {

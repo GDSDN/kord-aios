@@ -1,8 +1,29 @@
-import { describe, it, expect, mock } from "bun:test"
+import { describe, it, expect, mock, spyOn, beforeEach, afterEach } from "bun:test"
 import type { createOpencodeClient } from "@opencode-ai/sdk"
 import { parseModelSuggestion, promptWithRetry } from "./prompt-retry"
+import * as connectedProvidersCache from "./connected-providers-cache"
+import * as modelAvailability from "./model-availability"
+import { clearProviderHealth, getProviderBanInfo } from "./provider-health"
 
 type Client = ReturnType<typeof createOpencodeClient>
+
+let connectedProvidersSpy: ReturnType<typeof spyOn> | undefined
+let providerModelsSpy: ReturnType<typeof spyOn> | undefined
+let fetchAvailableModelsSpy: ReturnType<typeof spyOn> | undefined
+
+beforeEach(() => {
+  clearProviderHealth()
+})
+
+afterEach(() => {
+  connectedProvidersSpy?.mockRestore()
+  providerModelsSpy?.mockRestore()
+  fetchAvailableModelsSpy?.mockRestore()
+  connectedProvidersSpy = undefined
+  providerModelsSpy = undefined
+  fetchAvailableModelsSpy = undefined
+  clearProviderHealth()
+})
 
 describe("parseModelSuggestion", () => {
   describe("structured NamedError format", () => {
@@ -387,10 +408,31 @@ describe("promptWithRetry", () => {
 
   it("should try alternate provider in same fallback entry after quota error", async () => {
     // given first attempt fails due quota, then fallback with alternate provider succeeds
+    connectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
+    providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
+    fetchAvailableModelsSpy = spyOn(modelAvailability, "fetchAvailableModels").mockResolvedValue(
+      new Set([
+        "openai/gpt-5.3-codex",
+        "anthropic/gpt-5.3-codex",
+      ]),
+    )
     const promptMock = mock()
       .mockRejectedValueOnce(new Error("429 too many requests"))
       .mockResolvedValueOnce(undefined)
-    const client = { session: { prompt: promptMock } }
+    const client = {
+      provider: {
+        list: async () => ({ data: { connected: ["openai", "anthropic"] } }),
+      },
+      model: {
+        list: async () => ({
+          data: [
+            { provider: "openai", id: "gpt-5.3-codex" },
+            { provider: "anthropic", id: "gpt-5.3-codex" },
+          ],
+        }),
+      },
+      session: { prompt: promptMock },
+    }
 
     // when
     await promptWithRetry(client as unknown as Client, {
@@ -526,6 +568,195 @@ describe("promptWithRetry", () => {
       providerID: "anthropic",
       modelID: "claude-sonnet-4-5",
     })
+  })
+
+  it("should retry fallback when provider returns insufficient balance billing error", async () => {
+    // given
+    const promptMock = mock()
+      .mockRejectedValueOnce(
+        new Error("Insufficient balance. Manage your billing here: https://opencode.ai/workspace/wrk_xxx/billing")
+      )
+      .mockResolvedValueOnce(undefined)
+    const client = { session: { prompt: promptMock, abort: mock(() => Promise.resolve()) } }
+
+    // when
+    await promptWithRetry(client as unknown as Client, {
+      path: { id: "session-1" },
+      body: {
+        parts: [{ type: "text", text: "hello" }],
+        model: { providerID: "openai", modelID: "gpt-5.2" },
+      },
+    }, [
+      { providers: ["anthropic"], model: "claude-sonnet-4-5" },
+    ])
+
+    // then
+    expect(promptMock).toHaveBeenCalledTimes(2)
+    const retryCall = promptMock.mock.calls[1][0]
+    expect(retryCall.body.model).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-sonnet-4-5",
+    })
+  })
+
+  it("should continue fallback chain when first fallback hits deferred insufficient balance error", async () => {
+    // given
+    const promptMock = mock()
+      .mockRejectedValueOnce(new Error("429 too many requests"))
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+    const messagesMock = mock()
+      // snapshot before first fallback prompt (opencode)
+      .mockResolvedValueOnce({
+        data: [{ info: { time: { created: 1 } }, parts: [{ type: "text", text: "before" }] }],
+      })
+      // deferred check after first fallback prompt: same message updated with error payload
+      .mockResolvedValueOnce({
+        data: [
+          {
+            info: { time: { created: 1 } },
+            error: {
+              data: {
+                message: "Insufficient balance. Manage your billing here: https://opencode.ai/workspace/wrk_xxx/billing",
+                responseBody:
+                  '{"type":"error","error":{"type":"CreditsError","message":"Insufficient balance. Manage your billing here: https://opencode.ai/workspace/wrk_xxx/billing"}}',
+              },
+            },
+          },
+        ],
+      })
+      // snapshot before second fallback prompt (anthropic)
+      .mockResolvedValueOnce({
+        data: [
+          {
+            info: { time: { created: 1 } },
+            error: {
+              data: {
+                message: "Insufficient balance. Manage your billing here: https://opencode.ai/workspace/wrk_xxx/billing",
+              },
+            },
+          },
+        ],
+      })
+      // deferred checks after second fallback prompt: no new quota/billing errors
+      .mockResolvedValueOnce({
+        data: [
+          {
+            info: { time: { created: 1 } },
+            error: {
+              data: {
+                message: "Insufficient balance. Manage your billing here: https://opencode.ai/workspace/wrk_xxx/billing",
+              },
+            },
+          },
+          {
+            info: { time: { created: 2 } },
+            parts: [{ type: "text", text: "ok" }],
+          },
+        ],
+      })
+      .mockResolvedValue({
+        data: [
+          {
+            info: { time: { created: 1 } },
+            error: {
+              data: {
+                message: "Insufficient balance. Manage your billing here: https://opencode.ai/workspace/wrk_xxx/billing",
+              },
+            },
+          },
+          {
+            info: { time: { created: 2 } },
+            parts: [{ type: "text", text: "ok" }],
+          },
+        ],
+      })
+
+    const client = {
+      session: {
+        prompt: promptMock,
+        messages: messagesMock,
+        abort: mock(() => Promise.resolve()),
+      },
+    }
+
+    // when
+    await promptWithRetry(client as unknown as Client, {
+      path: { id: "session-1" },
+      body: {
+        parts: [{ type: "text", text: "hello" }],
+        model: { providerID: "openai", modelID: "gpt-5.2" },
+      },
+    }, [
+      { providers: ["opencode"], model: "glm-5" },
+      { providers: ["anthropic"], model: "claude-sonnet-4-5" },
+    ])
+
+    // then
+    expect(promptMock).toHaveBeenCalledTimes(3)
+    const retryCall = promptMock.mock.calls[2][0]
+    expect(retryCall.body.model).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-sonnet-4-5",
+    })
+  })
+
+  it("should skip disconnected providers when selecting fallback candidates", async () => {
+    // given
+    connectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic"])
+    const promptMock = mock()
+      .mockRejectedValueOnce(new Error("429 too many requests"))
+      .mockResolvedValueOnce(undefined)
+    const client = {
+      provider: { list: async () => ({ data: { connected: ["anthropic"] } }) },
+      model: { list: async () => ({ data: [{ provider: "anthropic", id: "claude-opus-4-6" }] }) },
+      session: { prompt: promptMock, abort: mock(() => Promise.resolve()) },
+    }
+
+    // when
+    await promptWithRetry(client as unknown as Client, {
+      path: { id: "session-1" },
+      body: {
+        parts: [{ type: "text", text: "hello" }],
+        model: { providerID: "openai", modelID: "gpt-5.2" },
+      },
+    }, [
+      { providers: ["github-copilot", "anthropic"], model: "claude-opus-4-6" },
+    ])
+
+    // then
+    expect(promptMock).toHaveBeenCalledTimes(2)
+    const retryCall = promptMock.mock.calls[1][0]
+    expect(retryCall.body.model).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-opus-4-6",
+    })
+  })
+
+  it("should mark provider unhealthy on quota failures", async () => {
+    // given
+    const promptMock = mock().mockRejectedValueOnce({
+      status: 402,
+      code: "insufficient_credits",
+      message: "Billing exhausted",
+    })
+    const client = { session: { prompt: promptMock } }
+
+    // when
+    await expect(
+      promptWithRetry(client as unknown as Client, {
+        path: { id: "session-1" },
+        body: {
+          parts: [{ type: "text", text: "hello" }],
+          model: { providerID: "openai", modelID: "gpt-5.2" },
+        },
+      })
+    ).rejects.toThrow()
+
+    // then
+    const ban = getProviderBanInfo("openai")
+    expect(ban).not.toBeNull()
+    expect(ban?.reason).toBe("quota")
   })
 
   it("should handle string error message with suggestion", async () => {

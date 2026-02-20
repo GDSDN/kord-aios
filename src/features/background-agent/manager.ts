@@ -5,7 +5,8 @@ import type {
   LaunchInput,
   ResumeInput,
 } from "./types"
-import { log, getAgentToolRestrictions, promptWithRetry, createSessionWithRetry } from "../../shared"
+import type { FallbackEntry } from "../../shared/model-requirements"
+import { log, getAgentToolRestrictions, promptWithRetry, createSessionWithRetry, buildFallbackCandidates } from "../../shared"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import { isInsideTmux } from "../../shared/tmux"
@@ -426,10 +427,15 @@ export class BackgroundManager {
     taskId: string
     sessionID: string
     parentSessionID: string
+    parentMessageID?: string
     description: string
     agent?: string
     parentAgent?: string
     concurrencyKey?: string
+    model?: { providerID: string; modelID: string; variant?: string }
+    fallbackChain?: FallbackEntry[]
+    prompt?: string
+    skillContent?: string
   }): Promise<BackgroundTask> {
     const existingTask = this.tasks.get(input.taskId)
     if (existingTask) {
@@ -442,6 +448,21 @@ export class BackgroundManager {
       }
       if (input.parentAgent !== undefined) {
         existingTask.parentAgent = input.parentAgent
+      }
+      if (input.parentMessageID !== undefined) {
+        existingTask.parentMessageID = input.parentMessageID
+      }
+      if (input.model !== undefined) {
+        existingTask.model = input.model
+      }
+      if (input.fallbackChain !== undefined) {
+        existingTask.fallbackChain = input.fallbackChain
+      }
+      if (input.prompt !== undefined) {
+        existingTask.prompt = input.prompt
+      }
+      if (input.skillContent !== undefined) {
+        existingTask.skillContent = input.skillContent
       }
       if (!existingTask.concurrencyGroup) {
         existingTask.concurrencyGroup = input.concurrencyKey ?? existingTask.agent
@@ -478,9 +499,9 @@ export class BackgroundManager {
       id: input.taskId,
       sessionID: input.sessionID,
       parentSessionID: input.parentSessionID,
-      parentMessageID: "",
+      parentMessageID: input.parentMessageID ?? "",
       description: input.description,
-      prompt: "",
+      prompt: input.prompt ?? "",
       agent: input.agent || "task",
       status: "running",
       startedAt: new Date(),
@@ -489,6 +510,9 @@ export class BackgroundManager {
         lastUpdate: new Date(),
       },
       parentAgent: input.parentAgent,
+      model: input.model,
+      fallbackChain: input.fallbackChain,
+      skillContent: input.skillContent,
       concurrencyKey: input.concurrencyKey,
       concurrencyGroup,
     }
@@ -1455,23 +1479,25 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
               if (currentModel) tried.add(currentModel)
 
               const chain = task.fallbackChain ?? []
-              let next:
-                | { providerID: string; modelID: string; variant?: string }
-                | undefined
+              const { candidates, diagnostics } = await buildFallbackCandidates({
+                client: this.client,
+                fallbackChain: chain,
+                excludeModels: tried,
+              })
+              const next = candidates[0]
 
-              for (const entry of chain) {
-                for (const providerID of entry.providers) {
-                  const key = `${providerID}/${entry.model}`
-                  if (tried.has(key)) continue
-                  next = {
-                    providerID,
-                    modelID: entry.model,
-                    ...(entry.variant ? { variant: entry.variant } : {}),
-                  }
-                  break
-                }
-                if (next) break
-              }
+              log("[background-agent] Retry-stuck fallback candidates", {
+                taskId: task.id,
+                sessionID,
+                chainLength: chain.length,
+                candidateCount: candidates.length,
+                connectedProvidersKnown: diagnostics.connectedProvidersKnown,
+                connectedProviders: diagnostics.connectedProviders,
+                availableModelCount: diagnostics.availableModelCount,
+                skippedDisconnected: diagnostics.skippedDisconnected,
+                skippedUnavailable: diagnostics.skippedUnavailable,
+                skippedUnhealthy: diagnostics.skippedUnhealthy,
+              })
 
               if (!next) {
                 task.status = "error"
@@ -1516,7 +1542,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
                     parts: [{ type: "text", text: task.prompt }],
                   },
                 },
-                undefined
+                task.fallbackChain
               ).catch((error) => {
                 log("[background-agent] Retry-stuck fallback prompt error:", error)
               })

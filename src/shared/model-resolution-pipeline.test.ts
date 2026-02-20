@@ -1,6 +1,7 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test, spyOn } from "bun:test"
 import { resolveModelPipeline, type ModelResolutionRequest } from "./model-resolution-pipeline"
 import type { FallbackEntry } from "./model-requirements"
+import * as connectedProvidersCache from "./connected-providers-cache"
 
 const AVAILABLE = new Set([
   "anthropic/claude-opus-4-6",
@@ -17,6 +18,16 @@ const FALLBACK_CHAIN: FallbackEntry[] = [
 ]
 
 describe("resolveModelPipeline — dynamic routing integration", () => {
+  let connectedProvidersSpy: ReturnType<typeof spyOn>
+
+  beforeEach(() => {
+    connectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
+  })
+
+  afterEach(() => {
+    connectedProvidersSpy.mockRestore()
+  })
+
   test("static mode (default) uses fallback chain as before", () => {
     //#given
     const request: ModelResolutionRequest = {
@@ -49,8 +60,8 @@ describe("resolveModelPipeline — dynamic routing integration", () => {
 
     //#then
     expect(result).toBeDefined()
-    // Dynamic routing should resolve before fallback chain
-    expect(["category-default", "dynamic-route"]).toContain(result!.provenance)
+    // Dynamic routing may fall through to fallback if no eligible provider is connected
+    expect(["category-default", "dynamic-route", "provider-fallback"]).toContain(result!.provenance)
   })
 
   test("dynamic mode falls back to chain when router returns nothing", () => {
@@ -157,5 +168,49 @@ describe("resolveModelPipeline — dynamic routing integration", () => {
     expect(result).toBeDefined()
     expect(result!.model).toContain("gemini-3-flash")
     expect(result!.provenance).toBe("provider-fallback")
+  })
+
+  test("dynamic routing picks connected available provider instead of first schema provider", () => {
+    //#given
+    connectedProvidersSpy.mockReturnValue(["opencode"])
+    const request: ModelResolutionRequest = {
+      constraints: {
+        availableModels: new Set(["opencode/claude-opus-4-6"]),
+      },
+      dynamic: {
+        routingMode: "dynamic",
+        agentName: "kord",
+        prompt: "refactor the architecture across modules",
+      },
+    }
+
+    //#when
+    const result = resolveModelPipeline(request)
+
+    //#then
+    expect(result).toBeDefined()
+    expect(result!.model).toBe("opencode/claude-opus-4-6")
+    expect(result!.provenance).toBe("dynamic-route")
+  })
+
+  test("dynamic routing returns undefined when routed providers are not connected", () => {
+    //#given
+    connectedProvidersSpy.mockReturnValue([])
+    const request: ModelResolutionRequest = {
+      constraints: {
+        availableModels: new Set(["anthropic/claude-opus-4-6"]),
+      },
+      dynamic: {
+        routingMode: "dynamic",
+        agentName: "kord",
+        prompt: "refactor the architecture across modules",
+      },
+    }
+
+    //#when
+    const result = resolveModelPipeline(request)
+
+    //#then
+    expect(result).toBeUndefined()
   })
 })

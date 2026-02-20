@@ -6,6 +6,7 @@ let WAIT_FOR_SESSION_TIMEOUT_MS = 30000
 let FIRST_OUTPUT_TIMEOUT_MS = 30000
 let MAX_POLL_TIME_MS = 10 * 60 * 1000
 let SESSION_CONTINUATION_STABILITY_MS = 5000
+let SYNC_HANDOFF_SLA_MS = 30000
 
 export function getTimingConfig() {
   return {
@@ -17,6 +18,7 @@ export function getTimingConfig() {
     FIRST_OUTPUT_TIMEOUT_MS,
     MAX_POLL_TIME_MS,
     SESSION_CONTINUATION_STABILITY_MS,
+    SYNC_HANDOFF_SLA_MS,
   }
 }
 
@@ -29,6 +31,7 @@ export function __resetTimingConfig(): void {
   FIRST_OUTPUT_TIMEOUT_MS = 30000
   MAX_POLL_TIME_MS = 10 * 60 * 1000
   SESSION_CONTINUATION_STABILITY_MS = 5000
+  SYNC_HANDOFF_SLA_MS = 30000
 }
 
 export function __setTimingConfig(overrides: Partial<ReturnType<typeof getTimingConfig>>): void {
@@ -40,4 +43,5 @@ export function __setTimingConfig(overrides: Partial<ReturnType<typeof getTiming
   if (overrides.FIRST_OUTPUT_TIMEOUT_MS !== undefined) FIRST_OUTPUT_TIMEOUT_MS = overrides.FIRST_OUTPUT_TIMEOUT_MS
   if (overrides.MAX_POLL_TIME_MS !== undefined) MAX_POLL_TIME_MS = overrides.MAX_POLL_TIME_MS
   if (overrides.SESSION_CONTINUATION_STABILITY_MS !== undefined) SESSION_CONTINUATION_STABILITY_MS = overrides.SESSION_CONTINUATION_STABILITY_MS
+  if (overrides.SYNC_HANDOFF_SLA_MS !== undefined) SYNC_HANDOFF_SLA_MS = overrides.SYNC_HANDOFF_SLA_MS
 }

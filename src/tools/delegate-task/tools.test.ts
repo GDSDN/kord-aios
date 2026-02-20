@@ -2969,9 +2969,484 @@ describe("kord-task", () => {
 
       // then
       expect(promptCalls).toBe(2)
-      expect(secondPromptBody.model.providerID).toBe("github-copilot")
-      expect(secondPromptBody.model.modelID).toBe("gpt-5.2")
+      expect(secondPromptBody.model.providerID).toBe("google")
+      expect(secondPromptBody.model.modelID).toBe("gemini-3-pro")
       expect(result).toContain("Task completed")
+    }, { timeout: 20000 })
+
+    test("uses user-configured agent fallback chain before hardcoded defaults", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+      let promptCalls = 0
+      let secondPromptBody: any
+
+      const mockManager = { launch: async () => ({}) }
+
+      const mockClient = {
+        app: {
+          agents: async () => ({
+            data: [
+              { name: "architect", mode: "subagent", model: { providerID: "openai", modelID: "gpt-5.2" } },
+            ],
+          }),
+        },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_architect_user_fallback" } }),
+          prompt: async (input: any) => {
+            promptCalls += 1
+            if (promptCalls === 1) {
+              throw new Error("429 rate limit exceeded")
+            }
+            secondPromptBody = input.body
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Retry success" }] }],
+          }),
+          status: async () => ({ data: { "ses_architect_user_fallback": { type: "idle" } } }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        userAgentOverrides: {
+          architect: {
+            fallback: [
+              { model: "anthropic/claude-opus-4-6", variant: "max" },
+            ],
+          },
+        },
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "kord",
+        abort: new AbortController().signal,
+      }
+
+      // when
+      const result = await tool.execute(
+        {
+          description: "Retry architect",
+          prompt: "Review architecture with fallback",
+          subagent_type: "architect",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      // then
+      expect(promptCalls).toBe(2)
+      expect(secondPromptBody.model.providerID).toBe("anthropic")
+      expect(secondPromptBody.model.modelID).toBe("claude-opus-4-6")
+      expect(secondPromptBody.variant).toBe("max")
+      expect(result).toContain("Task completed")
+    }, { timeout: 20000 })
+
+    test("uses latest assistant message with non-empty text when newest assistant message is empty", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+      const mockManager = { launch: async () => ({}) }
+
+      const mockClient = {
+        app: {
+          agents: async () => ({
+            data: [
+              { name: "architect", mode: "subagent", model: { providerID: "openai", modelID: "gpt-5.2" } },
+            ],
+          }),
+        },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_architect_non_empty_text" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [
+              {
+                info: { role: "assistant", time: { created: 1 } },
+                parts: [{ type: "text", text: "Hello from older assistant message" }],
+              },
+              {
+                info: { role: "assistant", time: { created: 2 } },
+                parts: [{ type: "text", text: "" }],
+              },
+            ],
+          }),
+          status: async () => ({ data: { "ses_architect_non_empty_text": { type: "idle" } } }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "kord",
+        abort: new AbortController().signal,
+      }
+
+      // when
+      const result = await tool.execute(
+        {
+          description: "Check non-empty assistant selection",
+          prompt: "Say hello",
+          subagent_type: "architect",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      // then
+      expect(result).toContain("Task completed")
+      expect(result).toContain("Hello from older assistant message")
+    }, { timeout: 20000 })
+
+    test("returns explicit failure when assistant text is '(No text output)'", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+      const mockManager = { launch: async () => ({}) }
+
+      cacheSpy.mockReturnValue(["openai"])
+      providerModelsSpy.mockReturnValue({
+        models: {
+          openai: ["gpt-5.2"],
+        },
+        connected: ["openai"],
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      })
+
+      const mockClient = {
+        app: {
+          agents: async () => ({
+            data: [
+              { name: "architect", mode: "subagent", model: { providerID: "openai", modelID: "gpt-5.2" } },
+            ],
+          }),
+        },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_architect_no_text" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [
+              {
+                info: { role: "assistant", time: { created: 1 } },
+                parts: [{ type: "text", text: "(No text output)" }],
+              },
+            ],
+          }),
+          status: async () => ({ data: { "ses_architect_no_text": { type: "idle" } } }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "kord",
+        abort: new AbortController().signal,
+      }
+
+      // when
+      const result = await tool.execute(
+        {
+          description: "No text sentinel",
+          prompt: "Say hello",
+          subagent_type: "architect",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      // then
+      expect(result).toContain("Subagent produced no text output")
+      expect(result).not.toContain("Task completed")
+    }, { timeout: 20000 })
+
+    test("retries with next fallback slot when first fallback returns no output", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+      const mockManager = { launch: async () => ({}) }
+      let promptCalls = 0
+
+      cacheSpy.mockReturnValue(["openai", "opencode", "zai-coding-plan"])
+      providerModelsSpy.mockReturnValue({
+        models: {
+          openai: ["gpt-5.2"],
+          opencode: ["glm-5"],
+          "zai-coding-plan": ["glm-4.7"],
+        },
+        connected: ["openai", "opencode", "zai-coding-plan"],
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      })
+
+      const mockClient = {
+        app: {
+          agents: async () => ({
+            data: [
+              { name: "architect", mode: "subagent", model: { providerID: "openai", modelID: "gpt-5.2" } },
+            ],
+          }),
+        },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_architect_recovery" } }),
+          prompt: async () => {
+            promptCalls += 1
+            if (promptCalls === 1) {
+              throw new Error("Model attempt timed out after 30000ms")
+            }
+            return { data: {} }
+          },
+          messages: async () => {
+            if (promptCalls <= 1) {
+              return {
+                data: [{ info: { role: "user", time: { created: 1 } }, parts: [{ type: "text", text: "start" }] }],
+              }
+            }
+
+            if (promptCalls === 2) {
+              return {
+                data: [
+                  {
+                    info: {
+                      role: "assistant",
+                      time: { created: 2 },
+                      model: { providerID: "opencode", modelID: "glm-5" },
+                    },
+                    parts: [{ type: "text", text: "(No text output)" }],
+                  },
+                ],
+              }
+            }
+
+            return {
+              data: [
+                {
+                  info: {
+                    role: "assistant",
+                    time: { created: 2 },
+                    model: { providerID: "opencode", modelID: "glm-5" },
+                  },
+                  parts: [{ type: "text", text: "(No text output)" }],
+                },
+                {
+                  info: {
+                    role: "assistant",
+                    time: { created: 3 },
+                    model: { providerID: "zai-coding-plan", modelID: "glm-4.7" },
+                  },
+                  parts: [{ type: "text", text: "Recovered hello" }],
+                },
+              ],
+            }
+          },
+          status: async () => ({ data: { "ses_architect_recovery": { type: "idle" } } }),
+          abort: async () => ({ data: {} }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        userAgentOverrides: {
+          architect: {
+            fallback: [
+              { model: "opencode/glm-5" },
+              { model: "zai-coding-plan/glm-4.7" },
+            ],
+          },
+        },
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "kord",
+        abort: new AbortController().signal,
+      }
+
+      // when
+      const result = await tool.execute(
+        {
+          description: "Recover from no output",
+          prompt: "Say hello",
+          subagent_type: "architect",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      // then
+      expect(promptCalls).toBe(3)
+      expect(result).toContain("Task completed")
+      expect(result).toContain("Recovered hello")
+    }, { timeout: 20000 })
+
+    test("sync delegation hands off to background when SLA is exceeded", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+      __setTimingConfig({
+        POLL_INTERVAL_MS: 10,
+        MIN_STABILITY_TIME_MS: 10,
+        STABILITY_POLLS_REQUIRED: 1,
+        MAX_POLL_TIME_MS: 500,
+        SYNC_HANDOFF_SLA_MS: 30,
+      })
+
+      const trackedInputs: any[] = []
+      const mockManager = {
+        launch: async () => ({}),
+        findBySession: () => undefined,
+        trackTask: async (input: any) => {
+          trackedInputs.push(input)
+          return { id: input.taskId, status: "running", sessionID: input.sessionID }
+        },
+      }
+
+      const mockClient = {
+        app: {
+          agents: async () => ({
+            data: [
+              { name: "architect", mode: "subagent", model: { providerID: "openai", modelID: "gpt-5.2" } },
+            ],
+          }),
+        },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_sync_handoff" } }),
+          prompt: async () => ({ data: {} }),
+          status: async () => ({ data: { "ses_sync_handoff": { type: "running" } } }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "kord",
+        abort: new AbortController().signal,
+      }
+
+      // when
+      const result = await tool.execute(
+        {
+          description: "Long running sync",
+          prompt: "Do complex architecture review",
+          subagent_type: "architect",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      // then
+      expect(result).toContain("Sync execution exceeded SLA")
+      expect(result).toContain("Session ID: ses_sync_handoff")
+      expect(result).toContain("background_output(task_id=")
+      expect(trackedInputs.length).toBe(1)
+      expect(trackedInputs[0].sessionID).toBe("ses_sync_handoff")
+      expect(trackedInputs[0].prompt).toBe("Do complex architecture review")
+    }, { timeout: 20000 })
+
+    test("sync continuation hands off to background when SLA is exceeded", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+      __setTimingConfig({
+        POLL_INTERVAL_MS: 10,
+        SESSION_CONTINUATION_STABILITY_MS: 100,
+        STABILITY_POLLS_REQUIRED: 20,
+        MAX_POLL_TIME_MS: 500,
+        SYNC_HANDOFF_SLA_MS: 30,
+      })
+
+      const trackedInputs: any[] = []
+      const mockManager = {
+        launch: async () => ({}),
+        findBySession: () => undefined,
+        trackTask: async (input: any) => {
+          trackedInputs.push(input)
+          return { id: input.taskId, status: "running", sessionID: input.sessionID }
+        },
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          prompt: async () => ({ data: {} }),
+          status: async () => ({ data: { "ses_existing_sync": { type: "running" } } }),
+          messages: async () => ({
+            data: [
+              {
+                info: {
+                  role: "assistant",
+                  agent: "architect",
+                  model: { providerID: "openai", modelID: "gpt-5.2" },
+                },
+                parts: [{ type: "text", text: "existing" }],
+              },
+            ],
+          }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "kord",
+        abort: new AbortController().signal,
+      }
+
+      // when
+      const result = await tool.execute(
+        {
+          description: "Continue long sync",
+          prompt: "continue existing work",
+          session_id: "ses_existing_sync",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      // then
+      expect(result).toContain("Sync execution exceeded SLA")
+      expect(result).toContain("Session ID: ses_existing_sync")
+      expect(result).toContain("background_output(task_id=")
+      expect(trackedInputs.length).toBe(1)
+      expect(trackedInputs[0].sessionID).toBe("ses_existing_sync")
+      expect(trackedInputs[0].prompt).toBe("continue existing work")
     }, { timeout: 20000 })
   })
 
