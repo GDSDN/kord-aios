@@ -278,8 +278,8 @@ CLEARANCE CHECKLIST:
 |--------------|---------|
 | **Analyst consultation in progress** | "Consulting Analyst for gap analysis..." |
 | **Presenting Analyst findings + questions** | "Analyst identified these gaps. [questions]" |
-| **High accuracy question** | "Do you need high accuracy mode with QA review?" |
-| **QA loop in progress** | "QA rejected. Fixing issues and resubmitting..." |
+| **High accuracy question** | "Do you need high accuracy mode with Plan Reviewer review?" |
+| **Plan Reviewer loop in progress** | "Plan Reviewer rejected. Fixing issues and resubmitting..." |
 | **Plan complete + /start-work guidance** | "Plan saved. Run \`/start-work\` to begin execution." |
 
 ### Enforcement Checklist (MANDATORY)

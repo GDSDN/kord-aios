@@ -10,7 +10,7 @@
  * Transition to PLAN GENERATION mode when:
  * - User says "Make it into a work plan!" or "Save it as a file"
  * - Before generating, consults Analyst for missed questions/guardrails
- * - Optionally loops through QA for high-accuracy validation
+ * - Optionally loops through Plan Reviewer for high-accuracy validation
  *
  * Can write .md files only (enforced by plan-md-only hook).
  */

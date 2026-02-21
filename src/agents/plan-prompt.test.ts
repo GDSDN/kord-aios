@@ -1,16 +1,16 @@
 import { describe, test, expect } from "bun:test"
 import { PLAN_SYSTEM_PROMPT } from "./plan"
 
-describe("PLAN_SYSTEM_PROMPT QA invocation policy", () => {
-  test("should direct providing ONLY the file path string when invoking QA", () => {
+describe("PLAN_SYSTEM_PROMPT Plan Reviewer invocation policy", () => {
+  test("should direct providing ONLY the file path string when invoking Plan Reviewer", () => {
     //#given
     const prompt = PLAN_SYSTEM_PROMPT
 
     //#when / #then
-    expect(prompt.toLowerCase()).toMatch(/qa.*only.*path|path.*only.*qa/)
+    expect(prompt.toLowerCase()).toMatch(/plan reviewer.*only.*path|path.*only.*plan reviewer/)
   })
 
-  test("should forbid wrapping QA invocation in explanations or markdown", () => {
+  test("should forbid wrapping Plan Reviewer invocation in explanations or markdown", () => {
     //#given
     const prompt = PLAN_SYSTEM_PROMPT
 

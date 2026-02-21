@@ -47,6 +47,32 @@ Generate plan to: docs/kord/plans/{name}.md
 
 ---
 
+## Project Artifacts
+
+List only artifacts that actually apply to this plan. Do not prefill universal artifacts.
+
+| Artifact | Agent | Path | Status |
+|----------|-------|------|--------|
+| [Artifact Name] | [subagent] | [exact path] | pending |
+| [Artifact Name] | [subagent] | [exact path] | generated |
+| User Stories | sm | docs/kord/stories/{name}.md | generated |
+| Backlog Validation | po | docs/kord/stories/{name}.md | validated |
+
+---
+
+## Decision Points
+
+List decisions that require evidence-based choice (vendor/stack/provider selection). Each decision MUST link to research evidence.
+
+- [ ] Decision: [What must be decided]
+  - Options: [Option A | Option B | Option C]
+  - Evaluation rubric: [Cost | Rate limits | Quality | Latency | Compliance]
+  - Evidence: docs/kord/research/{name}.md
+  - Final decision: [TBD]
+  - Rationale: [TBD]
+
+---
+
 ## Work Objectives
 
 ### Core Objective

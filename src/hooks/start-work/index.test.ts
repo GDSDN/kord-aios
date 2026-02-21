@@ -382,7 +382,7 @@ describe("start-work hook", () => {
   })
 
   describe("session agent management", () => {
-    test("should update session agent to build when start-work command is triggered", async () => {
+    test("should update session agent to builder when start-work command is triggered", async () => {
       // given
       const updateSpy = spyOn(sessionState, "updateSessionAgent")
       
@@ -398,7 +398,7 @@ describe("start-work hook", () => {
       )
 
       // then
-      expect(updateSpy).toHaveBeenCalledWith("ses-plan-to-kord", "build")
+      expect(updateSpy).toHaveBeenCalledWith("ses-plan-to-kord", "builder")
       updateSpy.mockRestore()
     })
   })
