@@ -17,6 +17,7 @@ import {
 } from "./storage"
 import type { MessageData, ResumeConfig } from "./types"
 import { log } from "../../shared/logger"
+import { markInternalSessionAbort } from "../../shared/internal-session-abort"
 
 export interface SessionRecoveryOptions {
   experimental?: ExperimentalConfig
@@ -358,6 +359,7 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
         onAbortCallback(sessionID)  // Mark recovering BEFORE abort
       }
 
+      markInternalSessionAbort(sessionID, "session-recovery")
       await ctx.client.session.abort({ path: { id: sessionID } }).catch(() => {})
 
       const messagesResp = await ctx.client.session.messages({

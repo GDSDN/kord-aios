@@ -12,7 +12,7 @@ import { resolveMultipleSkillsAsync } from "../../features/opencode-skill-loader
 import { discoverSkills } from "../../features/opencode-skill-loader"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
-import { log, getAgentToolRestrictions, resolveModelPipeline, promptWithRetry, createSessionWithRetry } from "../../shared"
+import { log, getAgentToolRestrictions, resolveModelPipeline, promptWithRetry, createSessionWithRetry, markInternalSessionAbort } from "../../shared"
 import { fetchAvailableModels, isModelAvailable } from "../../shared/model-availability"
 import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { buildFallbackCandidates } from "../../shared/fallback-candidates"
@@ -948,6 +948,7 @@ export async function executeSyncTask(
                 to: key,
               })
 
+              markInternalSessionAbort(sessionID, "delegate-task:retry-stuck")
               await client.session.abort({ path: { id: sessionID } }).catch(() => {})
 
               try {

@@ -3,6 +3,7 @@ import { log } from "./logger"
 import { buildFallbackCandidates } from "./fallback-candidates"
 import type { FallbackEntry } from "./model-requirements"
 import { markProviderUnhealthy } from "./provider-health"
+import { markInternalSessionAbort } from "./internal-session-abort"
 
 type Client = ReturnType<typeof createOpencodeClient>
 const DEFAULT_PROMPT_TIMEOUT_MS = 30_000
@@ -196,6 +197,28 @@ function collectDeltaMessages(messages: unknown[], snapshot: SessionMessageSnaps
   return Array.from(new Set(delta))
 }
 
+function hasMeaningfulAssistantOrToolOutput(messages: unknown[]): boolean {
+  return messages.some((message) => {
+    if (!message || typeof message !== "object") return false
+
+    const info = (message as { info?: { role?: string } }).info
+    const role = info?.role
+    if (role !== "assistant" && role !== "tool") return false
+
+    const parts = (message as { parts?: Array<{ type?: string; text?: string }> }).parts ?? []
+    if (parts.length === 0) return role === "tool"
+
+    return parts.some((part) => {
+      if (!part || typeof part !== "object") return false
+      const text = typeof part.text === "string" ? part.text.trim() : ""
+      if (text.length > 0) return true
+
+      const type = typeof part.type === "string" ? part.type.trim() : ""
+      return role === "tool" && type.length > 0
+    })
+  })
+}
+
 async function detectDeferredPromptError(
   client: Client,
   sessionID: string,
@@ -349,12 +372,35 @@ export async function promptWithRetry(
   const currentModel = currentProviderID && currentModelID
     ? `${currentProviderID}/${currentModelID}`
     : "unknown/default"
+  const sessionID = args.path?.id
 
   try {
     await callPromptAndDetectDeferredErrors(client, args, promptTimeoutMs)
   } catch (error) {
     if (isQuotaError(error) && currentProviderID) {
       markProviderUnhealthy(currentProviderID, "quota")
+    }
+
+    if (isTimeoutError(error) && sessionID) {
+      const currentMessages = await readSessionMessages(client, sessionID)
+      const recentWindowMs = promptTimeoutMs + 5_000
+      const now = Date.now()
+      const recentMessages = currentMessages.filter((message) => {
+        const created = extractCreatedTime(message)
+        if (created <= 0) return false
+        return now - created <= recentWindowMs
+      })
+
+      const hasOutputProgress = hasMeaningfulAssistantOrToolOutput(recentMessages)
+
+      if (hasOutputProgress) {
+        log("[prompt-retry] Timeout detected with ongoing output; preserving active generation", {
+          sessionID,
+          model: currentModel,
+          recentMessageCount: recentMessages.length,
+        })
+        return
+      }
     }
 
     // 1. Handle Model Not Found (Suggestion)
@@ -391,6 +437,7 @@ export async function promptWithRetry(
       const abortSession = async (stage: string): Promise<void> => {
         if (!sessionID || typeof client.session.abort !== "function") return
         try {
+          markInternalSessionAbort(sessionID, `prompt-retry:${stage}`)
           await client.session.abort({ path: { id: sessionID } })
           log("[prompt-retry] Aborted session before fallback", { sessionID, stage })
         } catch (abortError) {

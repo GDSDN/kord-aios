@@ -759,6 +759,50 @@ describe("promptWithRetry", () => {
     expect(ban?.reason).toBe("quota")
   })
 
+  it("should preserve active generation on timeout when output is already streaming", async () => {
+    // given
+    const now = Date.now()
+    const promptMock = mock().mockRejectedValueOnce(
+      new Error("session.prompt timed out after 30000ms for session session-1")
+    )
+    const messagesMock = mock()
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            info: { role: "assistant", time: { created: now } },
+            parts: [{ type: "text", text: "Streaming output started" }],
+          },
+        ],
+      })
+    const abortMock = mock(() => Promise.resolve())
+
+    const client = {
+      session: {
+        prompt: promptMock,
+        messages: messagesMock,
+        abort: abortMock,
+      },
+    }
+
+    // when
+    await promptWithRetry(
+      client as unknown as Client,
+      {
+        path: { id: "session-1" },
+        body: {
+          parts: [{ type: "text", text: "hello" }],
+          model: { providerID: "openai", modelID: "gpt-5.2" },
+        },
+      },
+      [{ providers: ["anthropic"], model: "claude-opus-4-6" }],
+    )
+
+    // then
+    expect(promptMock).toHaveBeenCalledTimes(1)
+    expect(abortMock).toHaveBeenCalledTimes(0)
+  })
+
   it("should handle string error message with suggestion", async () => {
 
     // given a client that fails with a string error containing suggestion

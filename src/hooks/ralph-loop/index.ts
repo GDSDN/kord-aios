@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { log } from "../../shared/logger"
+import { isRecentInternalSessionAbort, clearInternalSessionAbort } from "../../shared/internal-session-abort"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { readState, writeState, clearState, incrementIteration } from "./storage"
 import {
@@ -398,14 +399,20 @@ export function createRalphLoopHook(
       const error = props?.error as { name?: string } | undefined
 
       if (error?.name === "MessageAbortedError") {
-        if (sessionID) {
-          const state = readState(ctx.directory, stateDir)
-          if (state?.session_id === sessionID) {
-            clearState(ctx.directory, stateDir)
-            log(`[${HOOK_NAME}] User aborted, loop cleared`, { sessionID })
-          }
-          sessions.delete(sessionID)
+        if (!sessionID) return
+
+        if (isRecentInternalSessionAbort(sessionID)) {
+          clearInternalSessionAbort(sessionID)
+          log(`[${HOOK_NAME}] Internal abort detected; preserving loop state`, { sessionID })
+          return
         }
+
+        const state = readState(ctx.directory, stateDir)
+        if (state?.session_id === sessionID) {
+          clearState(ctx.directory, stateDir)
+          log(`[${HOOK_NAME}] User aborted, loop cleared`, { sessionID })
+        }
+        sessions.delete(sessionID)
         return
       }
 

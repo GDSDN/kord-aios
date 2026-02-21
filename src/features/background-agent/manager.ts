@@ -6,7 +6,7 @@ import type {
   ResumeInput,
 } from "./types"
 import type { FallbackEntry } from "../../shared/model-requirements"
-import { log, getAgentToolRestrictions, promptWithRetry, createSessionWithRetry, buildFallbackCandidates } from "../../shared"
+import { log, getAgentToolRestrictions, promptWithRetry, createSessionWithRetry, buildFallbackCandidates, markInternalSessionAbort } from "../../shared"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import { isInsideTmux } from "../../shared/tmux"
@@ -1522,6 +1522,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
                 to: `${next.providerID}/${next.modelID}`,
               })
 
+              markInternalSessionAbort(sessionID, "background-agent:retry-stuck")
               await this.client.session.abort({ path: { id: sessionID } }).catch(() => {})
 
               await promptWithRetry(
