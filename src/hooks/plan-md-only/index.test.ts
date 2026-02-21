@@ -118,8 +118,8 @@ describe("plan-md-only", () => {
       // then
       expect(output.message).toContain("PLAN MANDATORY WORKFLOW REMINDER")
       expect(output.message).toContain("INTERVIEW")
-      expect(output.message).toContain("ANALYST CONSULTATION")
-      expect(output.message).toContain("QA REVIEW")
+      expect(output.message).toContain("PLAN ANALYZER CONSULTATION")
+      expect(output.message).toContain("PLAN REVIEWER REVIEW")
     })
 
     test("should NOT inject workflow reminder for docs/kord/drafts/", async () => {
@@ -241,6 +241,46 @@ describe("plan-md-only", () => {
       }
       const output = {
         args: { prompt: "Analyze this codebase" },
+      }
+
+      // when
+      await hook["tool.execute.before"](input, output)
+
+      // then
+      expect(output.args.prompt).toContain(SYSTEM_DIRECTIVE_PREFIX)
+      expect(output.args.prompt).toContain("DO NOT modify any files")
+    })
+
+    test("should inject artifact-generation warning when Plan calls task for pm", async () => {
+      // given
+      const hook = createPlanMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "task",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { subagent_type: "pm", prompt: "Generate a PRD" },
+      }
+
+      // when
+      await hook["tool.execute.before"](input, output)
+
+      // then
+      expect(output.args.prompt).toContain(SYSTEM_DIRECTIVE_PREFIX)
+      expect(output.args.prompt).toContain("You MAY write/edit artifact files")
+    })
+
+    test("should inject consult warning when Plan calls task for explore", async () => {
+      // given
+      const hook = createPlanMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "task",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { subagent_type: "explore", prompt: "Search the repo" },
       }
 
       // when
