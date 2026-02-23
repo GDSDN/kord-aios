@@ -6,7 +6,7 @@ import type {
   ResumeInput,
 } from "./types"
 import type { FallbackEntry } from "../../shared/model-requirements"
-import { log, getAgentToolRestrictions, promptWithRetry, createSessionWithRetry, buildFallbackCandidates, markInternalSessionAbort } from "../../shared"
+import { log, getAgentToolRestrictions, promptWithRetry, createSessionWithRetry, buildFallbackCandidates, markInternalSessionAbort, isRecentInternalSessionAbort } from "../../shared"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import { isInsideTmux } from "../../shared/tmux"
@@ -1472,6 +1472,14 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
             const retryElapsed = Date.now() - task.retrySince.getTime()
 
             if (retryElapsed >= RETRY_FIRST_OUTPUT_TIMEOUT_MS) {
+              // Skip if promptWithRetry is already handling this session's fallback
+              // This prevents race condition where both background-manager and promptWithRetry
+              // try to abort and fallback simultaneously, killing the new session
+              if (isRecentInternalSessionAbort(sessionID)) {
+                log("[background-agent] Skipping retry-stuck fallback: promptWithRetry already handling", { taskId: task.id, sessionID })
+                continue
+              }
+
               const tried = new Set(task.retryFallbackTriedModels ?? [])
               const currentModel = task.model
                 ? `${task.model.providerID}/${task.model.modelID}`
