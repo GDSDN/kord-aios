@@ -1,5 +1,7 @@
 import { createBuiltinAgents } from "../agents";
 import { createDevJuniorAgentWithOverrides } from "../agents/dev-junior";
+import { loadAllSquads } from "../features/squad/loader";
+import { createAllSquadAgentConfigs } from "../features/squad/factory";
 import {
   loadUserCommands,
   loadProjectCommands,
@@ -378,8 +380,13 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
       };
     } else {
+      // Load squads and convert to agent configs
+      const squadLoadResult = loadAllSquads(ctx.directory);
+      const squadAgentConfigs = createAllSquadAgentConfigs(squadLoadResult.squads);
+
       config.agent = {
         ...builtinAgents,
+        ...Object.fromEntries(squadAgentConfigs), // Add squad agents
         ...userAgents,
         ...projectAgents,
         ...pluginAgents,

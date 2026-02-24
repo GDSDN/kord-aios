@@ -136,7 +136,7 @@ Artifacts are conditional, never universal. Dispatch only rows whose "When it ap
 | UX Spec | UI/flows, user journeys, accessibility | ux-design-expert | docs/kord/ux/{name}.md |
 | DevOps Notes | deployment/CI/CD/infrastructure decisions | devops | docs/kord/runs/{name}-devops.md |
 | Data Plan | schema/RLS/migrations/query performance concerns | data-engineer | supabase/planning/{name}.md |
-| Squad Manifest | need a new specialist squad | squad-creator | .opencode/squads/{squad-name}/SQUAD.yaml |
+| Squad Manifest | ONLY when user EXPLICITLY requests "create squad", "generate SQUAD.yaml", or explicitly asks for a new agent team | squad-creator | .opencode/squads/{squad-name}/SQUAD.yaml |
 
 Ordering:
 1) Run selected artifact writers in parallel (run_in_background=true)

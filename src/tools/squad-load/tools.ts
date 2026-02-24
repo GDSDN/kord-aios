@@ -6,6 +6,7 @@ import yaml from "js-yaml"
 import { SQUAD_LOAD_DESCRIPTION } from "./constants"
 import type { SquadLoadArgs } from "./types"
 import type { SquadManifest, SquadAgent, SquadConfig, PlanType } from "../../shared/types"
+import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 
 const DEFAULT_SEARCH_PATHS = [
   ".opencode/squads",
@@ -13,11 +14,30 @@ const DEFAULT_SEARCH_PATHS = [
   "docs/kord/squads",
 ]
 
+/** Get global squad search path from OpenCode config dir */
+function getGlobalSquadPath(): string | undefined {
+  try {
+    const configDir = getOpenCodeConfigDir({ binary: "opencode" })
+    return configDir ? join(configDir, "squads") : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export function findSquadManifestPath(directory: string, squadName: string): string | null {
+  // First check project-local paths
   for (const base of DEFAULT_SEARCH_PATHS) {
     const candidate = join(directory, base, squadName, "SQUAD.yaml")
     if (existsSync(candidate)) return candidate
   }
+
+  // Then check global path from OpenCode config dir
+  const globalPath = getGlobalSquadPath()
+  if (globalPath) {
+    const globalCandidate = join(globalPath, squadName, "SQUAD.yaml")
+    if (existsSync(globalCandidate)) return globalCandidate
+  }
+
   return null
 }
 

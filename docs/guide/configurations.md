@@ -37,14 +37,61 @@ It asks about your providers (Claude, OpenAI, Gemini, etc.) and generates optima
 
 ## Config File Locations
 
-Config file locations (priority order):
-1. `.opencode/kord-aios.json` (project)
-2. User config (platform-specific):
+Kord AIOS uses a two-tier configuration system (Global and Project). The configurations are merged at runtime, with **absolute priority given to the project configuration**.
+
+### 1. Global Configuration (User-level)
+
+The global configuration applies to all projects unless overridden.
+It is located in your user directory:
 
 | Platform        | User Config Path                                                                                            |
 | --------------- | ----------------------------------------------------------------------------------------------------------- |
 | **Windows**     | `~/.config/opencode/kord-aios.json` (preferred) or `%APPDATA%\opencode\kord-aios.json` (fallback) |
 | **macOS/Linux** | `~/.config/opencode/kord-aios.json`                                                                    |
+
+### 2. Project Configuration (Workspace-level)
+
+To override global settings for a specific project, you must create a configuration file inside the `.opencode/` directory at your project's root.
+
+> ⚠️ **CRITICAL WARNING**:
+> The project configuration **MUST** be placed inside the `.opencode/` folder.
+> It **CANNOT** be placed in the project root (`./kord-aios.json`). It will be ignored.
+>
+> ✅ **Correct**: `your-project/.opencode/kord-aios.json` (or `.jsonc`)
+> ❌ **Incorrect**: `your-project/kord-aios.json`
+
+### Configuration Merge Example
+
+If you have both files:
+
+**Global** (`~/.config/opencode/kord-aios.json`):
+```json
+{
+  "agents": {
+    "explore": { "model": "opencode/gpt-5-nano" },
+    "architect": { "model": "openai/gpt-5.2" }
+  }
+}
+```
+
+**Project** (`.opencode/kord-aios.json`):
+```json
+{
+  "agents": {
+    "explore": { "model": "anthropic/claude-haiku-4-5" }
+  }
+}
+```
+
+**Final Merged Result**:
+```json
+{
+  "agents": {
+    "explore": { "model": "anthropic/claude-haiku-4-5" }, // Overridden by project
+    "architect": { "model": "openai/gpt-5.2" }            // Inherited from global
+  }
+}
+```
 
 Schema autocomplete supported:
 

@@ -38,6 +38,17 @@ export function createSquadAgentConfig(
     ...(agentDef.temperature !== undefined ? { temperature: agentDef.temperature } : {}),
   }
 
+  // Apply tool permissions from SQUAD.yaml
+  if (agentDef.tools && Object.keys(agentDef.tools).length > 0) {
+    // Convert { "bash": false } to permission record
+    // false = deny, true = allow
+    const permission: Record<string, "allow" | "deny"> = {}
+    for (const [tool, enabled] of Object.entries(agentDef.tools)) {
+      permission[tool] = enabled ? "allow" : "deny"
+    }
+    config.permission = permission
+  }
+
   return config
 }
 

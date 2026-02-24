@@ -3,6 +3,7 @@ import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import jsYaml from "js-yaml"
 import { squadSchema, type SquadManifest } from "./schema"
+import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url))
 const BUILTIN_SQUADS_DIR = join(MODULE_DIR, "..", "builtin-squads")
@@ -119,10 +120,21 @@ const USER_SQUAD_SEARCH_PATHS = [
   ["docs", "kord", "squads"],
 ] as const
 
+/** Global squad search path (user's config dir) */
+function getGlobalSquadPath(): string | undefined {
+  try {
+    const configDir = getOpenCodeConfigDir({ binary: "opencode" })
+    return configDir ? join(configDir, "squads") : undefined
+  } catch {
+    return undefined
+  }
+}
+
 /**
  * Loads all squads from built-in and user directories.
  * Built-in squads: src/features/builtin-squads/
  * User squads (in order): .opencode/squads/ → .kord/squads/ → docs/kord/squads/
+ * Global squads: ~/.config/opencode/squads/
  */
 export function loadAllSquads(projectDir?: string): SquadLoadResult {
   const allSquads: LoadedSquad[] = []
@@ -150,6 +162,19 @@ export function loadAllSquads(projectDir?: string): SquadLoadResult {
       }
       allErrors.push(...user.errors)
     }
+  }
+
+  // 3. Global squads from OpenCode config dir
+  const globalSquadPath = getGlobalSquadPath()
+  if (globalSquadPath) {
+    const global = loadSquadsFromDir(globalSquadPath, "user")
+    for (const squad of global.squads) {
+      if (!seenNames.has(squad.manifest.name)) {
+        seenNames.add(squad.manifest.name)
+        allSquads.push(squad)
+      }
+    }
+    allErrors.push(...global.errors)
   }
 
   return { squads: allSquads, errors: allErrors }

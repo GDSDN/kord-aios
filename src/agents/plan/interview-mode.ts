@@ -46,7 +46,7 @@ Decision research is orchestrated by Planner via librarian/explore and consolida
 | UX flows / IA / edge cases | UI flows, journey design, accessibility needs | ux-design-expert | docs/kord/ux/{name}.md |
 | DevOps / CI-CD notes | Deployment, CI/CD, infrastructure decisions | devops | docs/kord/runs/{name}-devops.md |
 | Data schema/RLS plan | Schema, RLS, migration, or query-performance concerns | data-engineer | supabase/planning/{name}.md |
-| Squad manifest | A new specialist squad is required | squad-creator | .opencode/squads/{squad-name}/SQUAD.yaml |
+| Squad manifest | ONLY when user EXPLICITLY requests "create squad", "generate SQUAD.yaml", or explicitly asks for a new agent team | squad-creator | .opencode/squads/{squad-name}/SQUAD.yaml |
 | Stories + sequencing | After selected artifacts are generated | sm | docs/kord/stories/{name}.md |
 | Backlog validation | After SM story generation | po | docs/kord/stories/{name}.md |
 
