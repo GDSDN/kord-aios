@@ -370,6 +370,11 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       const squadLoadResult = loadAllSquads(ctx.directory);
       const squadAgentConfigs = createAllSquadAgentConfigs(squadLoadResult.squads);
 
+      log(`[config-handler] Loaded ${squadLoadResult.squads.length} squads with ${squadAgentConfigs.size} agents from ${ctx.directory}`, {
+        squads: squadLoadResult.squads.map(s => s.manifest.name),
+        agents: [...squadAgentConfigs.keys()],
+      });
+
       config.agent = {
         ...agentConfig,
         ...Object.fromEntries(
