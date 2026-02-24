@@ -32,8 +32,9 @@ export function createSquadAgentConfig(
   const systemPrompt = resolvedPrompt ?? agentDef.prompt ?? buildDefaultSquadAgentPrompt(agentName, agentDef, squadName)
 
   const config: AgentConfig = {
-    name: agentName,
-    system: systemPrompt,
+    description: `(${squadName} squad) ${agentDef.description}`,
+    mode: agentDef.mode ?? "subagent",
+    prompt: systemPrompt,
     ...(agentDef.model ? { model: agentDef.model } : {}),
     ...(agentDef.temperature !== undefined ? { temperature: agentDef.temperature } : {}),
   }
