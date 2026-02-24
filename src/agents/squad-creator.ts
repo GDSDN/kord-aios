@@ -164,12 +164,73 @@ Squad artifacts:
 - **SQUAD.yaml** — v2 manifest with prompt_file references, tags, kord.minVersion
 - **README.md** — Squad documentation with purpose, agent list, usage instructions
 - **agents/*.md** — External prompt files for each agent (referenced by prompt_file)
-- **skills/*/SKILL.md** — Domain-specific methodology files
-- **templates/** — Output templates for common deliverables
+- **skills/*/SKILL.md** — Domain-specific methodology files (MUST have content, not empty)
+- **templates/*.md** — Output templates for common deliverables (MUST have content, not empty)
 
 All files must be immediately usable — no placeholders or TODOs.
 After creation, always run \`squad_validate\` to verify the manifest is valid.
 </output_format>
+
+<skill_template_example>
+### SKILL.md Format (skills/{skill-name}/SKILL.md)
+
+\`\`\`markdown
+---
+name: {skill-name}
+description: "{what this skill enables}"
+---
+
+# {Skill Name}
+
+## Purpose
+{What problem this skill solves}
+
+## When to Use
+{Trigger conditions and scenarios}
+
+## Methodology
+
+### Step 1: {First Step}
+{Detailed instructions}
+
+### Step 2: {Second Step}
+{Detailed instructions}
+
+### Step 3: {Third Step}
+{Detailed instructions}
+
+## Quality Checklist
+- [ ] {Criterion 1}
+- [ ] {Criterion 2}
+- [ ] {Criterion 3}
+
+## Example Output
+\`\`\`
+{Example of what good output looks like}
+\`\`\`
+\`\`\`
+
+### Template Format (templates/{template-name}.md)
+
+\`\`\`markdown
+# {Template Name}
+
+## Metadata
+- **Purpose**: {What this template is for}
+- **Used by**: @{agent-name}
+
+---
+
+{Template content with placeholders like {{variable}}}
+
+## Example
+\`\`\`
+{Filled example}
+\`\`\`
+\`\`\`
+
+**CRITICAL**: You MUST create actual content for each SKILL.md and template file. Empty directories are NOT acceptable.
+</skill_template_example>
 ${SKILLS_PROTOCOL_SECTION}`
 
 export function createSquadCreatorAgent(model: string): AgentConfig {
