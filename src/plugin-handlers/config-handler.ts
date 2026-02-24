@@ -366,11 +366,16 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           }
         : undefined;
 
+      // Load squads and convert to agent configs (always, regardless of plannerEnabled)
+      const squadLoadResult = loadAllSquads(ctx.directory);
+      const squadAgentConfigs = createAllSquadAgentConfigs(squadLoadResult.squads);
+
       config.agent = {
         ...agentConfig,
         ...Object.fromEntries(
           Object.entries(builtinAgents).filter(([k]) => k !== "kord")
         ),
+        ...Object.fromEntries(squadAgentConfigs), // Add squad agents
         ...userAgents,
         ...projectAgents,
         ...pluginAgents,
@@ -380,7 +385,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
       };
     } else {
-      // Load squads and convert to agent configs
+      // Kord disabled - still load squads for non-Kord mode
       const squadLoadResult = loadAllSquads(ctx.directory);
       const squadAgentConfigs = createAllSquadAgentConfigs(squadLoadResult.squads);
 
