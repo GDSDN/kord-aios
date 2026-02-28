@@ -315,6 +315,48 @@ function deepMerge<T extends Record<string, unknown>>(target: T, source: Partial
   return result
 }
 
+/**
+ * Add-only merge: Preserves existing values, only adds missing keys.
+ * - Primitives: keep existing if set, otherwise use new
+ * - Arrays: keep existing array (do NOT replace or merge)
+ * - Objects: recursively merge, existing takes precedence
+ */
+function addOnlyMerge<T extends Record<string, unknown>>(existing: T, newConfig: Partial<T>): T {
+  // Start with all keys from newConfig
+  const result: Record<string, unknown> = { ...newConfig }
+
+  // Process all keys from existing
+  for (const key of Object.keys(existing)) {
+    const existingValue = existing[key]
+    const newValue = newConfig[key as keyof T]
+
+    // If key exists in existing, it always wins
+    if (existingValue !== undefined) {
+      // For objects: recursively merge (existing takes precedence)
+      if (
+        existingValue !== null &&
+        typeof existingValue === "object" &&
+        !Array.isArray(existingValue) &&
+        newValue !== null &&
+        typeof newValue === "object" &&
+        !Array.isArray(newValue)
+      ) {
+        // Recursive merge - existing takes precedence but we still get new keys
+        result[key] = addOnlyMerge(
+          existingValue as Record<string, unknown>,
+          newValue as Record<string, unknown>
+        )
+      } else {
+        // For primitives and arrays: existing always wins
+        result[key] = existingValue
+      }
+    }
+    // If key doesn't exist in existing, it will already be in result from the spread above
+  }
+
+  return result as T
+}
+
 export function generateKordAiosConfig(installConfig: InstallConfig): Record<string, unknown> {
   return generateModelConfig(installConfig)
 }
@@ -347,7 +389,7 @@ export function writeKordAiosConfig(installConfig: InstallConfig): ConfigMergeRe
           return { success: true, configPath: kordAiosConfigPath }
         }
 
-        const merged = deepMerge(existing, newConfig)
+        const merged = addOnlyMerge(existing, newConfig)
         writeFileSync(kordAiosConfigPath, JSON.stringify(merged, null, 2) + "\n")
       } catch (parseErr) {
         if (parseErr instanceof SyntaxError) {
@@ -363,6 +405,88 @@ export function writeKordAiosConfig(installConfig: InstallConfig): ConfigMergeRe
     return { success: true, configPath: kordAiosConfigPath }
   } catch (err) {
     return { success: false, configPath: kordAiosConfigPath, error: formatErrorWithSuggestion(err, "write kord-aios config") }
+  }
+}
+
+/**
+ * Writes kord-aios config to a project directory.
+ * Copies global config to project with add-only merge (existing project values win).
+ * If global config missing, writes minimal project config containing $schema.
+ *
+ * @param projectDir - The project directory to write config to
+ * @param globalConfigPath - Optional path to global config (defaults to global kord-aios.json)
+ * @returns ConfigMergeResult with configPath pointing to the project file
+ */
+export function writeProjectKordAiosConfig(projectDir: string, globalConfigPath?: string): ConfigMergeResult {
+  const projectOpencodeDir = resolve(projectDir, ".opencode")
+  const projectConfigPath = resolve(projectOpencodeDir, "kord-aios.json")
+
+  // Use provided global config path or default global path
+  const globalPath = globalConfigPath ?? getKordAiosConfig()
+
+  try {
+    // Create .opencode directory if it doesn't exist
+    if (!existsSync(projectOpencodeDir)) {
+      mkdirSync(projectOpencodeDir, { recursive: true })
+    }
+  } catch (err) {
+    return { success: false, configPath: projectOpencodeDir, error: formatErrorWithSuggestion(err, "create project .opencode directory") }
+  }
+
+  try {
+    let globalConfig: Record<string, unknown> | null = null
+
+    // Read global config if it exists
+    if (existsSync(globalPath)) {
+      try {
+        const content = readFileSync(globalPath, "utf-8")
+        if (!isEmptyOrWhitespace(content)) {
+          globalConfig = parseJsonc<Record<string, unknown>>(content)
+          if (!globalConfig || typeof globalConfig !== "object" || Array.isArray(globalConfig)) {
+            globalConfig = null
+          }
+        }
+      } catch {
+        // Failed to parse global config, treat as missing
+        globalConfig = null
+      }
+    }
+
+    // Determine what to write
+    let projectConfig: Record<string, unknown>
+
+    if (globalConfig) {
+      // Global config exists - merge with project config if it exists
+      if (existsSync(projectConfigPath)) {
+        try {
+          const projectContent = readFileSync(projectConfigPath, "utf-8")
+          if (!isEmptyOrWhitespace(projectContent)) {
+            const existingProjectConfig = parseJsonc<Record<string, unknown>>(projectContent)
+            if (existingProjectConfig && typeof existingProjectConfig === "object" && !Array.isArray(existingProjectConfig)) {
+              // Add-only merge: existing project values win
+              projectConfig = addOnlyMerge(existingProjectConfig, globalConfig)
+              writeFileSync(projectConfigPath, JSON.stringify(projectConfig, null, 2) + "\n")
+              return { success: true, configPath: projectConfigPath }
+            }
+          }
+        } catch {
+          // Failed to parse existing project config, overwrite with global
+        }
+      }
+
+      // No existing project config or parse failed - use global config
+      projectConfig = globalConfig
+    } else {
+      // Global config missing - write minimal project config with $schema
+      projectConfig = {
+        $schema: "https://raw.githubusercontent.com/GDSDN/kord-aios/master/assets/kord-opencode.schema.json",
+      }
+    }
+
+    writeFileSync(projectConfigPath, JSON.stringify(projectConfig, null, 2) + "\n")
+    return { success: true, configPath: projectConfigPath }
+  } catch (err) {
+    return { success: false, configPath: projectConfigPath, error: formatErrorWithSuggestion(err, "write project kord-aios config") }
   }
 }
 
@@ -627,7 +751,8 @@ export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
 
     const providers = (newConfig.provider ?? {}) as Record<string, unknown>
 
-    if (config.hasGemini) {
+    // Add-only: only add google provider if not already present
+    if (config.hasGemini && !providers.google) {
       providers.google = ANTIGRAVITY_PROVIDER_CONFIG.google
     }
 
