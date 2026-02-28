@@ -194,7 +194,7 @@ jobs:
           ls -la packages/${PLATFORM}/
           ls -la packages/${PLATFORM}/bin/
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         if: steps.check.outputs.skip != 'true'
         with:
           node-version: "24"
@@ -212,6 +212,6 @@ jobs:
           
           npm publish --access public --provenance $TAG_ARG
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
         timeout-minutes: 15
