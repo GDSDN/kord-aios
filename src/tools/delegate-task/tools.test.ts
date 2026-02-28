@@ -45,6 +45,70 @@ describe("kord-task", () => {
     providerModelsSpy?.mockRestore()
   })
 
+  describe("caller restrictions", () => {
+    test("blocks delegation when caller agent is dev", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+      const tool = createDelegateTask({
+        manager: { launch: async () => ({}) },
+        client: {},
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "dev",
+        abort: new AbortController().signal,
+      }
+
+      // when
+      const result = await tool.execute(
+        {
+          description: "Try delegate",
+          prompt: "Do something",
+          category: "quick",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      // then
+      expect(result).toContain("Agent \"dev\" is not allowed to delegate")
+    })
+
+    test("blocks delegation when caller agent is Dev (case-insensitive)", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+      const tool = createDelegateTask({
+        manager: { launch: async () => ({}) },
+        client: {},
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "Dev",
+        abort: new AbortController().signal,
+      }
+
+      // when
+      const result = await tool.execute(
+        {
+          description: "Try delegate",
+          prompt: "Do something",
+          subagent_type: "architect",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      // then
+      expect(result).toContain("Agent \"dev\" is not allowed to delegate")
+    })
+  })
+
   describe("DEFAULT_CATEGORIES", () => {
     test("visual-engineering category has model config", () => {
       // given

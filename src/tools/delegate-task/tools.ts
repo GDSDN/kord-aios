@@ -90,6 +90,12 @@ Prompts MUST be in English.`
     async execute(args: DelegateTaskArgs, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
 
+      // Dev is a deep worker executor; block further delegation to prevent loops and
+      // accidental category-routing into Dev-Junior.
+      if ((ctx.agent ?? "").toLowerCase() === "dev") {
+        return `Error: Agent "dev" is not allowed to delegate tasks via the "task" tool. Implement directly using tools, or use call_kord_agent for explore/librarian research.`
+      }
+
       if (args.executor && !args.subagent_type) {
         args.subagent_type = args.executor
       }
