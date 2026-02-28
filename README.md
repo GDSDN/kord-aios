@@ -57,6 +57,8 @@ Read the [Installation Guide](docs/guide/installation.md) or paste it to your LL
 
 Read and follow [docs/guide/installation.md](docs/guide/installation.md).
 
+> **Note**: Use `bunx kord-aios init` for setting up new projects if you have already installed Kord AIOS globally.
+
 ## Architecture
 
 ### Agents (20+)
