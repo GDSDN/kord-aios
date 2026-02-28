@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { Command } from "commander"
 import { install } from "./install"
+import { init } from "./init"
 import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
@@ -9,6 +10,7 @@ import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
 import type { DoctorOptions } from "./doctor"
+import type { InitOptions } from "./init"
 import packageJson from "../../package.json" with { type: "json" }
 
 const VERSION = packageJson.version
@@ -33,6 +35,7 @@ program
   .option("--kimi-for-coding <value>", "Kimi For Coding subscription: no, yes (default: no)")
   .option("--skip-auth", "Skip authentication setup hints")
   .option("--force", "Force fresh install regardless of project maturity")
+  .option("--reconfigure", "Bypass provider detection and ask all provider questions")
   .option("--skip-doctor", "Skip post-install verification checks")
   .option("--dry-run", "Preview changes without writing anything")
   .addHelpText("after", `
@@ -62,11 +65,44 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
       kimiForCoding: options.kimiForCoding,
       skipAuth: options.skipAuth ?? false,
       force: options.force ?? false,
+      reconfigure: options.reconfigure ?? false,
       skipDoctor: options.skipDoctor ?? false,
       dryRun: options.dryRun ?? false,
     }
     const exitCode = await install(args)
     process.exit(exitCode)
+  })
+
+program
+  .command("init")
+  .description("Initialize Kord AIOS project structure (non-interactive)")
+  .option("-d, --directory <path>", "Working directory (default: current directory)")
+  .option("--force", "Overwrite existing scaffolded files (templates, kord-rules.md)")
+  .addHelpText("after", `
+Examples:
+  $ bunx kord-aios init
+  $ bunx kord-aios init --directory /path/to/project
+  $ bunx kord-aios init --force
+
+What it creates:
+  - .kord/ directory with subdirectories (scripts, templates, checklists, skills, squads)
+  - docs/kord/ subdirectories (plans, drafts, notepads)
+  - Template files (story.md, adr.md, kord-rules.md)
+  - Project config (.opencode/kord-aios.json)
+
+What it does NOT do:
+  - Does NOT add plugin to opencode.json
+  - Does NOT configure provider authentication
+  - Does NOT run doctor checks
+  - Does NOT modify global config
+`)
+  .action(async (options) => {
+    const initOptions: InitOptions = {
+      directory: options.directory,
+      force: options.force ?? false,
+    }
+    const result = await init(initOptions)
+    process.exit(result.exitCode)
   })
 
 program
