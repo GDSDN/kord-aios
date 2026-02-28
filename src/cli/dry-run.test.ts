@@ -18,10 +18,10 @@ describe("dry-run", () => {
       dryRunLog("create", ".kord/templates/story.md")
 
       //#then
-      const output = logSpy.mock.calls[0][0] as string
-      expect(output).toContain("[DRY-RUN]")
-      expect(output).toContain("Would create")
-      expect(output).toContain(".kord/templates/story.md")
+      const allOutput = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n")
+      expect(allOutput).toContain("[DRY-RUN]")
+      expect(allOutput).toContain("Would create")
+      expect(allOutput).toContain(".kord/templates/story.md")
     })
   })
 

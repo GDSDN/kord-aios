@@ -56,7 +56,12 @@ export async function buildFallbackCandidates(
 
   if (connectedProviders === null && input.client) {
     const liveProviders = await getConnectedProviders(input.client)
-    connectedProviders = liveProviders.length > 0 ? liveProviders : []
+    // If the client cannot report connected providers (e.g. provider.list missing),
+    // treat provider connectivity as unknown. This prevents incorrectly filtering
+    // out all fallback providers in unit tests and offline contexts.
+    if (liveProviders.length > 0) {
+      connectedProviders = liveProviders
+    }
   }
 
   const connectedProvidersKnown = connectedProviders !== null
