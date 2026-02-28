@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { scaffoldProject, isProjectScaffolded } from "./scaffolder"
 
@@ -114,5 +114,28 @@ describe("isProjectScaffolded", () => {
   test("returns true after scaffolding", () => {
     scaffoldProject({ directory: TEST_DIR })
     expect(isProjectScaffolded(TEST_DIR)).toBe(true)
+  })
+
+  test("returns true with project config (.opencode/kord-aios.json) without full scaffold", () => {
+    //#given - project config as baseline signal
+    mkdirSync(join(TEST_DIR, ".opencode"), { recursive: true })
+    writeFileSync(join(TEST_DIR, ".opencode", "kord-aios.json"), "{}")
+
+    //#when
+    const result = isProjectScaffolded(TEST_DIR)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
+  test("returns false without project config or full scaffold", () => {
+    //#given - neither project config nor full scaffold
+    // Empty directory
+
+    //#when
+    const result = isProjectScaffolded(TEST_DIR)
+
+    //#then
+    expect(result).toBe(false)
   })
 })

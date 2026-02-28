@@ -157,4 +157,47 @@ describe("detectProjectMaturity", () => {
     expect(result.hasKordAiosConfig).toBe(true)
     expect(result.status).toBe("existing")
   })
+
+  test("existing: plugin + project config (.opencode/kord-aios.json) without scaffold", () => {
+    //#given - project config as baseline signal
+    writeFileSync(join(TEST_DIR, "opencode.json"), JSON.stringify({ plugin: ["kord-aios"] }))
+    mkdirSync(join(TEST_DIR, ".opencode"), { recursive: true })
+    writeFileSync(join(TEST_DIR, ".opencode", "kord-aios.json"), "{}")
+
+    //#when
+    const result = detectProjectMaturity(TEST_DIR)
+
+    //#then
+    expect(result.status).toBe("existing")
+    expect(result.hasProjectConfig).toBe(true)
+    expect(result.hasKordDirectory).toBe(false)
+    expect(result.hasDocsKord).toBe(false)
+  })
+
+  test("hasProjectConfig: detects .opencode/kord-aios.json", () => {
+    //#given
+    writeFileSync(join(TEST_DIR, "opencode.json"), JSON.stringify({ plugin: ["kord-aios"] }))
+    mkdirSync(join(TEST_DIR, ".opencode"), { recursive: true })
+    writeFileSync(join(TEST_DIR, ".opencode", "kord-aios.json"), JSON.stringify({ agents: {} }))
+
+    //#when
+    const result = detectProjectMaturity(TEST_DIR)
+
+    //#then
+    expect(result.hasProjectConfig).toBe(true)
+  })
+
+  test("partial: plugin + user config (not project config) without scaffold", () => {
+    //#given - user-level config at project root, not project config
+    writeFileSync(join(TEST_DIR, "opencode.json"), JSON.stringify({ plugin: ["kord-aios"] }))
+    writeFileSync(join(TEST_DIR, "kord-aios.config.jsonc"), "{}")
+
+    //#when
+    const result = detectProjectMaturity(TEST_DIR)
+
+    //#then
+    expect(result.status).toBe("partial")
+    expect(result.hasProjectConfig).toBe(false)
+    expect(result.hasKordAiosConfig).toBe(true)
+  })
 })
