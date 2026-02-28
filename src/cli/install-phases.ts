@@ -1,6 +1,6 @@
 import type { InstallArgs, InstallConfig, ProjectMaturityStatus } from "./types"
 import { detectProjectMaturity, type ProjectMaturity } from "./project-detector"
-import { isKordAiosInstalled, getKordAiosVersion, detectCurrentConfig, addPluginToKordAiosConfig, writeKordAiosConfig, addAuthPlugins, addProviderConfig } from "./config-manager"
+import { isKordAiosInstalled, getKordAiosVersion, detectCurrentConfig, addPluginToKordAiosConfig, writeKordAiosConfig, writeProjectKordAiosConfig, addAuthPlugins, addProviderConfig } from "./config-manager"
 import { createKordDirectory } from "./kord-directory"
 import { scaffoldProject } from "./scaffolder"
 import { runPostInstallDoctor, type PostInstallDoctorResult } from "./post-install-doctor"
@@ -30,6 +30,8 @@ export interface PhaseInstallationResult {
   pluginConfigPath: string
   configWritten: boolean
   configPath: string
+  projectConfigWritten: boolean
+  projectConfigPath: string
   kordDirCreated: boolean
   kordDirPath: string
   authConfigured: boolean
@@ -67,7 +69,7 @@ export async function phaseInstallation(config: InstallConfig, cwd: string): Pro
   const pluginResult = await addPluginToKordAiosConfig(VERSION)
   if (!pluginResult.success) {
     errors.push(`Plugin: ${pluginResult.error}`)
-    return { pluginAdded: false, pluginConfigPath: "", configWritten: false, configPath: "", kordDirCreated: false, kordDirPath: "", authConfigured: false, providerConfigured: false, errors }
+    return { pluginAdded: false, pluginConfigPath: "", configWritten: false, configPath: "", projectConfigWritten: false, projectConfigPath: "", kordDirCreated: false, kordDirPath: "", authConfigured: false, providerConfigured: false, errors }
   }
 
   let authConfigured = false
@@ -92,7 +94,12 @@ export async function phaseInstallation(config: InstallConfig, cwd: string): Pro
   const kordAiosResult = writeKordAiosConfig(config)
   if (!kordAiosResult.success) {
     errors.push(`Config: ${kordAiosResult.error}`)
-    return { pluginAdded: true, pluginConfigPath: pluginResult.configPath, configWritten: false, configPath: "", kordDirCreated: false, kordDirPath: "", authConfigured, providerConfigured, errors }
+    return { pluginAdded: true, pluginConfigPath: pluginResult.configPath, configWritten: false, configPath: "", projectConfigWritten: false, projectConfigPath: "", kordDirCreated: false, kordDirPath: "", authConfigured, providerConfigured, errors }
+  }
+
+  const projectConfigResult = writeProjectKordAiosConfig(cwd)
+  if (!projectConfigResult.success) {
+    errors.push(`Project config warning: ${projectConfigResult.error}`)
   }
 
   const kordDirResult = createKordDirectory(cwd)
@@ -107,6 +114,8 @@ export async function phaseInstallation(config: InstallConfig, cwd: string): Pro
     pluginConfigPath: pluginResult.configPath,
     configWritten: true,
     configPath: kordAiosResult.configPath,
+    projectConfigWritten: projectConfigResult.success,
+    projectConfigPath: projectConfigResult.configPath,
     kordDirCreated: kordDirResult.success && (kordDirResult.created ?? false),
     kordDirPath: kordDirResult.kordPath ?? "",
     authConfigured,

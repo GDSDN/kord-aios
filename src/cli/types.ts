@@ -21,6 +21,8 @@ export interface InstallArgs {
   skipDoctor?: boolean
   /** Dry-run mode — preview changes without writing */
   dryRun?: boolean
+  /** Bypass provider detection and ask all provider questions */
+  reconfigure?: boolean
 }
 
 export interface InstallConfig {
