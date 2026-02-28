@@ -410,8 +410,8 @@ describe("createSquadAgentConfig", () => {
     const config = createSquadAgentConfig("test-agent", agentDef, "test-squad")
 
     //#then
-    expect(config.name).toBe("test-agent")
-    expect(config.system).toBe("You are a test agent.")
+    expect(config.description).toBe("(test-squad squad) Test agent")
+    expect(config.prompt).toBe("You are a test agent.")
     expect(config.model).toBe("anthropic/claude-sonnet-4-5")
   })
 
@@ -431,7 +431,7 @@ describe("createSquadAgentConfig", () => {
     const config = createSquadAgentConfig("test-agent", agentDef, "test-squad", resolvedPrompts)
 
     //#then
-    expect(config.system).toBe("Resolved from .md file")
+    expect(config.prompt).toBe("Resolved from .md file")
   })
 
   test("falls back to inline prompt when prompt_file not resolved", () => {
@@ -450,7 +450,7 @@ describe("createSquadAgentConfig", () => {
     const config = createSquadAgentConfig("test-agent", agentDef, "test-squad", resolvedPrompts)
 
     //#then
-    expect(config.system).toBe("Inline prompt")
+    expect(config.prompt).toBe("Inline prompt")
   })
 
   test("creates config with default prompt when none provided", () => {
@@ -466,9 +466,9 @@ describe("createSquadAgentConfig", () => {
     const config = createSquadAgentConfig("copywriter", agentDef, "marketing")
 
     //#then
-    expect(config.system).toContain("copywriter")
-    expect(config.system).toContain("marketing")
-    expect(config.system).toContain("Kord AIOS")
+    expect(config.prompt).toContain("copywriter")
+    expect(config.prompt).toContain("marketing")
+    expect(config.prompt).toContain("Kord AIOS")
   })
 
   test("chief agent prompt mentions delegation capability", () => {
@@ -484,8 +484,8 @@ describe("createSquadAgentConfig", () => {
     const config = createSquadAgentConfig("chief", agentDef, "test")
 
     //#then
-    expect(config.system).toContain("squad chief")
-    expect(config.system).toContain("delegate")
+    expect(config.prompt).toContain("Squad chief")
+    expect(config.prompt).toContain("delegate")
   })
 })
 
@@ -650,6 +650,6 @@ describe("createAllSquadAgentConfigs", () => {
     expect(configs.size).toBeGreaterThan(0)
     expect(configs.has("dev-junior")).toBe(true)
     const devJuniorConfig = configs.get("dev-junior")!
-    expect(devJuniorConfig.system).toContain("dev-junior")
+    expect(devJuniorConfig.prompt).toContain("dev-junior")
   })
 })

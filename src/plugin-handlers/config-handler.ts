@@ -375,12 +375,14 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         agents: [...squadAgentConfigs.keys()],
       });
 
+      // NOTE: Squads can define agent names that overlap with core agents (e.g. dev-junior).
+      // Core/builtin agent configs must win; squads should only contribute additional agents.
       config.agent = {
+        ...Object.fromEntries(squadAgentConfigs), // Add squad agents (lowest precedence)
         ...agentConfig,
         ...Object.fromEntries(
           Object.entries(builtinAgents).filter(([k]) => k !== "kord")
         ),
-        ...Object.fromEntries(squadAgentConfigs), // Add squad agents
         ...userAgents,
         ...projectAgents,
         ...pluginAgents,
@@ -394,9 +396,10 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       const squadLoadResult = loadAllSquads(ctx.directory);
       const squadAgentConfigs = createAllSquadAgentConfigs(squadLoadResult.squads);
 
+      // Squads should not override builtin/user/project agent configs.
       config.agent = {
+        ...Object.fromEntries(squadAgentConfigs), // Add squad agents (lowest precedence)
         ...builtinAgents,
-        ...Object.fromEntries(squadAgentConfigs), // Add squad agents
         ...userAgents,
         ...projectAgents,
         ...pluginAgents,
