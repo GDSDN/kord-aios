@@ -112,6 +112,12 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Ensure npm supports trusted publishing
+        run: |
+          npm --version
+          npm install -g npm@latest
+          npm --version
+
       - name: Install dependencies
         run: bun install
         env:
@@ -183,11 +189,24 @@ jobs:
             TAG_ARG="--tag ${{ steps.version.outputs.dist_tag }}"
           fi
           if [ -n "${NODE_AUTH_TOKEN}" ]; then
+            echo "Publishing with NODE_AUTH_TOKEN"
             NPMRC="${RUNNER_TEMP}/.npmrc"
             printf "//registry.npmjs.org/:_authToken=%s\n" "${NODE_AUTH_TOKEN}" > "${NPMRC}"
             npm publish --userconfig "${NPMRC}" --access public --provenance $TAG_ARG
-          else
-            npm publish --access public --provenance $TAG_ARG
+            exit 0
+          fi
+
+          echo "NODE_AUTH_TOKEN is empty; attempting OIDC trusted publishing"
+          set +e
+          OUTPUT=$(npm publish --access public --provenance $TAG_ARG 2>&1)
+          STATUS=$?
+          set -e
+          echo "$OUTPUT"
+          if [ $STATUS -ne 0 ]; then
+            if echo "$OUTPUT" | grep -q "ENEEDAUTH"; then
+              echo "::error::npm publish failed with ENEEDAUTH. Set repo/org secret NPM_TOKEN (or NODE_AUTH_TOKEN), or configure npm Trusted Publisher (OIDC) for this workflow file (publish.yml)."
+            fi
+            exit $STATUS
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN || secrets.NODE_AUTH_TOKEN }}
