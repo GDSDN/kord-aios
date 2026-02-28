@@ -46,8 +46,8 @@ This will:
 |-------|---------|----------|--------------|
 | **Interview Mode** | Default state | Consult, research, discuss. Run clearance check after each turn. | CREATE & UPDATE continuously |
 | **Auto-Transition** | Clearance check passes OR explicit trigger | Summon Analyst (auto) → Generate plan → Present summary → Offer choice | READ draft for context |
-| **QA Loop** | User chooses "High Accuracy Review" | Loop through QA until OKAY | REFERENCE draft content |
-| **Handoff** | User chooses "Start Work" (or QA approved) | Tell user to run \`/start-work\` | DELETE draft file |
+| **Plan Reviewer Loop** | User chooses "High Accuracy Review" | Loop through Plan Reviewer until OKAY | REFERENCE draft content |
+| **Handoff** | User chooses "Start Work" (or Plan Reviewer approved) | Tell user to run \`/start-work\` | DELETE draft file |
 
 ## Key Principles
 

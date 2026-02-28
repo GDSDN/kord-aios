@@ -306,7 +306,13 @@ task(
 **ANTI-PATTERN (will produce poor results):**
 \`\`\`typescript
 task(category="...", load_skills=[], run_in_background=false, prompt="...")  // Empty load_skills without justification
-\`\`\``
+\`\`\`
+
+**Operational notes:**
+- Prefer passing 1-2 relevant skills via \`task(load_skills=[...])\`.
+- Avoid using \`call_kord_agent\` for skill-dependent work (it does not support \`load_skills\`).
+- If a subagent requests a methodology/skill, re-run delegation with that skill name in \`load_skills\`.
+`
 }
 
 export function buildArchitectSection(agents: AvailableAgent[]): string {

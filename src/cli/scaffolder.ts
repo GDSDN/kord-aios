@@ -87,11 +87,13 @@ export function scaffoldProject(options: ScaffoldOptions): ScaffoldResult {
 }
 
 export function isProjectScaffolded(directory: string): boolean {
-  // Check for presence of required baseline directories
-  // 1. docs/kord/plans
-  // 2. .kord/templates
-  return (
+  // Check for presence of required baseline signals:
+  // 1. Project config (.opencode/kord-aios.json) - new baseline signal
+  // 2. docs/kord/plans AND .kord/templates - full scaffold
+  const hasProjectConfig = existsSync(join(directory, ".opencode", "kord-aios.json"))
+  const hasFullScaffold =
     existsSync(join(directory, KORD_DOCS_DIR, "plans")) &&
     existsSync(join(directory, KORD_DIR, "templates"))
-  )
+
+  return hasProjectConfig || hasFullScaffold
 }

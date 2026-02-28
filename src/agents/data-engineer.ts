@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 
 const MODE: AgentMode = "subagent"
 
@@ -99,7 +100,8 @@ Schemas: SQL with COMMENT ON for documentation.
 Migrations: Numbered, versioned SQL files with UP/DOWN sections.
 Analysis: EXPLAIN ANALYZE output with recommendations.
 Match the language of the request.
-</output_format>`
+</output_format>
+${SKILLS_PROTOCOL_SECTION}`
 
 export function createDataEngineerAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([

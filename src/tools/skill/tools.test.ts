@@ -99,6 +99,51 @@ describe("skill tool - synchronous description", () => {
     // then
     expect(tool.description).toContain("No skills are currently available")
   })
+
+  it("includes skill descriptions in available_skills list", () => {
+    // given
+    const loadedSkills = [
+      createMockSkill("playwright", {}),
+      createMockSkill("git-master", {}),
+    ]
+
+    // when
+    const tool = createSkillTool({ skills: loadedSkills })
+
+    // then
+    expect(tool.description).toContain("<available_skills>")
+    expect(tool.description).toContain("playwright")
+    expect(tool.description).toContain("Test skill playwright")
+    expect(tool.description).toContain("git-master")
+    expect(tool.description).toContain("Test skill git-master")
+  })
+
+  it("throws error with available skills list for nonexistent skill", async () => {
+    // given
+    const loadedSkills = [
+      createMockSkill("playwright", {}),
+      createMockSkill("git-master", {}),
+    ]
+    const tool = createSkillTool({ skills: loadedSkills })
+
+    // when / #then
+    await expect(tool.execute({ name: "nonexistent-skill" }, mockContext)).rejects.toThrow(
+      /Skill "nonexistent-skill" not found.*Available skills:.*playwright.*git-master/s
+    )
+  })
+
+  it("returns content starting with ## Skill: when calling valid skill", async () => {
+    // given
+    const loadedSkills = [createMockSkill("test-skill")]
+    const tool = createSkillTool({ skills: loadedSkills })
+
+    // when
+    const result = await tool.execute({ name: "test-skill" }, mockContext)
+
+    // then
+    expect(result).toStartWith("## Skill:")
+    expect(result).toContain("test-skill")
+  })
 })
 
 describe("skill tool - agent restriction", () => {
@@ -349,3 +394,4 @@ describe("skill tool - MCP schema display", () => {
     })
   })
 })
+

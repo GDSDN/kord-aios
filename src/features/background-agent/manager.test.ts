@@ -1283,6 +1283,98 @@ describe("BackgroundManager.resume model persistence", () => {
   })
 })
 
+describe("BackgroundManager fallback chain retry", () => {
+  let manager: BackgroundManager
+  let promptCalls: Array<{ path: { id: string }; body: Record<string, unknown> }>
+
+  beforeEach(() => {
+    promptCalls = []
+
+    const client = {
+      session: {
+        create: async () => ({ data: { id: "session-launch" } }),
+        get: async () => ({ data: { directory: tmpdir() } }),
+        prompt: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptCalls.push(args)
+          if (promptCalls.length === 1) {
+            throw new Error("429 rate limit exceeded")
+          }
+          return {}
+        },
+        messages: async () => ({ data: [] }),
+        todo: async () => ({ data: [] }),
+        status: async () => ({ data: {} }),
+        abort: async () => ({}),
+      },
+    }
+
+    manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+  })
+
+  afterEach(() => {
+    manager.shutdown()
+  })
+
+  test("launch should retry with fallback chain on quota errors", async () => {
+    // given
+    await manager.launch({
+      description: "launch with fallback",
+      prompt: "do work",
+      agent: "explore",
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-message",
+      model: { providerID: "openai", modelID: "gpt-5.3-codex" },
+      fallbackChain: [{ providers: ["anthropic"], model: "claude-haiku-4-5" }],
+    } as any)
+
+    // when
+    await new Promise((resolve) => setTimeout(resolve, 80))
+
+    // then
+    expect(promptCalls.length).toBe(2)
+    expect(promptCalls[1].body.model).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-haiku-4-5",
+    })
+  })
+
+  test("resume should retry with persisted fallback chain on quota errors", async () => {
+    // given
+    const task: BackgroundTask = {
+      id: "task-resume-fallback",
+      sessionID: "session-resume",
+      parentSessionID: "parent-session",
+      parentMessageID: "message-1",
+      description: "resume with fallback",
+      prompt: "previous prompt",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      model: { providerID: "openai", modelID: "gpt-5.3-codex" },
+      concurrencyGroup: "openai/gpt-5.3-codex",
+      fallbackChain: [{ providers: ["anthropic"], model: "claude-haiku-4-5" }],
+    } as any
+    getTaskMap(manager).set(task.id, task)
+
+    // when
+    await manager.resume({
+      sessionId: "session-resume",
+      prompt: "continue",
+      parentSessionID: "new-parent",
+      parentMessageID: "new-message",
+    })
+    await new Promise((resolve) => setTimeout(resolve, 80))
+
+    // then
+    expect(promptCalls.length).toBe(2)
+    expect(promptCalls[1].body.model).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-haiku-4-5",
+    })
+  })
+})
+
 describe("BackgroundManager process cleanup", () => {
   test("should remove listeners after last shutdown", () => {
     // given
@@ -1444,6 +1536,36 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       expect(updatedTask?.startedAt).toBeInstanceOf(Date)
       expect(updatedTask?.sessionID).toBeDefined()
       expect(updatedTask?.sessionID).toBeTruthy()
+    })
+
+    test("should transition pending→error when startTask fails", async () => {
+      // given
+      const config = { defaultConcurrency: 5 }
+      manager.shutdown()
+      manager = new BackgroundManager({ client: mockClient, directory: tmpdir() } as unknown as PluginInput, config)
+
+      // Make session creation fail (non-retryable)
+      ;(mockClient.session as unknown as { create: () => Promise<unknown> }).create = async () => ({
+        error: { statusCode: 400, message: "bad request" },
+      })
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "parent-session",
+        parentMessageID: "parent-message",
+      }
+
+      // when
+      const task = await manager.launch(input)
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      // then
+      const updatedTask = manager.getTask(task.id)
+      expect(updatedTask?.status).toBe("error")
+      expect(updatedTask?.completedAt).toBeInstanceOf(Date)
+      expect(updatedTask?.sessionID).toBeUndefined()
     })
 
     test("should set startedAt when transitioning to running", async () => {

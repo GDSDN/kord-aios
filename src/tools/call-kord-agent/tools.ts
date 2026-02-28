@@ -4,7 +4,9 @@ import { join } from "node:path"
 import { ALLOWED_AGENTS, CALL_KORD_AGENT_DESCRIPTION } from "./constants"
 import type { CallKordAgentArgs } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
-import { log, getAgentToolRestrictions } from "../../shared"
+import type { AgentOverrides } from "../../config/schema"
+import { log, getAgentToolRestrictions, promptWithRetry, createSessionWithRetry } from "../../shared"
+import { resolveAgentFallbackChain } from "../../shared/agent-fallback"
 import { consumeNewMessages } from "../../shared/session-cursor"
 import { findFirstMessageWithAgent, findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
@@ -34,7 +36,8 @@ type ToolContextWithMetadata = {
 
 export function createCallKordAgent(
   ctx: PluginInput,
-  backgroundManager: BackgroundManager
+  backgroundManager: BackgroundManager,
+  options?: { userAgentOverrides?: AgentOverrides },
 ): ToolDefinition {
   const agentDescriptions = ALLOWED_AGENTS.map(
     (name) => `- ${name}: Specialized agent for ${name} tasks`
@@ -75,7 +78,7 @@ export function createCallKordAgent(
         return await executeBackground(args, toolCtx, backgroundManager)
       }
 
-      return await executeSync(args, toolCtx, ctx)
+      return await executeSync(args, toolCtx, ctx, options)
     },
   })
 }
@@ -153,7 +156,8 @@ Use \`background_output\` tool with task_id="${task.id}" to check progress:
 async function executeSync(
   args: CallKordAgentArgs,
   toolContext: ToolContextWithMetadata,
-  ctx: PluginInput
+  ctx: PluginInput,
+  options?: { userAgentOverrides?: AgentOverrides },
 ): Promise<string> {
   let sessionID: string
 
@@ -178,22 +182,23 @@ async function executeSync(
     log(`[call_kord_agent] Parent session dir: ${parentSession?.data?.directory}, fallback: ${ctx.directory}`)
     const parentDirectory = parentSession?.data?.directory ?? ctx.directory
 
-    const createResult = await ctx.client.session.create({
-      body: {
-        parentID: toolContext.sessionID,
-        title: `${args.description} (@${args.subagent_type} subagent)`,
-        permission: [
-          { permission: "question", action: "deny" as const, pattern: "*" },
-        ],
-      } as any,
-      query: {
-        directory: parentDirectory,
-      },
-    })
-
-    if (createResult.error) {
-      log(`[call_kord_agent] Session create error:`, createResult.error)
-      const errorStr = String(createResult.error)
+    try {
+      const created = await createSessionWithRetry(ctx.client, {
+        body: {
+          parentID: toolContext.sessionID,
+          title: `${args.description} (@${args.subagent_type} subagent)`,
+          permission: [
+            { permission: "question", action: "deny" as const, pattern: "*" },
+          ],
+        },
+        query: {
+          directory: parentDirectory,
+        },
+      })
+      sessionID = created.id
+    } catch (createErr) {
+      log(`[call_kord_agent] Session create error:`, createErr)
+      const errorStr = String(createErr)
       if (errorStr.toLowerCase().includes("unauthorized")) {
         return `Error: Failed to create session (Unauthorized). This may be due to:
 1. OAuth token restrictions (e.g., Claude Code credentials are restricted to Claude Code only)
@@ -202,12 +207,11 @@ async function executeSync(
 
 Try using a different provider or API key authentication.
 
-Original error: ${createResult.error}`
+ Original error: ${errorStr}`
       }
-      return `Error: Failed to create session: ${createResult.error}`
+      return `Error: Failed to create session: ${errorStr}`
     }
 
-    sessionID = createResult.data.id
     log(`[call_kord_agent] Created session: ${sessionID}`)
   }
 
@@ -220,7 +224,10 @@ Original error: ${createResult.error}`
   log(`[call_kord_agent] Prompt text:`, args.prompt.substring(0, 100))
 
   try {
-    await ctx.client.session.prompt({
+    const fallbackChain = resolveAgentFallbackChain(args.subagent_type, {
+      userAgentOverrides: options?.userAgentOverrides,
+    })
+    await promptWithRetry(ctx.client, {
       path: { id: sessionID },
       body: {
         agent: args.subagent_type,
@@ -230,7 +237,7 @@ Original error: ${createResult.error}`
         },
         parts: [{ type: "text", text: args.prompt }],
       },
-    })
+    }, fallbackChain)
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
     log(`[call_kord_agent] Prompt error:`, errorMessage)

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { createRalphLoopHook } from "./index"
 import { readState, writeState, clearState } from "./storage"
 import type { RalphLoopState } from "./types"
+import { markInternalSessionAbort, _resetInternalSessionAbortState } from "../../shared/internal-session-abort"
 
 describe("ralph-loop", () => {
   const TEST_DIR = join(tmpdir(), "ralph-loop-test-" + Date.now())
@@ -55,6 +56,7 @@ describe("ralph-loop", () => {
     }
 
     clearState(TEST_DIR)
+    _resetInternalSessionAbortState()
   })
 
   afterEach(() => {
@@ -538,6 +540,28 @@ describe("ralph-loop", () => {
       // then - continuation includes original task and promise
       expect(promptCalls[0].text).toContain("Create a calculator app")
       expect(promptCalls[0].text).toContain("<promise>CALCULATOR_DONE</promise>")
+    })
+
+
+    test("should keep loop active on internal fallback abort", async () => {
+      // given - active loop and an internal abort marker
+      const hook = createRalphLoopHook(createMockPluginInput())
+      hook.startLoop("session-123", "Build something")
+      markInternalSessionAbort("session-123", "prompt-retry:initial")
+
+      // when - MessageAbortedError is emitted from internal fallback abort
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID: "session-123",
+            error: { name: "MessageAbortedError", message: "The operation was aborted." },
+          },
+        },
+      })
+
+      // then - loop state must remain active
+      expect(hook.getState()).not.toBeNull()
     })
 
     test("should clear loop state on user abort (MessageAbortedError)", async () => {

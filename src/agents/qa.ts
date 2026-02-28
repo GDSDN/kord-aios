@@ -2,6 +2,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { isGptModel } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 
 const MODE: AgentMode = "subagent"
 
@@ -198,12 +199,22 @@ If REJECT:
 **Your job is to UNBLOCK work, not to BLOCK it with perfectionism.**
 
 **Response Language**: Match the language of the plan content.
-`
+
+<write_scope>
+You are allowed to write documentation outputs only.
+
+Default output locations:
+- Review notes: docs/kord/notepads/reviews/
+- Story annotations (when needed): docs/kord/stories/
+
+If you encounter a write permission error, do not try to write elsewhere in the repo.
+Stay within these documentation directories.
+</write_scope>
+
+${SKILLS_PROTOCOL_SECTION}`
 
 export function createQaAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([
-    "write",
-    "edit",
     "task",
     "task",
   ])

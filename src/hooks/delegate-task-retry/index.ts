@@ -8,6 +8,11 @@ export interface DelegateTaskErrorPattern {
 
 export const DELEGATE_TASK_ERROR_PATTERNS: DelegateTaskErrorPattern[] = [
   {
+    pattern: "Cannot use subagent_type=\"dev-junior\"",
+    errorType: "dev_junior_misuse",
+    fixHint: "Do not pass subagent_type=\"dev-junior\". Use category=\"quick\"|\"deep\"|... (category routing spawns dev-junior automatically).",
+  },
+  {
     pattern: "run_in_background",
     errorType: "missing_run_in_background",
     fixHint: "Add run_in_background=false (for delegation) or run_in_background=true (for parallel exploration)",

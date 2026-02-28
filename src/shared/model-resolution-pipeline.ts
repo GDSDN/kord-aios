@@ -5,6 +5,7 @@ import type { FallbackEntry } from "./model-requirements"
 import { classifyTask, routeModel } from "./model-router"
 import { loadModelSchema } from "./model-schema"
 import { parsePromptModelOverride } from "./prompt-model-override"
+import { isProviderHealthy } from "./provider-health"
 
 export type ModelResolutionRequest = {
   intent?: {
@@ -127,10 +128,48 @@ export function resolveModelPipeline(
       request.dynamic.costPreference,
     )
     if (routeResult) {
-      const fullModel = `${routeResult.model}`
       const providerMatch = schema.find(e => e.model === routeResult.model)
-      const provider = providerMatch?.providers[0]
-      const resolvedModel = provider ? `${provider}/${routeResult.model}` : routeResult.model
+      const providers = providerMatch?.providers ?? []
+      const connectedProviders = readConnectedProvidersCache()
+      const connectedSet = connectedProviders ? new Set(connectedProviders) : null
+      let resolvedModel: string | undefined
+
+      if (providers.length > 0) {
+        for (const provider of providers) {
+          if (connectedSet && !connectedSet.has(provider)) {
+            continue
+          }
+          if (!isProviderHealthy(provider)) {
+            continue
+          }
+
+          if (availableModels.size > 0) {
+            const match = fuzzyMatchModel(`${provider}/${routeResult.model}`, availableModels, [provider])
+            if (match) {
+              resolvedModel = match
+              break
+            }
+            continue
+          }
+
+          resolvedModel = `${provider}/${routeResult.model}`
+          break
+        }
+      }
+
+      if (!resolvedModel && routeResult.model.includes("/")) {
+        resolvedModel = routeResult.model
+      }
+
+      if (!resolvedModel) {
+        log("Dynamic routing returned model but no connected/available provider matched", {
+          agent: request.dynamic.agentName,
+          model: routeResult.model,
+          providers,
+          connectedProviders,
+          availableModelCount: availableModels.size,
+        })
+      } else {
       log("Model resolved via dynamic routing", {
         agent: request.dynamic.agentName,
         model: resolvedModel,
@@ -142,6 +181,7 @@ export function resolveModelPipeline(
         provenance: "dynamic-route" as ModelResolutionProvenance,
         variant: routeResult.variant,
         attempted,
+      }
       }
     }
     log("Dynamic routing returned no result, falling through to fallback chain")
@@ -158,6 +198,9 @@ export function resolveModelPipeline(
       } else {
         for (const entry of effectiveChain) {
           for (const provider of entry.providers) {
+            if (!isProviderHealthy(provider)) {
+              continue
+            }
             if (connectedSet.has(provider)) {
               const model = `${provider}/${entry.model}`
               log("Model resolved via fallback chain (connected provider)", {
@@ -179,6 +222,9 @@ export function resolveModelPipeline(
     } else {
       for (const entry of effectiveChain) {
         for (const provider of entry.providers) {
+          if (!isProviderHealthy(provider)) {
+            continue
+          }
           const fullModel = `${provider}/${entry.model}`
           const match = fuzzyMatchModel(fullModel, availableModels, [provider])
           if (match) {
@@ -199,6 +245,10 @@ export function resolveModelPipeline(
 
         const crossProviderMatch = fuzzyMatchModel(entry.model, availableModels)
         if (crossProviderMatch) {
+          const [providerID] = crossProviderMatch.split("/")
+          if (!providerID || !isProviderHealthy(providerID)) {
+            continue
+          }
           log("Model resolved via fallback chain (cross-provider fuzzy match)", {
             model: entry.model,
             match: crossProviderMatch,

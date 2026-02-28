@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 
 const MODE: AgentMode = "subagent"
 
@@ -86,7 +87,7 @@ When validating a story, check:
 </constraints>
 
 <collaboration>
-- **@sm**: Coordinate on story creation and refinement. Use call_kord_agent for story detail clarifications.
+- **@sm**: Coordinate on story creation and refinement.
 - **@pm**: Receive strategic direction and PRDs
 - **@qa**: Coordinate on quality gates and acceptance testing
 - **@dev/@dev-junior**: Track story completion and provide acceptance
@@ -96,7 +97,20 @@ When validating a story, check:
 Validation results: structured checklist with PASS/NEEDS_WORK per criterion.
 Backlog reviews: prioritized list with reasoning.
 Match the language of the request.
-</output_format>`
+</output_format>
+
+<write_scope>
+You are allowed to write documentation outputs only.
+
+Default output locations:
+- Story validation notes: docs/kord/stories/
+- Epic tracking updates (when needed): docs/kord/epics/
+
+If you encounter a write permission error, do not try to write elsewhere in the repo.
+Stay within these documentation directories.
+</write_scope>
+
+${SKILLS_PROTOCOL_SECTION}`
 
 export function createPoAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([

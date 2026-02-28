@@ -10,6 +10,8 @@ https://raw.githubusercontent.com/GDSDN/kord-aios/refs/heads/dev/docs/guide/inst
 
 **Alternative, Not recommended, do this by yourself**
 
+### Global Installation & Updates
+
 Run the interactive installer:
 
 ```bash
@@ -21,7 +23,31 @@ npx kord-aios install # alternative
 >
 > **Supported platforms**: macOS (ARM64, x64), Linux (x64, ARM64, Alpine/musl), Windows (x64)
 
-Follow the prompts to configure your Claude, ChatGPT, and Gemini subscriptions. After installation, authenticate your providers as instructed.
+The `install` command registers the plugin globally and writes the project configuration during install/update. Follow the prompts to configure your Claude, ChatGPT, and Gemini subscriptions. After installation, authenticate your providers as instructed.
+
+#### Re-installation Behavior
+
+Running `install` again will perform a smart merge, preserving your existing configuration. It automatically skips provider questions if you are already configured. To force the installer to ask provider questions again, use the `--reconfigure` flag:
+
+```bash
+bunx kord-aios install --reconfigure
+```
+
+### Project Initialization
+
+If you have already installed Kord AIOS globally and just want to initialize a new project, run:
+
+```bash
+bunx kord-aios init
+```
+
+This creates a project-specific configuration (`.opencode/kord-aios.json`) and scaffolds the Kord project structure (like `.kord/` and `docs/kord/`). It **does not** modify your global configuration.
+
+### Configuration Hierarchy
+
+Kord AIOS uses a deep-merge configuration system:
+1. **Global config**: `~/.config/opencode/kord-aios.json` (baseline)
+2. **Project config**: `<project>/.opencode/kord-aios.json` (overrides global)
 
 After you install it, you can read this [overview guide](./overview.md) to understand more.
 
@@ -38,7 +64,7 @@ follow these steps:
 
 ### Step 0: Ask user about subscriptions
 
-Ask the user these questions to determine CLI options:
+Ask the user these questions to determine CLI options (skip if the user just wants to re-install, update, or initialize a project, as Kord AIOS preserves existing config automatically):
 
 1. **Do you have a Claude Pro/Max Subscription?**
    - If **yes**: **Are you on max20 (20x mode)?**
@@ -86,11 +112,20 @@ Spawn a subagent to handle installation and report back - to save context.
 
 ### Step 2: Run the installer
 
+**For Project Initialization Only** (if the user already installed globally):
+```bash
+bunx kord-aios init
+```
+This creates a project config (`.opencode/kord-aios.json`) and scaffolds directories, but **does not** modify the global config.
+
+**For Global Installation/Update**:
 Based on user's answers, run the CLI installer with appropriate flags:
 
 ```bash
 bunx kord-aios install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>]
 ```
+
+If the user already has a configuration, `install` will preserve it through a smart merge. If provider flags are omitted during re-installation, it reuses the existing config. To force reconfiguration, append `--reconfigure`.
 
 **Examples:**
 - User has all native subscriptions: `bunx kord-aios install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no`
@@ -100,10 +135,13 @@ bunx kord-aios install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copi
 - User has Z.ai for Librarian: `bunx kord-aios install --no-tui --claude=yes --gemini=no --copilot=no --zai-coding-plan=yes`
 - User has only OpenCode Zen: `bunx kord-aios install --no-tui --claude=no --gemini=no --copilot=no --opencode-zen=yes`
 - User has no subscriptions: `bunx kord-aios install --no-tui --claude=no --gemini=no --copilot=no`
+- Re-install while keeping existing config: `bunx kord-aios install --no-tui`
+- Force reconfiguration: `bunx kord-aios install --no-tui --reconfigure --claude=yes`
 
 The CLI will:
 - Register the plugin in `opencode.json`
-- Configure agent models based on subscription flags
+- Configure agent models based on subscription flags (smart merge preserves existing config)
+- Write project config (`.opencode/kord-aios.json`) during install/update
 - Show which auth steps are needed
 
 ### Step 3: Verify Setup

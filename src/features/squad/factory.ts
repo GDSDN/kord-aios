@@ -32,10 +32,22 @@ export function createSquadAgentConfig(
   const systemPrompt = resolvedPrompt ?? agentDef.prompt ?? buildDefaultSquadAgentPrompt(agentName, agentDef, squadName)
 
   const config: AgentConfig = {
-    name: agentName,
-    system: systemPrompt,
+    description: `(${squadName} squad) ${agentDef.description}`,
+    mode: agentDef.mode ?? "subagent",
+    prompt: systemPrompt,
     ...(agentDef.model ? { model: agentDef.model } : {}),
     ...(agentDef.temperature !== undefined ? { temperature: agentDef.temperature } : {}),
+  }
+
+  // Apply tool permissions from SQUAD.yaml
+  if (agentDef.tools && Object.keys(agentDef.tools).length > 0) {
+    // Convert { "bash": false } to permission record
+    // false = deny, true = allow
+    const permission: Record<string, "allow" | "deny"> = {}
+    for (const [tool, enabled] of Object.entries(agentDef.tools)) {
+      permission[tool] = enabled ? "allow" : "deny"
+    }
+    config.permission = permission
   }
 
   return config

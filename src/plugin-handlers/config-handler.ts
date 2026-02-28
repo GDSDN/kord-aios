@@ -1,5 +1,7 @@
 import { createBuiltinAgents } from "../agents";
 import { createDevJuniorAgentWithOverrides } from "../agents/dev-junior";
+import { loadAllSquads } from "../features/squad/loader";
+import { createAllSquadAgentConfigs } from "../features/squad/factory";
 import {
   loadUserCommands,
   loadProjectCommands,
@@ -209,7 +211,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       librarian?: { tools?: Record<string, unknown> };
       vision?: { tools?: Record<string, unknown> };
       builder?: { tools?: Record<string, unknown> };
-      kord?: { tools?: Record<string, unknown> };@de
+      kord?: { tools?: Record<string, unknown> };
     };
     const configAgent = config.agent as AgentConfig | undefined;
 
@@ -341,6 +343,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
             .filter(([key]) => {
               if (key === "build") return false;
               if (key === "plan" && shouldDemotePlan) return false;
+              if (key === "general") return false;
               // Filter out agents that Kord AIOS provides to prevent
               // OpenCode defaults from overwriting user config in kord-aios.json
               // See: https://github.com/kord-aios/kord-aios/issues/472
@@ -363,21 +366,37 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           }
         : undefined;
 
+      // Load squads and convert to agent configs (always, regardless of plannerEnabled)
+      const squadLoadResult = loadAllSquads(ctx.directory);
+      const squadAgentConfigs = createAllSquadAgentConfigs(squadLoadResult.squads);
+
+      log(`[config-handler] Loaded ${squadLoadResult.squads.length} squads with ${squadAgentConfigs.size} agents from ${ctx.directory}`, {
+        squads: squadLoadResult.squads.map(s => s.manifest.name),
+        agents: [...squadAgentConfigs.keys()],
+      });
+
       config.agent = {
         ...agentConfig,
         ...Object.fromEntries(
           Object.entries(builtinAgents).filter(([k]) => k !== "kord")
         ),
+        ...Object.fromEntries(squadAgentConfigs), // Add squad agents
         ...userAgents,
         ...projectAgents,
         ...pluginAgents,
         ...filteredConfigAgents,
+        general: { mode: "subagent", hidden: true },
         build: { ...migratedBuild, mode: "subagent", hidden: true },
         ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
       };
     } else {
+      // Kord disabled - still load squads for non-Kord mode
+      const squadLoadResult = loadAllSquads(ctx.directory);
+      const squadAgentConfigs = createAllSquadAgentConfigs(squadLoadResult.squads);
+
       config.agent = {
         ...builtinAgents,
+        ...Object.fromEntries(squadAgentConfigs), // Add squad agents
         ...userAgents,
         ...projectAgents,
         ...pluginAgents,

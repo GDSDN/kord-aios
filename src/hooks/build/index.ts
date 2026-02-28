@@ -16,6 +16,7 @@ import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/ho
 import { log } from "../../shared/logger"
 import { createSystemDirective, SYSTEM_DIRECTIVE_PREFIX, SystemDirectiveTypes } from "../../shared/system-directive"
 import { isCallerOrchestrator, getMessageDir } from "../../shared/session-utils"
+import { isRecentInternalSessionAbort, clearInternalSessionAbort } from "../../shared/internal-session-abort"
 import type { BackgroundManager } from "../../features/background-agent"
 
 export const HOOK_NAME = "build"
@@ -648,9 +649,17 @@ export function createBuildHook(
         const state = getState(sessionID)
 
         if (state.lastEventWasAbortError) {
-          state.lastEventWasAbortError = false
-          log(`[${HOOK_NAME}] Skipped: abort error immediately before idle`, { sessionID })
-          return
+          // Don't block if this was an internal abort for model fallback
+          if (isRecentInternalSessionAbort(sessionID)) {
+            clearInternalSessionAbort(sessionID)
+            state.lastEventWasAbortError = false
+            log(`[${HOOK_NAME}] Internal abort detected, allowing continuation`, { sessionID })
+            // Continue to check boulder state instead of returning
+          } else {
+            state.lastEventWasAbortError = false
+            log(`[${HOOK_NAME}] Skipped: abort error immediately before idle`, { sessionID })
+            return
+          }
         }
 
         if (state.promptFailureCount >= 2) {

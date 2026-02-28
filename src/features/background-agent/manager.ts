@@ -5,7 +5,8 @@ import type {
   LaunchInput,
   ResumeInput,
 } from "./types"
-import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry } from "../../shared"
+import type { FallbackEntry } from "../../shared/model-requirements"
+import { log, getAgentToolRestrictions, promptWithRetry, createSessionWithRetry, buildFallbackCandidates, markInternalSessionAbort, isRecentInternalSessionAbort } from "../../shared"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import { isInsideTmux } from "../../shared/tmux"
@@ -15,6 +16,7 @@ import {
   MIN_RUNTIME_BEFORE_STALE_MS,
   MIN_STABILITY_TIME_MS,
   POLLING_INTERVAL_MS,
+  RETRY_FIRST_OUTPUT_TIMEOUT_MS,
   TASK_CLEANUP_DELAY_MS,
   TASK_TTL_MS,
 } from "./constants"
@@ -140,6 +142,7 @@ export class BackgroundManager {
       parentAgent: input.parentAgent,
       model: input.model,
       category: input.category,
+      fallbackChain: input.fallbackChain,
     }
 
     this.tasks.set(task.id, task)
@@ -201,6 +204,19 @@ export class BackgroundManager {
           await this.startTask(item)
         } catch (error) {
           log("[background-agent] Error starting task:", error)
+
+          // Ensure the task doesn't remain pending forever.
+          if (item.task.status === "pending") {
+            item.task.status = "error"
+            item.task.error = this.getErrorText(error)
+            item.task.completedAt = new Date()
+            this.cleanupPendingByParent(item.task)
+            this.markForNotification(item.task)
+            this.notifyParentSession(item.task).catch((err) => {
+              log("[background-agent] Failed to notify on startTask error:", err)
+            })
+          }
+
           // Release concurrency slot if startTask failed and didn't release it itself
           // This prevents slot leaks when errors occur after acquire but before task.concurrencyKey is set
           if (!item.task.concurrencyKey) {
@@ -235,28 +251,20 @@ export class BackgroundManager {
     const parentDirectory = parentSession?.data?.directory ?? this.directory
     log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${parentDirectory}`)
 
-    const createResult = await this.client.session.create({
+    const created = await createSessionWithRetry(this.client, {
       body: {
         parentID: input.parentSessionID,
         title: `${input.description} (@${input.agent} subagent)`,
         permission: [
           { permission: "question", action: "deny" as const, pattern: "*" },
         ],
-      } as any,
+      },
       query: {
         directory: parentDirectory,
       },
     })
 
-    if (createResult.error) {
-      throw new Error(`Failed to create background session: ${createResult.error}`)
-    }
-
-    if (!createResult.data?.id) {
-      throw new Error("Failed to create background session: API returned no session ID")
-    }
-
-    const sessionID = createResult.data.id
+    const sessionID = created.id
     subagentSessions.add(sessionID)
 
     log("[background-agent] tmux callback check", {
@@ -286,6 +294,7 @@ export class BackgroundManager {
     task.status = "running"
     task.startedAt = new Date()
     task.sessionID = sessionID
+    task.skillContent = input.skillContent
     task.progress = {
       toolCalls: 0,
       lastUpdate: new Date(),
@@ -319,7 +328,7 @@ export class BackgroundManager {
       : undefined
     const launchVariant = input.model?.variant
 
-    promptWithModelSuggestionRetry(this.client, {
+    promptWithRetry(this.client, {
       path: { id: sessionID },
       body: {
         agent: input.agent,
@@ -334,7 +343,7 @@ export class BackgroundManager {
         },
         parts: [{ type: "text", text: input.prompt }],
       },
-    }).catch((error) => {
+    }, input.fallbackChain).catch((error) => {
       log("[background-agent] promptAsync error:", error)
       const existingTask = this.findBySession(sessionID)
       if (existingTask) {
@@ -418,10 +427,15 @@ export class BackgroundManager {
     taskId: string
     sessionID: string
     parentSessionID: string
+    parentMessageID?: string
     description: string
     agent?: string
     parentAgent?: string
     concurrencyKey?: string
+    model?: { providerID: string; modelID: string; variant?: string }
+    fallbackChain?: FallbackEntry[]
+    prompt?: string
+    skillContent?: string
   }): Promise<BackgroundTask> {
     const existingTask = this.tasks.get(input.taskId)
     if (existingTask) {
@@ -434,6 +448,21 @@ export class BackgroundManager {
       }
       if (input.parentAgent !== undefined) {
         existingTask.parentAgent = input.parentAgent
+      }
+      if (input.parentMessageID !== undefined) {
+        existingTask.parentMessageID = input.parentMessageID
+      }
+      if (input.model !== undefined) {
+        existingTask.model = input.model
+      }
+      if (input.fallbackChain !== undefined) {
+        existingTask.fallbackChain = input.fallbackChain
+      }
+      if (input.prompt !== undefined) {
+        existingTask.prompt = input.prompt
+      }
+      if (input.skillContent !== undefined) {
+        existingTask.skillContent = input.skillContent
       }
       if (!existingTask.concurrencyGroup) {
         existingTask.concurrencyGroup = input.concurrencyKey ?? existingTask.agent
@@ -470,9 +499,9 @@ export class BackgroundManager {
       id: input.taskId,
       sessionID: input.sessionID,
       parentSessionID: input.parentSessionID,
-      parentMessageID: "",
+      parentMessageID: input.parentMessageID ?? "",
       description: input.description,
-      prompt: "",
+      prompt: input.prompt ?? "",
       agent: input.agent || "task",
       status: "running",
       startedAt: new Date(),
@@ -481,6 +510,9 @@ export class BackgroundManager {
         lastUpdate: new Date(),
       },
       parentAgent: input.parentAgent,
+      model: input.model,
+      fallbackChain: input.fallbackChain,
+      skillContent: input.skillContent,
       concurrencyKey: input.concurrencyKey,
       concurrencyGroup,
     }
@@ -579,7 +611,7 @@ export class BackgroundManager {
       : undefined
     const resumeVariant = existingTask.model?.variant
 
-    this.client.session.prompt({
+    promptWithRetry(this.client, {
       path: { id: existingTask.sessionID },
       body: {
         agent: existingTask.agent,
@@ -593,7 +625,7 @@ export class BackgroundManager {
         },
         parts: [{ type: "text", text: input.prompt }],
       },
-    }).catch((error) => {
+    }, existingTask.fallbackChain).catch((error) => {
       log("[background-agent] resume prompt error:", error)
       existingTask.status = "error"
       const errorMessage = error instanceof Error ? error.message : String(error)
@@ -1387,6 +1419,10 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
       try {
         const sessionStatus = allStatuses[sessionID]
+
+        if (sessionStatus?.type !== "retry") {
+          task.retrySince = undefined
+        }
         
         // Don't skip if session not in status - fall through to message-based detection
         if (sessionStatus?.type === "idle") {
@@ -1419,6 +1455,112 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
             info?: { role?: string }
             parts?: Array<{ type?: string; tool?: string; name?: string; text?: string }>
           }>
+
+          const hasAssistantOrToolMessage = messages.some(
+            (m) => m.info?.role === "assistant" || m.info?.role === "tool"
+          )
+
+          if (hasAssistantOrToolMessage) {
+            task.retrySince = undefined
+          }
+
+          // Detect and recover from sessions stuck in `retry` without output.
+          // This happens when the provider accepts the request but can't execute
+          // (e.g., out of credits), and no error is thrown to trigger fallback.
+          if (sessionStatus?.type === "retry" && !hasAssistantOrToolMessage) {
+            task.retrySince ??= new Date()
+            const retryElapsed = Date.now() - task.retrySince.getTime()
+
+            if (retryElapsed >= RETRY_FIRST_OUTPUT_TIMEOUT_MS) {
+              // Skip if promptWithRetry is already handling this session's fallback
+              // This prevents race condition where both background-manager and promptWithRetry
+              // try to abort and fallback simultaneously, killing the new session
+              if (isRecentInternalSessionAbort(sessionID)) {
+                log("[background-agent] Skipping retry-stuck fallback: promptWithRetry already handling", { taskId: task.id, sessionID })
+                continue
+              }
+
+              const tried = new Set(task.retryFallbackTriedModels ?? [])
+              const currentModel = task.model
+                ? `${task.model.providerID}/${task.model.modelID}`
+                : undefined
+              if (currentModel) tried.add(currentModel)
+
+              const chain = task.fallbackChain ?? []
+              const { candidates, diagnostics } = await buildFallbackCandidates({
+                client: this.client,
+                fallbackChain: chain,
+                excludeModels: tried,
+              })
+              const next = candidates[0]
+
+              log("[background-agent] Retry-stuck fallback candidates", {
+                taskId: task.id,
+                sessionID,
+                chainLength: chain.length,
+                candidateCount: candidates.length,
+                connectedProvidersKnown: diagnostics.connectedProvidersKnown,
+                connectedProviders: diagnostics.connectedProviders,
+                availableModelCount: diagnostics.availableModelCount,
+                skippedDisconnected: diagnostics.skippedDisconnected,
+                skippedUnavailable: diagnostics.skippedUnavailable,
+                skippedUnhealthy: diagnostics.skippedUnhealthy,
+              })
+
+              if (!next) {
+                task.status = "error"
+                task.error = `Session stuck in retry with no output after ${Math.floor(RETRY_FIRST_OUTPUT_TIMEOUT_MS / 1000)}s; exhausted fallback models.`
+                task.completedAt = new Date()
+                this.cleanupPendingByParent(task)
+                this.markForNotification(task)
+                this.notifyParentSession(task).catch((err) => {
+                  log("[background-agent] Failed to notify on retry-stuck error:", err)
+                })
+                if (task.concurrencyKey) {
+                  this.concurrencyManager.release(task.concurrencyKey)
+                  task.concurrencyKey = undefined
+                }
+                continue
+              }
+
+              log("[background-agent] Session stuck in retry; attempting model fallback", {
+                taskId: task.id,
+                sessionID,
+                from: currentModel ?? "unknown",
+                to: `${next.providerID}/${next.modelID}`,
+              })
+
+              markInternalSessionAbort(sessionID, "background-agent:retry-stuck")
+              await this.client.session.abort({ path: { id: sessionID } }).catch(() => {})
+
+              await promptWithRetry(
+                this.client,
+                {
+                  path: { id: sessionID },
+                  body: {
+                    agent: task.agent,
+                    model: { providerID: next.providerID, modelID: next.modelID },
+                    ...(next.variant ? { variant: next.variant } : {}),
+                    system: task.skillContent,
+                    tools: {
+                      ...getAgentToolRestrictions(task.agent),
+                      task: false,
+                      call_kord_agent: true,
+                      question: false,
+                    },
+                    parts: [{ type: "text", text: task.prompt }],
+                  },
+                },
+                task.fallbackChain
+              ).catch((error) => {
+                log("[background-agent] Retry-stuck fallback prompt error:", error)
+              })
+
+              task.model = { providerID: next.providerID, modelID: next.modelID, ...(next.variant ? { variant: next.variant } : {}) }
+              task.retryFallbackTriedModels = Array.from(new Set([...(task.retryFallbackTriedModels ?? []), `${next.providerID}/${next.modelID}`]))
+              task.retrySince = new Date()
+            }
+          }
           const assistantMsgs = messages.filter(
             (m) => m.info?.role === "assistant"
           )

@@ -1,7 +1,7 @@
 import type { BackgroundTask, LaunchInput, ResumeInput } from "./types"
 import type { OpencodeClient, OnSubagentSessionCreated, QueueItem } from "./constants"
 import { TMUX_CALLBACK_DELAY_MS } from "./constants"
-import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry } from "../../shared"
+import { log, getAgentToolRestrictions, promptWithRetry } from "../../shared"
 import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
 import { isInsideTmux } from "../../shared/tmux"
@@ -29,6 +29,7 @@ export function createTask(input: LaunchInput): BackgroundTask {
     parentModel: input.parentModel,
     parentAgent: input.parentAgent,
     model: input.model,
+    fallbackChain: input.fallbackChain,
   }
 }
 
@@ -136,7 +137,7 @@ export async function startTask(
     : undefined
   const launchVariant = input.model?.variant
 
-  promptWithModelSuggestionRetry(client, {
+  promptWithRetry(client, {
     path: { id: sessionID },
     body: {
       agent: input.agent,
@@ -221,7 +222,7 @@ export async function resumeTask(
     : undefined
   const resumeVariant = task.model?.variant
 
-  client.session.prompt({
+  promptWithRetry(client, {
     path: { id: task.sessionID },
     body: {
       agent: task.agent,
@@ -235,7 +236,7 @@ export async function resumeTask(
       },
       parts: [{ type: "text", text: input.prompt }],
     },
-  }).catch((error) => {
+  }, task.fallbackChain).catch((error) => {
     log("[background-agent] resume prompt error:", error)
     onTaskError(task, error instanceof Error ? error : new Error(String(error)))
   })

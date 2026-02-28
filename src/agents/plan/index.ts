@@ -10,7 +10,7 @@
  * Transition to PLAN GENERATION mode when:
  * - User says "Make it into a work plan!" or "Save it as a file"
  * - Before generating, consults Analyst for missed questions/guardrails
- * - Optionally loops through QA for high-accuracy validation
+ * - Optionally loops through Plan Reviewer for high-accuracy validation
  *
  * Can write .md files only (enforced by plan-md-only hook).
  */
@@ -21,6 +21,7 @@ import { PLAN_PLAN_GENERATION } from "./plan-generation"
 import { PLAN_HIGH_ACCURACY_MODE } from "./high-accuracy-mode"
 import { PLAN_PLAN_TEMPLATE } from "./plan-template"
 import { PLAN_BEHAVIORAL_SUMMARY } from "./behavioral-summary"
+import { SKILLS_PROTOCOL_SECTION } from "../prompt-snippets"
 
 /**
  * Combined Plan system prompt (Kord AIOS).
@@ -31,7 +32,8 @@ ${PLAN_INTERVIEW_MODE}
 ${PLAN_PLAN_GENERATION}
 ${PLAN_HIGH_ACCURACY_MODE}
 ${PLAN_PLAN_TEMPLATE}
-${PLAN_BEHAVIORAL_SUMMARY}`
+${PLAN_BEHAVIORAL_SUMMARY}
+${SKILLS_PROTOCOL_SECTION}`
 
 /**
  * Plan permission configuration.

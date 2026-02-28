@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 
 const MODE: AgentMode = "subagent"
 
@@ -90,7 +91,8 @@ Configuration files: exact file content ready to commit.
 Pipeline changes: diff-friendly format with before/after.
 Deployment plans: step-by-step with rollback procedures.
 Match the language of the request.
-</output_format>`
+</output_format>
+${SKILLS_PROTOCOL_SECTION}`
 
 export function createDevopsAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([

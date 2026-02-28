@@ -175,10 +175,10 @@ describe("S09: Squad skill adaptation for Kord engine", () => {
 		}
 	})
 
-	test("all skills preserve frontmatter agent: squad-creator", () => {
+	 test("all skills preserve frontmatter agent: squad-creator", () => {
 		//#then
 		for (const skill of skills) {
-			expect(skill.content).toMatch(/^---\n[\s\S]*?agent:\s*squad-creator[\s\S]*?---/)
+			expect(skill.content).toMatch(/^---\r?\n[\s\S]*?agent:\s*squad-creator[\s\S]*?---/)
 		}
 	})
 

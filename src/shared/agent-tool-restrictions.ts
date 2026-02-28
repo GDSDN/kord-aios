@@ -16,9 +16,9 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
 
   librarian: EXPLORATION_AGENT_DENYLIST,
 
+  // Architect may write docs/architecture outputs; path authority is enforced
+  // by the agent-authority hook.
   architect: {
-    write: false,
-    edit: false,
     task: false,
     call_kord_agent: false,
   },

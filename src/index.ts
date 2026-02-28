@@ -36,6 +36,7 @@ import {
   createAgentAuthorityHook,
   createStoryLifecycleHook,
   createQualityGateHook,
+  createAutoQaGateHook,
   createDecisionLoggerHook,
   createStopContinuationGuardHook,
   createCompactionContextInjector,
@@ -310,6 +311,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const qualityGate = isHookEnabled("quality-gate")
     ? createQualityGateHook(ctx, pluginConfig.quality_gate?.max_iterations)
     : null;
+  const autoQaGate = isHookEnabled("auto-qa-gate")
+    ? createAutoQaGateHook(ctx, pluginConfig.experimental?.auto_qa_gate)
+    : null;
   const decisionLogger = isHookEnabled("decision-logger")
     ? createDecisionLoggerHook(ctx, pluginConfig.decision_logger)
     : null;
@@ -418,7 +422,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     : null;
   const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
 
-  const callKordAgent = createCallKordAgent(ctx, backgroundManager);
+  const callKordAgent = createCallKordAgent(ctx, backgroundManager, {
+    userAgentOverrides: pluginConfig.agents,
+  });
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
     (agent) => agent.toLowerCase() === "vision",
   );
@@ -485,6 +491,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     client: ctx.client,
     directory: ctx.directory,
     userCategories: pluginConfig.categories,
+    userAgentOverrides: pluginConfig.agents,
     gitMasterConfig: pluginConfig.git_master,
     kordJuniorModel: pluginConfig.agents?.["dev-junior"]?.model,
     browserProvider,

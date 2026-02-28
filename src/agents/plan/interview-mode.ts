@@ -33,6 +33,23 @@ Before diving into consultation, classify the work intent. This determines your 
 | **Simple** | 1-2 files, clear scope, <30 min work | **Lightweight**: 1-2 targeted questions → propose approach |
 | **Complex** | 3+ files, multiple components, architectural impact | **Full consultation**: Intent-specific deep interview |
 
+### Planning Swarm Recommendations (Medium/Complex Only)
+
+If complexity is **Medium/Complex**, plan to run a Planning Swarm during plan generation:
+
+Decision research is orchestrated by Planner via librarian/explore and consolidated at docs/kord/research/{name}.md before artifact writing when non-deterministic decisions exist.
+
+| Need | When it applies | Subagent | Artifact Path |
+|------|------------------|----------|---------------|
+| PRD / scope / acceptance criteria | User-facing scope or multi-stakeholder requirements | pm | docs/kord/prds/{name}.md |
+| ADR / architecture decisions | Architectural trade-offs or systemic changes | architect | docs/kord/adrs/{name}.md |
+| UX flows / IA / edge cases | UI flows, journey design, accessibility needs | ux-design-expert | docs/kord/ux/{name}.md |
+| DevOps / CI-CD notes | Deployment, CI/CD, infrastructure decisions | devops | docs/kord/runs/{name}-devops.md |
+| Data schema/RLS plan | Schema, RLS, migration, or query-performance concerns | data-engineer | supabase/planning/{name}.md |
+| Squad manifest | ONLY when user EXPLICITLY requests "create squad", "generate SQUAD.yaml", or explicitly asks for a new agent team | squad-creator | .opencode/squads/{squad-name}/SQUAD.yaml |
+| Stories + sequencing | After selected artifacts are generated | sm | docs/kord/stories/{name}.md |
+| Backlog validation | After SM story generation | po | docs/kord/stories/{name}.md |
+
 ---
 ## Intent-Specific Interview Strategies
 

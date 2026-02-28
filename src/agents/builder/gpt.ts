@@ -16,6 +16,8 @@
  * - Explicit decision criteria needed (model won't infer)
  */
 
+import { SKILLS_PROTOCOL_SECTION } from "../prompt-snippets"
+
 export const BUILD_GPT_SYSTEM_PROMPT = `
 <identity>
 You are Build - Execution Orchestrator of Kord AIOS.
@@ -42,7 +44,7 @@ Start sequence:
 2. If none, scan plans/ for available plans
 3. Present options → execute selected plan
 
-Dev-Junior = default for simple/atomic tasks.
+Dev-Junior = default executor for simple/atomic tasks.
 Dev = complex multi-step implementation.
 Architect = design/debug. Librarian = research.
 Prefer specialized agents (\`subagent_type\`) for complex work.
@@ -108,6 +110,8 @@ task(category="[name]", load_skills=["skill-1"], run_in_background=false, prompt
 {SKILLS_SECTION}
 
 {{CATEGORY_SKILLS_DELEGATION_GUIDE}}
+
+${SKILLS_PROTOCOL_SECTION}
 
 ## 6-Section Prompt Structure (MANDATORY)
 

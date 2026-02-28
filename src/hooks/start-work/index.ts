@@ -94,7 +94,7 @@ export function createStartWorkHook(ctx: PluginInput) {
         sessionID: input.sessionID,
       })
 
-      updateSessionAgent(input.sessionID, "build") // Always switch: fixes #1298
+      updateSessionAgent(input.sessionID, "builder") // Always switch: fixes #1298
 
       const existingState = readBoulderState(ctx.directory)
       const sessionId = input.sessionID
@@ -128,7 +128,7 @@ All ${progress.total} tasks are done. Create a new plan with: /plan "your task"`
               clearBoulderState(ctx.directory)
             }
             const planType = detectPlanType(matchedPlan)
-            const newState = createBoulderState(matchedPlan, sessionId, "build", squad, {
+            const newState = createBoulderState(matchedPlan, sessionId, "builder", squad, {
               ...(wave !== undefined ? { current_wave: wave } : {}),
               ...(planType !== undefined ? { plan_type: planType } : {}),
             })
@@ -217,7 +217,7 @@ All ${plans.length} plan(s) are complete. Create a new plan with: /plan "your ta
           const planPath = incompletePlans[0]
           const progress = getPlanProgress(planPath)
           const planType = detectPlanType(planPath)
-          const newState = createBoulderState(planPath, sessionId, "build", squad, {
+          const newState = createBoulderState(planPath, sessionId, "builder", squad, {
             ...(wave !== undefined ? { current_wave: wave } : {}),
             ...(planType !== undefined ? { plan_type: planType } : {}),
           })

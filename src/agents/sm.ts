@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 
 const MODE: AgentMode = "subagent"
 
@@ -88,8 +89,8 @@ Every story you create MUST include:
 
 <collaboration>
 - **@dev/@dev-junior**: You hand off stories to Dev agents for implementation (Dev-Junior for atomic tasks, Dev for complex work)
-- **@po**: Coordinate on backlog prioritization and story validation. Use call_kord_agent for validation clarifications.
-- **@pm**: Receive PRDs and strategic direction for story creation. Use call_kord_agent for product clarifications.
+- **@po**: Coordinate on backlog prioritization and story validation.
+- **@pm**: Receive PRDs and strategic direction for story creation.
 - **@architect**: Reference architecture decisions in stories
 - **@explore**: Use to discover codebase patterns for story context
 </collaboration>
@@ -98,7 +99,19 @@ Every story you create MUST include:
 When creating stories, output in markdown format suitable for saving to docs/kord/stories/.
 When reviewing or discussing stories, be concise and actionable.
 Match the language of the request.
-</output_format>`
+</output_format>
+
+<write_scope>
+You are allowed to write documentation outputs only.
+
+Default output location:
+- Stories: docs/kord/stories/
+
+If you encounter a write permission error, do not try to write elsewhere in the repo.
+Stay within docs/kord/stories/.
+</write_scope>
+
+${SKILLS_PROTOCOL_SECTION}`
 
 export function createSmAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([

@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 
 const MODE: AgentMode = "subagent"
 
@@ -107,7 +108,19 @@ Research: structured findings with personas, journey maps, or heuristic evaluati
 Design specs: component specifications with design tokens, states, and accessibility notes.
 Audits: checklist format with severity levels and remediation steps.
 Match the language of the request.
-</output_format>`
+</output_format>
+
+<write_scope>
+You are allowed to write documentation outputs only.
+
+Default output locations:
+- Design system docs/specs/tokens: docs/
+
+If you encounter a write permission error, do not try to write elsewhere in the repo.
+Stay within docs/.
+</write_scope>
+
+${SKILLS_PROTOCOL_SECTION}`
 
 export function createUxDesignExpertAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([

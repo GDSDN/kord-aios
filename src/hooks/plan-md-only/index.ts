@@ -1,7 +1,17 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readdirSync } from "node:fs"
 import { join, resolve, relative, isAbsolute } from "node:path"
-import { HOOK_NAME, PLAN_AGENT, ALLOWED_EXTENSIONS, ALLOWED_PATH_PREFIX, BLOCKED_TOOLS, PLANNING_CONSULT_WARNING, PLAN_WORKFLOW_REMINDER } from "./constants"
+import {
+  HOOK_NAME,
+  PLAN_AGENT,
+  ALLOWED_EXTENSIONS,
+  ALLOWED_PATH_PREFIX,
+  BLOCKED_TOOLS,
+  PLANNING_CONSULT_WARNING,
+  PLAN_WORKFLOW_REMINDER,
+  ARTIFACT_WRITE_SUBAGENTS,
+  ARTIFACT_GENERATION_WARNING,
+} from "./constants"
 import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { readBoulderState } from "../../features/boulder-state"
@@ -113,14 +123,41 @@ export function createPlanMdOnlyHook(ctx: PluginInput) {
       const toolName = input.tool
 
       // Inject read-only warning for task tools called by Plan
-       if (TASK_TOOLS.includes(toolName)) {
-         const prompt = output.args.prompt as string | undefined
-         if (prompt && !prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
-           output.args.prompt = PLANNING_CONSULT_WARNING + prompt
+      if (TASK_TOOLS.includes(toolName)) {
+        const prompt = output.args.prompt as string | undefined
+
+        // call_kord_agent is explore/librarian-only; always consult-mode
+        if (toolName === "call_kord_agent") {
+          if (prompt && !prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
+            output.args.prompt = PLANNING_CONSULT_WARNING + prompt
+            log(`[${HOOK_NAME}] Injected read-only planning warning to ${toolName}`, {
+              sessionID: input.sessionID,
+              tool: toolName,
+              agent: agentName,
+            })
+          }
+          return
+        }
+
+        if (prompt && !prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
+          let subagentType = output.args.subagent_type as string | undefined
+          if (!subagentType) {
+            const match = prompt.match(/subagent_type=['"]([^'"]+)['"]/)
+            if (match) {
+              subagentType = match[1]
+            }
+          }
+
+          const warningToInject = subagentType && ARTIFACT_WRITE_SUBAGENTS.includes(subagentType)
+            ? ARTIFACT_GENERATION_WARNING
+            : PLANNING_CONSULT_WARNING
+
+          output.args.prompt = warningToInject + prompt
           log(`[${HOOK_NAME}] Injected read-only planning warning to ${toolName}`, {
             sessionID: input.sessionID,
             tool: toolName,
             agent: agentName,
+            subagentType,
           })
         }
         return

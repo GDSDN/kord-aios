@@ -13,6 +13,7 @@ import {
   buildAntiPatternsSection,
   categorizeTools,
 } from "./dynamic-agent-prompt-builder"
+import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 
 const MODE: AgentMode = "all"
 
@@ -613,13 +614,15 @@ export function createDevAgent(
     ? buildDevPrompt(availableAgents, tools, skills, categories, useTaskSystem)
     : buildDevPrompt([], tools, skills, categories, useTaskSystem)
 
+  const promptWithSkills = prompt + SKILLS_PROTOCOL_SECTION
+
   return {
     description:
       "Senior Implementation Specialist. Autonomous deep worker with GPT 5.2 Codex. Story-driven development, explores thoroughly before acting, uses explore/librarian for context, completes tasks end-to-end. Invocable by orchestrators for complex multi-step tasks. (Dev - Kord AIOS)",
     mode: MODE,
     model,
     maxTokens: 32000,
-    prompt,
+    prompt: promptWithSkills,
     color: "#D97706", // Forged Amber - Golden heated metal, divine craftsman
     permission: { question: "allow", call_kord_agent: "deny" } as AgentConfig["permission"],
     reasoningEffort: "medium",

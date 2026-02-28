@@ -90,6 +90,12 @@ Prompts MUST be in English.`
     async execute(args: DelegateTaskArgs, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
 
+      // Dev is a deep worker executor; block further delegation to prevent loops and
+      // accidental category-routing into Dev-Junior.
+      if ((ctx.agent ?? "").toLowerCase() === "dev") {
+        return `Error: Agent "dev" is not allowed to delegate tasks via the "task" tool. Implement directly using tools, or use call_kord_agent for explore/librarian research.`
+      }
+
       if (args.executor && !args.subagent_type) {
         args.subagent_type = args.executor
       }
@@ -163,6 +169,7 @@ Prompts MUST be in English.`
       let modelInfo: import("../../features/task-toast-manager/types").ModelFallbackInfo | undefined
       let actualModel: string | undefined
       let isUnstableAgent = false
+      let fallbackChain: any[] | undefined
 
       if (args.category) {
         const resolution = await resolveCategoryExecution(args, options, inheritedModel, systemDefaultModel)
@@ -175,6 +182,7 @@ Prompts MUST be in English.`
         modelInfo = resolution.modelInfo
         actualModel = resolution.actualModel
         isUnstableAgent = resolution.isUnstableAgent
+        fallbackChain = resolution.fallbackChain
 
         const isRunInBackgroundExplicitlyFalse = args.run_in_background === false || args.run_in_background === "false" as unknown as boolean
 
@@ -196,7 +204,7 @@ Prompts MUST be in English.`
             availableCategories,
             availableSkills,
           })
-          return executeUnstableAgentTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel)
+          return executeUnstableAgentTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel, fallbackChain)
         }
       } else {
         const resolution = await resolveSubagentExecution(args, options, parentContext.agent, categoryExamples)
@@ -205,6 +213,7 @@ Prompts MUST be in English.`
         }
         agentToUse = resolution.agentToUse
         categoryModel = resolution.categoryModel
+        fallbackChain = resolution.fallbackChain
       }
 
       const systemContent = buildSystemContent({
@@ -216,10 +225,10 @@ Prompts MUST be in English.`
       })
 
       if (runInBackground) {
-        return executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent)
+        return executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, fallbackChain)
       }
 
-      return executeSyncTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, modelInfo)
+      return executeSyncTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, modelInfo, fallbackChain)
     },
   })
 }

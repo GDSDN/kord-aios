@@ -13,6 +13,7 @@ export interface ProjectMaturity {
   hasOpenCodeJson: boolean
   hasKordPlugin: boolean
   hasKordAiosConfig: boolean
+  hasProjectConfig: boolean
   hasKordDirectory: boolean
   hasDocsKord: boolean
   hasKordRules: boolean
@@ -28,6 +29,7 @@ export function detectProjectMaturity(projectDir: string): ProjectMaturity {
   const hasKordPlugin = hasOpenCodeJson ? detectKordPlugin(join(projectDir, "opencode.json")) : false
   const hasKordAiosConfig = existsSync(join(projectDir, "kord-aios.config.jsonc"))
     || existsSync(join(projectDir, "kord-aios.config.json"))
+  const hasProjectConfig = existsSync(join(projectDir, ".opencode", "kord-aios.json"))
   const hasKordDirectory = existsSync(join(projectDir, ".kord"))
   const hasDocsKord = existsSync(join(projectDir, "docs", "kord"))
   const hasKordRules = existsSync(join(projectDir, "kord-rules.md"))
@@ -38,6 +40,7 @@ export function detectProjectMaturity(projectDir: string): ProjectMaturity {
     hasOpenCodeJson,
     hasKordPlugin,
     hasKordAiosConfig,
+    hasProjectConfig,
     hasKordDirectory,
     hasDocsKord,
     hasKordRules,
@@ -48,6 +51,7 @@ export function detectProjectMaturity(projectDir: string): ProjectMaturity {
     hasOpenCodeJson,
     hasKordPlugin,
     hasKordAiosConfig,
+    hasProjectConfig,
     hasKordDirectory,
     hasDocsKord,
     hasKordRules,
@@ -59,6 +63,7 @@ interface MaturitySignals {
   hasOpenCodeJson: boolean
   hasKordPlugin: boolean
   hasKordAiosConfig: boolean
+  hasProjectConfig: boolean
   hasKordDirectory: boolean
   hasDocsKord: boolean
   hasKordRules: boolean
@@ -67,6 +72,11 @@ interface MaturitySignals {
 function classifyMaturity(signals: MaturitySignals): "fresh" | "partial" | "existing" {
   if (!signals.hasOpenCodeJson || !signals.hasKordPlugin) {
     return "fresh"
+  }
+
+  // Project config (.opencode/kord-aios.json) is a baseline signal for "existing"
+  if (signals.hasProjectConfig) {
+    return "existing"
   }
 
   const hasScaffold = signals.hasKordDirectory && signals.hasDocsKord

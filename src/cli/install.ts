@@ -7,6 +7,7 @@ import { runPostInstallDoctor } from "./post-install-doctor"
 import {
   addPluginToKordAiosConfig,
   writeKordAiosConfig,
+  writeProjectKordAiosConfig,
   isKordAiosInstalled,
   getKordAiosVersion,
   addAuthPlugins,
@@ -167,6 +168,30 @@ function argsToConfig(args: InstallArgs): InstallConfig {
   }
 }
 
+// Partial args type for config conversion (only provider fields needed)
+interface ProviderArgs {
+  claude?: ClaudeSubscription
+  openai?: BooleanArg
+  gemini?: BooleanArg
+  copilot?: BooleanArg
+  opencodeZen?: BooleanArg
+  zaiCodingPlan?: BooleanArg
+  kimiForCoding?: BooleanArg
+}
+
+function providerArgsToConfig(args: ProviderArgs): InstallConfig {
+  return {
+    hasClaude: args.claude !== "no",
+    isMax20: args.claude === "max20",
+    hasOpenAI: args.openai === "yes",
+    hasGemini: args.gemini === "yes",
+    hasCopilot: args.copilot === "yes",
+    hasOpencodeZen: args.opencodeZen === "yes",
+    hasZaiCodingPlan: args.zaiCodingPlan === "yes",
+    hasKimiForCoding: args.kimiForCoding === "yes",
+  }
+}
+
 function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubscription; openai: BooleanArg; gemini: BooleanArg; copilot: BooleanArg; opencodeZen: BooleanArg; zaiCodingPlan: BooleanArg; kimiForCoding: BooleanArg } {
   let claude: ClaudeSubscription = "no"
   if (detected.hasClaude) {
@@ -184,118 +209,177 @@ function detectedToInitialValues(detected: DetectedConfig): { claude: ClaudeSubs
   }
 }
 
-async function runTuiMode(detected: DetectedConfig): Promise<InstallConfig | null> {
+async function runTuiMode(detected: DetectedConfig, reconfigure: boolean): Promise<InstallConfig | null> {
   const initial = detectedToInitialValues(detected)
 
-  const claude = await p.select({
-    message: "Do you have a Claude Pro/Max subscription?",
-    options: [
-      { value: "no" as const, label: "No", hint: "Will use opencode/glm-4.7-free as fallback" },
-      { value: "yes" as const, label: "Yes (standard)", hint: "Claude Opus 4.5 for orchestration" },
-      { value: "max20" as const, label: "Yes (max20 mode)", hint: "Full power with Claude Sonnet 4.5 for Librarian" },
-    ],
-    initialValue: initial.claude,
-  })
-
-  if (p.isCancel(claude)) {
-    p.cancel("Installation cancelled.")
-    return null
+  // Helper to determine if we should skip a question
+  const shouldSkip = (key: keyof typeof initial, detectedValue: boolean): boolean => {
+    if (reconfigure) return false
+    return detectedValue
   }
 
-  const openai = await p.select({
-    message: "Do you have an OpenAI/ChatGPT Plus subscription?",
-    options: [
-      { value: "no" as const, label: "No", hint: "Architect will use fallback models" },
-      { value: "yes" as const, label: "Yes", hint: "GPT-5.2 for Architect (high-IQ debugging)" },
-    ],
-    initialValue: initial.openai,
-  })
-
-  if (p.isCancel(openai)) {
-    p.cancel("Installation cancelled.")
-    return null
+  // Collect results from detected + newly answered
+  const result: InstallConfig = {
+    hasClaude: detected.hasClaude,
+    isMax20: detected.isMax20,
+    hasOpenAI: detected.hasOpenAI,
+    hasGemini: detected.hasGemini,
+    hasCopilot: detected.hasCopilot,
+    hasOpencodeZen: detected.hasOpencodeZen,
+    hasZaiCodingPlan: detected.hasZaiCodingPlan,
+    hasKimiForCoding: detected.hasKimiForCoding,
   }
 
-  const gemini = await p.select({
-    message: "Will you integrate Google Gemini?",
-    options: [
-      { value: "no" as const, label: "No", hint: "Frontend/docs agents will use fallback" },
-      { value: "yes" as const, label: "Yes", hint: "Beautiful UI generation with Gemini 3 Pro" },
-    ],
-    initialValue: initial.gemini,
-  })
+  // Ask Claude question only if not already configured or reconfigure is true
+  if (!shouldSkip("claude", detected.hasClaude)) {
+    const claude = await p.select({
+      message: "Do you have a Claude Pro/Max subscription?",
+      options: [
+        { value: "no" as const, label: "No", hint: "Will use opencode/glm-4.7-free as fallback" },
+        { value: "yes" as const, label: "Yes (standard)", hint: "Claude Opus 4.5 for orchestration" },
+        { value: "max20" as const, label: "Yes (max20 mode)", hint: "Full power with Claude Sonnet 4.5 for Librarian" },
+      ],
+      initialValue: initial.claude,
+    })
 
-  if (p.isCancel(gemini)) {
-    p.cancel("Installation cancelled.")
-    return null
+    if (p.isCancel(claude)) {
+      p.cancel("Installation cancelled.")
+      return null
+    }
+
+    result.hasClaude = claude !== "no"
+    result.isMax20 = claude === "max20"
+  } else {
+    p.log.info(`Claude: ${initial.claude} (already configured, skipping)`)
   }
 
-  const copilot = await p.select({
-    message: "Do you have a GitHub Copilot subscription?",
-    options: [
-      { value: "no" as const, label: "No", hint: "Only native providers will be used" },
-      { value: "yes" as const, label: "Yes", hint: "Fallback option when native providers unavailable" },
-    ],
-    initialValue: initial.copilot,
-  })
+  // Ask OpenAI question only if not already configured or reconfigure is true
+  if (!shouldSkip("openai", detected.hasOpenAI)) {
+    const openai = await p.select({
+      message: "Do you have an OpenAI/ChatGPT Plus subscription?",
+      options: [
+        { value: "no" as const, label: "No", hint: "Architect will use fallback models" },
+        { value: "yes" as const, label: "Yes", hint: "GPT-5.2 for Architect (high-IQ debugging)" },
+      ],
+      initialValue: initial.openai,
+    })
 
-  if (p.isCancel(copilot)) {
-    p.cancel("Installation cancelled.")
-    return null
+    if (p.isCancel(openai)) {
+      p.cancel("Installation cancelled.")
+      return null
+    }
+
+    result.hasOpenAI = openai === "yes"
+  } else {
+    p.log.info(`OpenAI: ${initial.openai} (already configured, skipping)`)
   }
 
-  const opencodeZen = await p.select({
-    message: "Do you have access to OpenCode Zen (opencode/ models)?",
-    options: [
-      { value: "no" as const, label: "No", hint: "Will use other configured providers" },
-      { value: "yes" as const, label: "Yes", hint: "opencode/claude-opus-4-6, opencode/gpt-5.2, etc." },
-    ],
-    initialValue: initial.opencodeZen,
-  })
+  // Ask Gemini question only if not already configured or reconfigure is true
+  if (!shouldSkip("gemini", detected.hasGemini)) {
+    const gemini = await p.select({
+      message: "Will you integrate Google Gemini?",
+      options: [
+        { value: "no" as const, label: "No", hint: "Frontend/docs agents will use fallback" },
+        { value: "yes" as const, label: "Yes", hint: "Beautiful UI generation with Gemini 3 Pro" },
+      ],
+      initialValue: initial.gemini,
+    })
 
-  if (p.isCancel(opencodeZen)) {
-    p.cancel("Installation cancelled.")
-    return null
+    if (p.isCancel(gemini)) {
+      p.cancel("Installation cancelled.")
+      return null
+    }
+
+    result.hasGemini = gemini === "yes"
+  } else {
+    p.log.info(`Gemini: ${initial.gemini} (already configured, skipping)`)
   }
 
-  const zaiCodingPlan = await p.select({
-    message: "Do you have a Z.ai Coding Plan subscription?",
-    options: [
-      { value: "no" as const, label: "No", hint: "Will use other configured providers" },
-      { value: "yes" as const, label: "Yes", hint: "Fallback for Librarian and Multimodal Looker" },
-    ],
-    initialValue: initial.zaiCodingPlan,
-  })
+  // Ask Copilot question only if not already configured or reconfigure is true
+  if (!shouldSkip("copilot", detected.hasCopilot)) {
+    const copilot = await p.select({
+      message: "Do you have a GitHub Copilot subscription?",
+      options: [
+        { value: "no" as const, label: "No", hint: "Only native providers will be used" },
+        { value: "yes" as const, label: "Yes", hint: "Fallback option when native providers unavailable" },
+      ],
+      initialValue: initial.copilot,
+    })
 
-  if (p.isCancel(zaiCodingPlan)) {
-    p.cancel("Installation cancelled.")
-    return null
+    if (p.isCancel(copilot)) {
+      p.cancel("Installation cancelled.")
+      return null
+    }
+
+    result.hasCopilot = copilot === "yes"
+  } else {
+    p.log.info(`Copilot: ${initial.copilot} (already configured, skipping)`)
   }
 
-  const kimiForCoding = await p.select({
-    message: "Do you have a Kimi For Coding subscription?",
-    options: [
-      { value: "no" as const, label: "No", hint: "Will use other configured providers" },
-      { value: "yes" as const, label: "Yes", hint: "Kimi K2.5 for Kord/Plan fallback" },
-    ],
-    initialValue: initial.kimiForCoding,
-  })
+  // Ask OpenCode Zen question only if not already configured or reconfigure is true
+  if (!shouldSkip("opencodeZen", detected.hasOpencodeZen)) {
+    const opencodeZen = await p.select({
+      message: "Do you have access to OpenCode Zen (opencode/ models)?",
+      options: [
+        { value: "no" as const, label: "No", hint: "Will use other configured providers" },
+        { value: "yes" as const, label: "Yes", hint: "opencode/claude-opus-4-6, opencode/gpt-5.2, etc." },
+      ],
+      initialValue: initial.opencodeZen,
+    })
 
-  if (p.isCancel(kimiForCoding)) {
-    p.cancel("Installation cancelled.")
-    return null
+    if (p.isCancel(opencodeZen)) {
+      p.cancel("Installation cancelled.")
+      return null
+    }
+
+    result.hasOpencodeZen = opencodeZen === "yes"
+  } else {
+    p.log.info(`OpenCode Zen: ${initial.opencodeZen} (already configured, skipping)`)
   }
 
-  return {
-    hasClaude: claude !== "no",
-    isMax20: claude === "max20",
-    hasOpenAI: openai === "yes",
-    hasGemini: gemini === "yes",
-    hasCopilot: copilot === "yes",
-    hasOpencodeZen: opencodeZen === "yes",
-    hasZaiCodingPlan: zaiCodingPlan === "yes",
-    hasKimiForCoding: kimiForCoding === "yes",
+  // Ask Z.ai Coding Plan question only if not already configured or reconfigure is true
+  if (!shouldSkip("zaiCodingPlan", detected.hasZaiCodingPlan)) {
+    const zaiCodingPlan = await p.select({
+      message: "Do you have a Z.ai Coding Plan subscription?",
+      options: [
+        { value: "no" as const, label: "No", hint: "Will use other configured providers" },
+        { value: "yes" as const, label: "Yes", hint: "Fallback for Librarian and Multimodal Looker" },
+      ],
+      initialValue: initial.zaiCodingPlan,
+    })
+
+    if (p.isCancel(zaiCodingPlan)) {
+      p.cancel("Installation cancelled.")
+      return null
+    }
+
+    result.hasZaiCodingPlan = zaiCodingPlan === "yes"
+  } else {
+    p.log.info(`Z.ai Coding Plan: ${initial.zaiCodingPlan} (already configured, skipping)`)
   }
+
+  // Ask Kimi For Coding question only if not already configured or reconfigure is true
+  if (!shouldSkip("kimiForCoding", detected.hasKimiForCoding)) {
+    const kimiForCoding = await p.select({
+      message: "Do you have a Kimi For Coding subscription?",
+      options: [
+        { value: "no" as const, label: "No", hint: "Will use other configured providers" },
+        { value: "yes" as const, label: "Yes", hint: "Kimi K2.5 for Kord/Plan fallback" },
+      ],
+      initialValue: initial.kimiForCoding,
+    })
+
+    if (p.isCancel(kimiForCoding)) {
+      p.cancel("Installation cancelled.")
+      return null
+    }
+
+    result.hasKimiForCoding = kimiForCoding === "yes"
+  } else {
+    p.log.info(`Kimi For Coding: ${initial.kimiForCoding} (already configured, skipping)`)
+  }
+
+  return result
 }
 
 function getMaturityMessage(status: ProjectMaturityStatus): string {
@@ -310,6 +394,43 @@ function getMaturityMessage(status: ProjectMaturityStatus): string {
 }
 
 async function runNonTuiInstall(args: InstallArgs): Promise<number> {
+  // Check if any provider flags are explicitly provided
+  const hasExplicitProviderFlags = args.claude !== undefined ||
+    args.openai !== undefined ||
+    args.gemini !== undefined ||
+    args.copilot !== undefined ||
+    args.opencodeZen !== undefined ||
+    args.zaiCodingPlan !== undefined ||
+    args.kimiForCoding !== undefined
+
+  // If no explicit flags given and not reconfigure, try to reuse existing config
+  if (!hasExplicitProviderFlags && !args.reconfigure) {
+    const detected = detectCurrentConfig()
+
+    // Only reuse if there's an existing installation
+    if (detected.isInstalled) {
+      const initial = detectedToInitialValues(detected)
+      printInfo("Existing configuration detected - reusing provider settings")
+      printInfo(`Reusing: Claude=${initial.claude}, OpenAI=${initial.openai}, Gemini=${initial.gemini}, Copilot=${initial.copilot}`)
+
+      // Build args from detected values and run normal flow (skip validation)
+      const reusedArgs: InstallArgs = {
+        ...args,
+        claude: initial.claude,
+        openai: initial.openai,
+        gemini: initial.gemini,
+        copilot: initial.copilot,
+        opencodeZen: initial.opencodeZen,
+        zaiCodingPlan: initial.zaiCodingPlan,
+        kimiForCoding: initial.kimiForCoding,
+      }
+
+      // Run normal flow with reused args
+      return runNonTuiInstallWithArgs(reusedArgs, detected)
+    }
+  }
+
+  // Original validation logic for when explicit flags are provided or reconfigure is true
   const validation = validateNonTuiArgs(args)
   if (!validation.valid) {
     printHeader(false)
@@ -319,14 +440,20 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
     }
     console.log()
     printInfo("Usage: npx kord-aios install --no-tui --claude=<no|yes|max20> --gemini=<no|yes> --copilot=<no|yes>")
+    printInfo("Or run without flags to reuse existing config (if available)")
+    printInfo("Use --reconfigure to force full reconfiguration")
     console.log()
     return 1
   }
 
+  // Run normal flow with validated args
+  const detected = detectCurrentConfig()
+  return runNonTuiInstallWithArgs(args, detected)
+}
+
+async function runNonTuiInstallWithArgs(args: InstallArgs, detected: DetectedConfig): Promise<number> {
   const maturity = detectProjectMaturity(process.cwd())
   const effectiveStatus: ProjectMaturityStatus = args.force ? "fresh" : maturity.status
-
-  const detected = detectCurrentConfig()
   const isUpdate = effectiveStatus === "existing"
 
   printHeader(isUpdate)
@@ -387,6 +514,13 @@ async function runNonTuiInstall(args: InstallArgs): Promise<number> {
     return 1
   }
   printSuccess(`Config written ${SYMBOLS.arrow} ${color.dim(kordAiosResult.configPath)}`)
+
+  const projectConfigResult = writeProjectKordAiosConfig(process.cwd())
+  if (!projectConfigResult.success) {
+    printWarning(`Project config write warning: ${projectConfigResult.error} ${SYMBOLS.arrow} ${color.dim(projectConfigResult.configPath)}`)
+  } else {
+    printSuccess(`Project config written ${SYMBOLS.arrow} ${color.dim(projectConfigResult.configPath)}`)
+  }
 
   printStep(step++, totalSteps, "Creating .kord/ directory structure...")
   const kordDirResult = createKordDirectory(process.cwd())
@@ -504,7 +638,7 @@ export async function install(args: InstallArgs): Promise<number> {
     s.stop(`OpenCode ${version ?? "installed"} ${color.green("[OK]")}`)
   }
 
-  const config = await runTuiMode(detected)
+  const config = await runTuiMode(detected, args.reconfigure ?? false)
   if (!config) return 1
 
   s.start("Adding Kord AIOS to OpenCode config")
@@ -544,6 +678,14 @@ export async function install(args: InstallArgs): Promise<number> {
     return 1
   }
   s.stop(`Config written to ${color.cyan(kordAiosResult.configPath)}`)
+
+  s.start("Writing project-level Kord AIOS configuration")
+  const projectConfigResult = writeProjectKordAiosConfig(process.cwd())
+  if (!projectConfigResult.success) {
+    s.stop(`Project config warning: ${projectConfigResult.error} ${color.yellow("[!]")} ${color.cyan(projectConfigResult.configPath)}`)
+  } else {
+    s.stop(`Project config written to ${color.cyan(projectConfigResult.configPath)}`)
+  }
 
   s.start("Creating .kord/ directory structure")
   const kordDirResult = createKordDirectory(process.cwd())

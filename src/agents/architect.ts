@@ -2,6 +2,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { isGptModel } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 
 const MODE: AgentMode = "subagent"
 
@@ -168,12 +169,23 @@ Before finalizing answers on architecture, security, or performance:
 
 <delivery>
 Your response goes directly to the user with no intermediate processing. Make your final message self-contained: a clear recommendation they can act on immediately, covering both what to do and why.
-</delivery>`
+</delivery>
+
+<write_scope>
+You are allowed to write documentation outputs only.
+
+Default output locations:
+- Architecture docs: docs/kord/architecture/ or docs/architecture/
+- ADRs: docs/kord/adrs/
+
+If you encounter a write permission error, do not try to write elsewhere in the repo.
+Stay within these documentation directories.
+</write_scope>
+
+${SKILLS_PROTOCOL_SECTION}`
 
 export function createArchitectAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([
-    "write",
-    "edit",
     "task",
     "task",
   ])
