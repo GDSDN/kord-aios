@@ -382,15 +382,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Merge to master
-        continue-on-error: true
+      - name: Skip branch sync
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          VERSION="${{ needs.publish-main.outputs.version }}"
-          git stash --include-untracked || true
-          git checkout master
-          git reset --hard "v${VERSION}"
-          git push -f origin master || echo "::warning::Failed to push to master"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          echo "No automatic branch sync (manual only)."
