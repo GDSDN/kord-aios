@@ -57,4 +57,19 @@
 - **Path Sanitization**: Kept all existing path normalization/sanitization logic unchanged
 - **Git Blocking**: Kept existing git command blocking logic unchanged
 
+## Task 7: Convert T2 Prompt-Only Agents to Overridable .md Defaults (2026-03-01)
 
+### Learnings
+
+- **Final embedding pattern**: For each T2 wrapper, import `../features/builtin-agents/<agent>.md?raw`, run `parseFrontmatter()`, and feed only `body` into runtime prompts.
+- **Prompt composition rule**: Keep `SKILLS_PROTOCOL_SECTION` in TypeScript composition (`promptBody + SKILLS_PROTOCOL_SECTION`) rather than embedding it in markdown, so markdown stays static and override-friendly.
+- **Compatibility preservation**: Existing exported prompt constants (`QA_SYSTEM_PROMPT`, `ANALYST_SYSTEM_PROMPT`, `PLAN_ANALYZER_SYSTEM_PROMPT`, `PLAN_REVIEWER_SYSTEM_PROMPT`) can remain, but must source from parsed markdown body to avoid duplicate inline prompt blocks.
+
+## Task 6.5: Squad Agent Namespace + Chief L2 Awareness (2026-03-01)
+
+### Learnings
+
+- **Namespace safety**: Registering squad agents as `squad-{manifest.name}-{yamlKey}` removes cross-squad key collisions while preserving readable delegation targets.
+- **Prompt key stability**: `prompt_file` resolution must continue to use the original YAML key (`resolvedPrompts[yamlKey]`), even after runtime name prefixing.
+- **Chief runtime policy**: `is_chief` works best as an authority flag that enforces runtime `mode: "all"`, independent of declared YAML mode.
+- **L2 awareness composition**: Chief prompts can be safely augmented with an auto-generated awareness section containing members, skills, tools summary, and exact prefixed delegation syntax.

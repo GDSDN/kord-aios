@@ -2,6 +2,48 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { SquadManifest, SquadAgent, SquadCategory } from "./schema"
 import type { LoadedSquad } from "./loader"
 
+function getPrefixedSquadAgentName(squadName: string, yamlKey: string): string {
+  return `squad-${squadName}-${yamlKey}`
+}
+
+function summarizeAgentTools(agentDef: SquadAgent): string {
+  if (!agentDef.tools || Object.keys(agentDef.tools).length === 0) return "default"
+
+  return Object.entries(agentDef.tools)
+    .map(([tool, enabled]) => `${tool}:${enabled ? "allow" : "deny"}`)
+    .join(", ")
+}
+
+function buildChiefAwarenessSection(manifest: SquadManifest): string {
+  const lines: string[] = [
+    "## Squad Awareness",
+    "",
+    "### Squad Members",
+  ]
+
+  const agentEntries = Object.entries(manifest.agents) as [string, SquadAgent][]
+  for (const [yamlKey, memberDef] of agentEntries) {
+    const prefixedName = getPrefixedSquadAgentName(manifest.name, yamlKey)
+    const skills = memberDef.skills.length > 0 ? memberDef.skills.join(", ") : "none"
+    const tools = summarizeAgentTools(memberDef)
+    lines.push(`- @${prefixedName} — ${memberDef.description} (skills: ${skills}; tools: ${tools})`)
+  }
+
+  lines.push("")
+  lines.push("### Delegation Syntax")
+  for (const [yamlKey, memberDef] of agentEntries) {
+    const prefixedName = getPrefixedSquadAgentName(manifest.name, yamlKey)
+    lines.push(`- \`task(subagent_type=\"${prefixedName}\")\` — ${memberDef.description}`)
+  }
+
+  return lines.join("\n")
+}
+
+function appendChiefAwarenessSection(basePrompt: string, manifest?: SquadManifest): string {
+  if (!manifest) return basePrompt
+  return `${basePrompt.trimEnd()}\n\n${buildChiefAwarenessSection(manifest)}`
+}
+
 /** Squad agent entry for prompt builder injection */
 export interface SquadAvailableAgent {
   name: string
@@ -27,13 +69,16 @@ export function createSquadAgentConfig(
   agentDef: SquadAgent,
   squadName: string,
   resolvedPrompts?: Record<string, string>,
+  options?: { yamlKey?: string, manifest?: SquadManifest },
 ): AgentConfig {
-  const resolvedPrompt = resolvedPrompts?.[agentName]
-  const systemPrompt = resolvedPrompt ?? agentDef.prompt ?? buildDefaultSquadAgentPrompt(agentName, agentDef, squadName)
+  const yamlKey = options?.yamlKey ?? agentName
+  const resolvedPrompt = resolvedPrompts?.[yamlKey]
+  const basePrompt = resolvedPrompt ?? agentDef.prompt ?? buildDefaultSquadAgentPrompt(agentName, agentDef, squadName)
+  const systemPrompt = agentDef.is_chief ? appendChiefAwarenessSection(basePrompt, options?.manifest) : basePrompt
 
   const config: AgentConfig = {
     description: `(${squadName} squad) ${agentDef.description}`,
-    mode: agentDef.mode ?? "subagent",
+    mode: agentDef.is_chief ? "all" : (agentDef.mode ?? "subagent"),
     prompt: systemPrompt,
     ...(agentDef.model ? { model: agentDef.model } : {}),
     ...(agentDef.temperature !== undefined ? { temperature: agentDef.temperature } : {}),
@@ -76,9 +121,10 @@ export function getSquadAgents(squads: LoadedSquad[]): SquadAvailableAgent[] {
 
   for (const { manifest } of squads) {
     const agentEntries = Object.entries(manifest.agents) as [string, SquadAgent][]
-    for (const [name, agentDef] of agentEntries) {
+    for (const [yamlKey, agentDef] of agentEntries) {
+      const prefixedName = getPrefixedSquadAgentName(manifest.name, yamlKey)
       agents.push({
-        name,
+        name: prefixedName,
         description: `(${manifest.name} squad) ${agentDef.description}`,
         squadName: manifest.name,
         isChief: agentDef.is_chief,
@@ -128,9 +174,12 @@ export function buildSquadPromptSection(squads: LoadedSquad[]): string {
 
   for (const { manifest } of squads) {
     const agentEntries = Object.entries(manifest.agents) as [string, SquadAgent][]
-    const agentNames = agentEntries.map(([n]) => `@${n}`).join(", ")
+    const agentNames = agentEntries
+      .map(([yamlKey]) => `@${getPrefixedSquadAgentName(manifest.name, yamlKey)}`)
+      .join(", ")
     const chief = agentEntries.find(([, a]) => a.is_chief)?.[0]
-    lines.push(`| ${manifest.name} | ${manifest.description} | ${agentNames} | ${chief ? `@${chief}` : "—"} |`)
+    const chiefDisplayName = chief ? `@${getPrefixedSquadAgentName(manifest.name, chief)}` : "—"
+    lines.push(`| ${manifest.name} | ${manifest.description} | ${agentNames} | ${chiefDisplayName} |`)
   }
 
   // Delegation syntax per agent
@@ -142,8 +191,9 @@ export function buildSquadPromptSection(squads: LoadedSquad[]): string {
 
   for (const { manifest } of squads) {
     const agentEntries = Object.entries(manifest.agents) as [string, SquadAgent][]
-    for (const [name, agentDef] of agentEntries) {
-      lines.push(`- \`task(subagent_type="${name}")\` — ${agentDef.description}`)
+    for (const [yamlKey, agentDef] of agentEntries) {
+      const prefixedName = getPrefixedSquadAgentName(manifest.name, yamlKey)
+      lines.push(`- \`task(subagent_type="${prefixedName}")\` — ${agentDef.description}`)
     }
   }
 
@@ -196,8 +246,12 @@ export function createAllSquadAgentConfigs(squads: LoadedSquad[]): Map<string, A
 
   for (const { manifest, resolvedPrompts } of squads) {
     const agentEntries = Object.entries(manifest.agents) as [string, SquadAgent][]
-    for (const [name, agentDef] of agentEntries) {
-      configs.set(name, createSquadAgentConfig(name, agentDef, manifest.name, resolvedPrompts))
+    for (const [yamlKey, agentDef] of agentEntries) {
+      const prefixedName = getPrefixedSquadAgentName(manifest.name, yamlKey)
+      configs.set(
+        prefixedName,
+        createSquadAgentConfig(prefixedName, agentDef, manifest.name, resolvedPrompts, { yamlKey, manifest }),
+      )
     }
   }
 

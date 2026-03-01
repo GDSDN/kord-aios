@@ -54,3 +54,19 @@
 - **Test Coverage**: Added 6 new tests to cover unknown agent blocking, DEFAULT_AGENT_ALLOWLIST fallback, and T0/T1 agent full access
 - **19 Tests Pass**: All 19 agent-authority tests pass including new and existing tests
 
+## Task 7: Convert T2 Prompt-Only Agents to Overridable .md Defaults (2026-03-01)
+
+### Issues/Gotchas
+
+- **Broken raw import quoting**: `pm.ts`, `po.ts`, `sm.ts`, `qa.ts`, and `devops.ts` had missing closing quotes on `*.md?raw` imports, causing immediate TypeScript parse failures.
+- **Duplicate prompt constants**: Partial migration left both parsed-body and legacy inline `*_SYSTEM_PROMPT` constants in the same files, creating redeclarations and inconsistent prompt sources.
+- **Partial conversion drift**: Some T2 wrappers still used embedded template literals while related `.md` defaults already existed, so runtime behavior diverged from the intended three-layer embedding pattern.
+
+## Task 6.5: Squad Agent Namespace + Chief L2 Awareness (2026-03-01)
+
+### Issues/Gotchas
+
+- **Collision risk in shared keys**: Multiple squads can define the same YAML agent key (for example, `worker`), so bare runtime names would silently overwrite map entries.
+- **Prompt lookup pitfall**: Switching runtime names to prefixed values can accidentally break `prompt_file` hydration if lookup is changed from YAML key to prefixed key.
+- **Chief-only awareness boundary**: Awareness injection must be constrained to `is_chief` agents only; worker prompts should remain unmodified.
+- **Delegation syntax drift**: Prompt builder content must be updated consistently to prefixed subagent names to avoid stale examples.
