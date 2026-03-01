@@ -4,6 +4,7 @@ import { isAbsolute, join, relative, resolve } from "node:path"
 import { readBoulderState } from "../../features/boulder-state"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { findFirstMessageWithAgent, findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
+import { getAgentCapabilities } from "../../shared/agent-capabilities"
 import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
 import { BLOCKED_GIT_COMMANDS, DEFAULT_AGENT_ALLOWLIST, HOOK_NAME } from "./constants"
@@ -149,7 +150,8 @@ function isBlockedGitCommand(command: string): boolean {
 }
 
 export function createAgentAuthorityHook(ctx: PluginInput, config?: AgentAuthorityConfig) {
-  const allowlistByAgent = resolveAllowlist(config)
+  // Config allowlist is preserved for backward compatibility but handled via getAgentCapabilities
+  // The config parameter is kept for potential future use (e.g., passing to getAgentCapabilities sources)
 
   return {
     "tool.execute.before": async (
@@ -194,7 +196,40 @@ export function createAgentAuthorityHook(ctx: PluginInput, config?: AgentAuthori
         throw new Error(`Agent ${getAgentDisplayName(agentName)} does not have write permission for path ${filePath}.`)
       }
 
-      const allowlist = allowlistByAgent[agentName] ?? []
+      // Use getAgentCapabilities to resolve write_paths with proper precedence:
+      // 1. Agent frontmatter/squad/config (if provided)
+      // 2. DEFAULT_AGENT_ALLOWLIST fallback for legacy agents
+      // 3. Empty (deny all) for unknown agents
+      const capabilities = getAgentCapabilities(agentName)
+      let allowlist: string[]
+
+      if (capabilities.write_paths && capabilities.write_paths.length > 0) {
+        allowlist = capabilities.write_paths
+        log(`[${HOOK_NAME}] Using capabilities write_paths`, {
+          sessionID: input.sessionID,
+          agent: agentName,
+          source: "capabilities",
+          paths: allowlist,
+        })
+      } else if (agentName in DEFAULT_AGENT_ALLOWLIST) {
+        // Fallback to hardcoded allowlist for legacy agents without capabilities
+        allowlist = DEFAULT_AGENT_ALLOWLIST[agentName]
+        log(`[${HOOK_NAME}] Using DEFAULT_AGENT_ALLOWLIST fallback`, {
+          sessionID: input.sessionID,
+          agent: agentName,
+          source: "hardcoded",
+          paths: allowlist,
+        })
+      } else {
+        // Unknown agent with no capabilities + no allowlist entry = deny all
+        allowlist = []
+        log(`[${HOOK_NAME}] No write_paths or allowlist - blocking`, {
+          sessionID: input.sessionID,
+          agent: agentName,
+          source: "none",
+        })
+      }
+
       if (!isAllowedPath(relativePath, allowlist)) {
         log(`[${HOOK_NAME}] Blocked write`, {
           sessionID: input.sessionID,

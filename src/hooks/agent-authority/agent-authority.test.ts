@@ -205,4 +205,86 @@ describe("createAgentAuthorityHook", () => {
     //#then
     await expect(result).resolves.toBeUndefined()
   })
+
+  // Tests for getAgentCapabilities integration
+  test("blocks unknown agent with no allowlist entry from writing", async () => {
+    //#given
+    updateSessionAgent("ses_unknown", "unknown-custom-agent")
+    const input = { tool: "Write", sessionID: "ses_unknown", callID: "call_unknown_1" }
+    const output = { args: { filePath: "docs/test.md", content: "hello" } }
+
+    //#when
+    const result = hook["tool.execute.before"]?.(input as any, output as any)
+
+    //#then
+    // Unknown agent has no write_paths from getAgentCapabilities and no DEFAULT_AGENT_ALLOWLIST entry
+    await expect(result).rejects.toThrow("does not have write permission")
+  })
+
+  test("pm falls back to DEFAULT_AGENT_ALLOWLIST for legacy agent", async () => {
+    //#given - pm is in DEFAULT_AGENT_ALLOWLIST, should allow docs/** but block src/**
+    updateSessionAgent("ses_pm_docs", "pm")
+    const input = { tool: "Write", sessionID: "ses_pm_docs", callID: "call_pm_docs" }
+    const output = { args: { filePath: "docs/kord/plans/plan.md", content: "plan" } }
+
+    //#when
+    const result = hook["tool.execute.before"]?.(input as any, output as any)
+
+    //#then - pm can write to docs/** per DEFAULT_AGENT_ALLOWLIST
+    await expect(result).resolves.toBeUndefined()
+  })
+
+  test("pm blocks writing to src via DEFAULT_AGENT_ALLOWLIST fallback", async () => {
+    //#given
+    updateSessionAgent("ses_pm_src", "pm")
+    const input = { tool: "Write", sessionID: "ses_pm_src", callID: "call_pm_src" }
+    const output = { args: { filePath: "src/feature.ts", content: "code" } }
+
+    //#when
+    const result = hook["tool.execute.before"]?.(input as any, output as any)
+
+    //#then - pm cannot write to src/** per DEFAULT_AGENT_ALLOWLIST
+    await expect(result).rejects.toThrow("does not have write permission")
+  })
+
+  test("dev-junior has full access as T0/T1 agent", async () => {
+    //#given - dev-junior is a T0/T1 agent with ["**"] access
+    updateSessionAgent("ses_dev_junior", "dev-junior")
+    const input = { tool: "Write", sessionID: "ses_dev_junior", callID: "call_dj_1" }
+    const output = { args: { filePath: "src/any/file.ts", content: "code" } }
+
+    //#when
+    const result = hook["tool.execute.before"]?.(input as any, output as any)
+
+    //#then - dev-junior can write anywhere
+    await expect(result).resolves.toBeUndefined()
+  })
+
+  test("data-engineer has limited access per DEFAULT_AGENT_ALLOWLIST", async () => {
+    //#given - data-engineer has specific paths in DEFAULT_AGENT_ALLOWLIST
+    updateSessionAgent("ses_de", "data-engineer")
+    const input = { tool: "Write", sessionID: "ses_de", callID: "call_de_1" }
+
+    // data-engineer can write to migrations and schema files
+    const allowedOutput = { args: { filePath: "db/migrations/001.sql", content: "CREATE TABLE" } }
+
+    //#when
+    const allowedResult = hook["tool.execute.before"]?.(input as any, allowedOutput as any)
+
+    //#then
+    await expect(allowedResult).resolves.toBeUndefined()
+  })
+
+  test("data-engineer blocked from writing to src", async () => {
+    //#given
+    updateSessionAgent("ses_de_src", "data-engineer")
+    const input = { tool: "Write", sessionID: "ses_de_src", callID: "call_de_src" }
+    const output = { args: { filePath: "src/feature.ts", content: "code" } }
+
+    //#when
+    const result = hook["tool.execute.before"]?.(input as any, output as any)
+
+    //#then - data-engineer cannot write to src/** (not in allowlist)
+    await expect(result).rejects.toThrow("does not have write permission")
+  })
 })

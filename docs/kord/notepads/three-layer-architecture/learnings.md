@@ -43,3 +43,18 @@
   - explore/librarian deny call_kord_agent in restrictions
   - architect no longer denies call_kord_agent (now allowed by global default)
 
+## Task 6: Update Agent Authority Hook to Read Declarative Permissions (2026-02-28)
+
+### Learnings
+
+- **getAgentCapabilities Integration**: Hook now uses `getAgentCapabilities(agentName)` for write permission resolution
+- **Precedence Order**: The resolver handles:
+  1. T0/T1 agents (kord, dev, dev-junior) get ["**"] access
+  2. Agents in DEFAULT_AGENT_ALLOWLIST get fallback paths
+  3. Unknown agents get empty array (deny all)
+- **Backward Compatibility**: Legacy agents without frontmatter still work via DEFAULT_AGENT_ALLOWLIST fallback
+- **Debug Logging**: Added logging to show which source was used (capabilities vs hardcoded vs none)
+- **Path Sanitization**: Kept all existing path normalization/sanitization logic unchanged
+- **Git Blocking**: Kept existing git command blocking logic unchanged
+
+

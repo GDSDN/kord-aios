@@ -44,3 +44,13 @@
 - **Merge Order**: Correctly placed OpenCode agents between builtinAgents and Claude Code agents in the merge order
 - **No migrateAgentConfig**: OpenCode agents use their own format (tools as object with boolean values), so no permission migration is applied
 
+## Task 6: Update Agent Authority Hook to Read Declarative Permissions (2026-02-28)
+
+### Issues/Gotchas
+
+- **Unused Variable**: Removed unused `allowlistByAgent` variable from hook - was using getAgentCapabilities instead
+- **Import Order**: Had to add back `getAgentDisplayName` import which was accidentally removed - needed for error messages
+- **Unknown Agent Blocking**: New behavior blocks unknown agents that have no entry in DEFAULT_AGENT_ALLOWLIST - this is intentional but may affect custom agents that weren't explicitly added
+- **Test Coverage**: Added 6 new tests to cover unknown agent blocking, DEFAULT_AGENT_ALLOWLIST fallback, and T0/T1 agent full access
+- **19 Tests Pass**: All 19 agent-authority tests pass including new and existing tests
+
