@@ -26,6 +26,8 @@ import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-c
 import { createBuiltinSkills } from "../features/builtin-skills"
 import type { LoadedSkill, SkillScope } from "../features/opencode-skill-loader/types"
 import type { BrowserAutomationProvider } from "../config/schema"
+import { buildSquadPromptSection } from "../features/squad/factory"
+import type { LoadedSquad } from "../features/squad/loader"
 
 type AgentSource = AgentFactory | AgentConfig
 
@@ -299,7 +301,8 @@ export async function createBuiltinAgents(
   client?: any,
   browserProvider?: BrowserAutomationProvider,
   uiSelectedModel?: string,
-  disabledSkills?: Set<string>
+  disabledSkills?: Set<string>,
+  squads?: LoadedSquad[]
 ): Promise<Record<string, AgentConfig>> {
   const connectedProviders = readConnectedProvidersCache()
   // IMPORTANT: Do NOT pass client to fetchAvailableModels during plugin initialization.
@@ -442,7 +445,9 @@ export async function createBuiltinAgents(
         availableAgents,
         undefined,
         availableSkills,
-        availableCategories
+        availableCategories,
+        undefined,
+        squads
       )
 
       if (kordResolvedVariant) {
@@ -489,7 +494,9 @@ export async function createBuiltinAgents(
           availableAgents,
           undefined,
           availableSkills,
-          availableCategories
+          availableCategories,
+          undefined,
+          squads
         )
 
         devConfig = { ...devConfig, variant: devResolvedVariant ?? "medium" }
@@ -540,6 +547,7 @@ export async function createBuiltinAgents(
         availableAgents,
         availableSkills,
         userCategories: categories,
+        squads,
       })
 
       if (builderResolvedVariant) {

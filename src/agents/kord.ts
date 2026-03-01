@@ -23,6 +23,8 @@ import {
   categorizeTools,
 } from "./dynamic-agent-prompt-builder"
 import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
+import { buildSquadPromptSection } from "../features/squad/factory"
+import type { LoadedSquad } from "../features/squad/loader"
 
 function buildTaskManagementSection(useTaskSystem: boolean): string {
   if (useTaskSystem) {
@@ -583,7 +585,8 @@ export function createKordAgent(
   availableToolNames?: string[],
   availableSkills?: AvailableSkill[],
   availableCategories?: AvailableCategory[],
-  useTaskSystem = false
+  useTaskSystem = false,
+  squads?: LoadedSquad[]
 ): AgentConfig {
   const tools = availableToolNames ? categorizeTools(availableToolNames) : []
   const skills = availableSkills ?? []
@@ -594,6 +597,12 @@ export function createKordAgent(
 
   const promptWithSkills = prompt + SKILLS_PROTOCOL_SECTION
 
+  // Inject squad awareness if squads are present
+  const squadSection = buildSquadPromptSection(squads ?? [])
+  const promptWithSquads = squadSection
+    ? promptWithSkills + `\n\n<Squad_Awareness>\n${squadSection}\n</Squad_Awareness>`
+    : promptWithSkills
+
   const permission = { question: "allow", call_kord_agent: "deny" } as AgentConfig["permission"]
   const base = {
     description:
@@ -601,7 +610,7 @@ export function createKordAgent(
     mode: MODE,
     model,
     maxTokens: 64000,
-    prompt: promptWithSkills,
+    prompt: promptWithSquads,
     color: "#00CED1",
     permission,
   }

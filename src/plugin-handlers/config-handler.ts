@@ -1,7 +1,7 @@
 import { createBuiltinAgents } from "../agents";
 import { createDevJuniorAgentWithOverrides } from "../agents/dev-junior";
 import { loadAllSquads } from "../features/squad/loader";
-import { createAllSquadAgentConfigs } from "../features/squad/factory";
+import { createAllSquadAgentConfigs, buildSquadPromptSection } from "../features/squad/factory";
 import {
   loadUserCommands,
   loadProjectCommands,
@@ -203,6 +203,10 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     // Pass it as uiSelectedModel so it takes highest priority in model resolution
     const currentModel = config.model as string | undefined;
     const disabledSkills = new Set<string>(pluginConfig.disabled_skills ?? []);
+
+    // Load squads early so they can be passed to createBuiltinAgents
+    const squadLoadResult = loadAllSquads(ctx.directory);
+
     const builtinAgents = await createBuiltinAgents(
       migratedDisabledAgents,
       pluginConfig.agents,
@@ -214,7 +218,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       ctx.client,
       browserProvider,
       currentModel, // uiSelectedModel - takes highest priority
-      disabledSkills
+      disabledSkills,
+      squadLoadResult.squads
     );
 
     // Claude Code agents: Do NOT apply permission migration
@@ -354,12 +359,19 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         const temperatureToUse = planOverride?.temperature ?? categoryConfig?.temperature;
         const topPToUse = planOverride?.top_p ?? categoryConfig?.top_p;
         const maxTokensToUse = planOverride?.maxTokens ?? categoryConfig?.maxTokens;
+
+        // Inject squad awareness into planner prompt
+        const squadSection = buildSquadPromptSection(squadLoadResult.squads)
+        const plannerPrompt = squadSection
+          ? PLAN_SYSTEM_PROMPT + `\n\n<Squad_Awareness>\n${squadSection}\n</Squad_Awareness>`
+          : PLAN_SYSTEM_PROMPT
+
         const planBase = {
           name: "planner",
           ...(resolvedModel ? { model: resolvedModel } : {}),
           ...(variantToUse ? { variant: variantToUse } : {}),
           mode: "all" as const,
-          prompt: PLAN_SYSTEM_PROMPT,
+          prompt: plannerPrompt,
           permission: PLAN_PERMISSION,
           description: `${configAgent?.plan?.description ?? "Planner agent"} (Planner - Kord AIOS)`,
           color: (configAgent?.plan?.color as string) ?? "#FF5722", // Deep Orange - Fire/Flame theme
@@ -417,11 +429,10 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
 
       const planDemoteConfig = shouldDemotePlan
            ? { mode: "subagent" as const
-          }
-        : undefined;
+         }
+       : undefined;
 
-      // Load squads and convert to agent configs (always, regardless of plannerEnabled)
-      const squadLoadResult = loadAllSquads(ctx.directory);
+      // Reuse squads loaded earlier, convert to agent configs
       const squadAgentConfigs = createAllSquadAgentConfigs(squadLoadResult.squads);
 
       log(`[config-handler] Loaded ${squadLoadResult.squads.length} squads with ${squadAgentConfigs.size} agents from ${ctx.directory}`, {
@@ -459,8 +470,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
       };
     } else {
-      // Kord disabled - still load squads for non-Kord mode
-      const squadLoadResult = loadAllSquads(ctx.directory);
+      // Kord disabled - reuse squads loaded earlier for non-Kord mode
       const squadAgentConfigs = createAllSquadAgentConfigs(squadLoadResult.squads);
 
       // Squads should not override builtin/user/project agent configs.
