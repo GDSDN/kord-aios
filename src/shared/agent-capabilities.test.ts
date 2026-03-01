@@ -1,7 +1,15 @@
-import { describe, test, expect } from "bun:test"
+import { describe, test, expect, beforeEach } from "bun:test"
 import { getAgentCapabilities, type AgentCapabilities } from "./agent-capabilities"
+import {
+  clearAgentFrontmatterCapabilities,
+  setAgentFrontmatterCapabilities,
+} from "./agent-frontmatter-capabilities-store"
 
 describe("agent-capabilities", () => {
+  beforeEach(() => {
+    clearAgentFrontmatterCapabilities()
+  })
+
   describe("AgentCapabilities type", () => {
     test("has required write_paths field", () => {
       // given an agent capabilities object
@@ -47,6 +55,32 @@ describe("agent-capabilities", () => {
   })
 
   describe("getAgentCapabilities", () => {
+    describe("stored frontmatter defaults", () => {
+      test("uses stored frontmatter when sources.frontmatter is omitted", () => {
+        clearAgentFrontmatterCapabilities()
+        setAgentFrontmatterCapabilities("course-creator", {
+          write_paths: ["docs/courses/**"],
+        })
+
+        const result = getAgentCapabilities("course-creator")
+
+        expect(result.write_paths).toEqual(["docs/courses/**"])
+      })
+
+      test("explicit sources.frontmatter overrides stored frontmatter", () => {
+        clearAgentFrontmatterCapabilities()
+        setAgentFrontmatterCapabilities("course-creator", {
+          write_paths: ["docs/courses/**"],
+        })
+
+        const result = getAgentCapabilities("course-creator", {
+          frontmatter: { write_paths: ["docs/override/**"] },
+        })
+
+        expect(result.write_paths).toEqual(["docs/override/**"])
+      })
+    })
+
     describe("frontmatter as defaults (lowest priority)", () => {
       test("uses frontmatter write_paths as base defaults", () => {
         // given frontmatter source with write_paths

@@ -310,6 +310,32 @@ Or disable via `disabled_agents` in `~/.config/opencode/kord-aios.json` or `.ope
 
 Available built-in agent names are defined in `src/config/schema.ts` (`BuiltinAgentNameSchema`).
 
+### OpenCode Agent Files (`.opencode/agents/*.md`)
+
+You can define custom agent overrides in markdown files with frontmatter:
+
+```markdown
+---
+name: Course Creator
+model: openai/gpt-5.2
+write_paths:
+  - docs/courses/**
+  - docs/curriculum/**
+tool_allowlist:
+  - Read
+  - Write
+---
+
+You are a course creation specialist.
+```
+
+Rules:
+
+- Agent runtime key is the **filename without `.md`** (`course-creator.md` -> `course-creator`).
+- Files are loaded from both `.opencode/agents/*.md` and `~/.config/opencode/agents/*.md`.
+- `write_paths` frontmatter is enforced by the `agent-authority` hook.
+- T0 orchestration agents (`kord`, `dev`, `builder`, `planner`) are filtered and cannot be overridden via OpenCode agent files.
+
 ### Model Routing
 
 Per-agent model routing allows you to control how models are selected for each agent. Two modes are available:

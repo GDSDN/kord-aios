@@ -162,6 +162,62 @@ kord-aios/
 | Add MCP | `src/mcp/` | Create config, add to `createBuiltinMcps()` |
 | Add skill | `src/features/builtin-skills/` | Create dir with SKILL.md |
 | Add squad | `src/features/builtin-squads/` | Create dir with SQUAD.yaml |
+
+## CUSTOM AGENT LOADING
+
+Kord AIOS supports loading custom agents from `.opencode/agents/*.md` files. This enables methodology content (T2 agents) to be overridden from disk while keeping the execution engine compiled.
+
+### Agent File Format
+
+Agents are defined as Markdown files with YAML frontmatter:
+
+```markdown
+---
+name: Course Creator
+description: Creates educational content
+model: openai/gpt-5.2
+temperature: 0.3
+tools: Read,Write,Glob
+write_paths:
+  - docs/courses/**
+  - docs/curriculum/**
+tool_allowlist:
+  - Read
+  - Write
+engine_min_version: 1.0.0
+---
+
+You are a course creator agent that designs educational content.
+```
+
+### Frontmatter Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Agent display name |
+| `description` | string | Agent description |
+| `model` | string | Model to use (e.g., `openai/gpt-5.2`) |
+| `temperature` | number | Temperature (0-1) |
+| `tools` | string | Comma-separated tool names to enable |
+| `write_paths` | string[] | Paths agent can write to (for agent-authority) |
+| `tool_allowlist` | string[] | Specific tools allowed |
+| `engine_min_version` | string | Minimum plugin version required (semver) |
+
+### Loader Paths
+
+| Priority | Location | Description |
+|----------|----------|-------------|
+| 1 (lowest) | Builtin | Compiled T2 agent prompts from `src/features/builtin-agents/` |
+| 2 | `~/.config/opencode/agents/*.md` | User-global custom agents |
+| 3 | `.opencode/agents/*.md` | Project-specific custom agents |
+| 4 (highest) | `kord-aios.json` | Explicit agent configuration in config file |
+
+### Key Behaviors
+
+- **Filename as key**: Agents are keyed by filename (e.g., `course-creator.md` → `course-creator`)
+- **T0 Protection**: kord, dev, builder, planner cannot be overridden via `.opencode/agents/`
+- **Authority wiring**: `write_paths` frontmatter is loaded into in-memory capabilities and enforced by `src/hooks/agent-authority/index.ts`
+- **Extraction**: Use `bunx kord-aios extract` to export builtin agents/skills for customization
 | Add command | `src/features/builtin-commands/` | Add template + register in commands.ts |
 | Config schema | `src/config/schema.ts` | Zod schema, run `bun run build:schema` |
 | Plugin config | `src/plugin-handlers/config-handler.ts` | JSONC loading, merging, migration |

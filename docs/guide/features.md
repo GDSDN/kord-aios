@@ -71,6 +71,36 @@ Ask @explore to find all usages of createUser
 Ask @vision to analyze this diagram
 ```
 
+### Custom Agents
+
+You can add custom agents via `.opencode/agents/*.md` files. This enables methodology content (T2 agents) to be overridden from disk while keeping the execution engine compiled.
+
+**Agent file format:**
+```markdown
+---
+name: Course Creator
+description: Creates course content
+model: openai/gpt-5.2
+temperature: 0.3
+tools: Read,Write
+write_paths:
+  - docs/courses/**
+  - docs/curriculum/**
+---
+
+You are a course creator agent that designs educational content.
+```
+
+**Loader paths (priority: lowest to highest):**
+1. Builtin: `src/features/builtin-agents/*.md` (compiled)
+2. User: `~/.config/opencode/agents/*.md`
+3. Project: `.opencode/agents/*.md`
+4. Config: `kord-aios.json` agents section
+
+**T0 protection:** kord, dev, builder, planner cannot be overridden.
+
+**Extract builtin content:** Use `bunx kord-aios extract` to export agents/skills for customization.
+
 ### Background Agents
 
 Run agents in the background while continuing your work:
@@ -289,7 +319,7 @@ Disable via `disabled_commands: ["ralph-loop"]` in `kord-aios.json`.
 | **thinking-block-validator** | PreToolUse | Validates thinking blocks to prevent API errors. |
 | **write-existing-file-guard** | PreToolUse | Guards against accidental file overwrites. |
 | **edit-error-recovery** | PostToolUse | Recovers from edit tool failures with retry strategies. |
-| **agent-authority** | PreToolUse | Enforces per-agent tool allowlists from `agent_authority.allowlist` config. |
+| **agent-authority** | PreToolUse | Enforces per-agent write authority using frontmatter `write_paths`, capability resolution, and additive `agent_authority.allowlist` config. |
 | **subagent-question-blocker** | PreToolUse | Blocks subagents from asking the user questions (they should work autonomously). |
 
 #### Recovery & Stability (3)

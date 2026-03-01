@@ -112,3 +112,22 @@
 - **YAML configuration requirements**: Chief requires both `is_chief: true` AND `mode: all` in SQUAD.yaml - is_chief triggers factory assembly, mode:all enables primary+subagent invocation
 - **Runtime naming**: Factory prefixes agent names as `squad-{squadName}-{yamlKey}` - chief.md should NOT hardcode these, should refer to domain roles instead
 - **GOOD vs BAD examples**: Providing concrete examples of what to include vs exclude helps squad-creator generate proper chief prompts
+
+## Task 14: L2-Squad Integration Tests + Documentation (2026-03-01)
+
+### Learnings
+
+- **Integration test scope**: Created comprehensive `l2-squad-integration.test.ts` covering end-to-end L2-Squad behavior - chief prompt assembly, prefixed naming, mode differences, and worker isolation
+- **Test coverage verification**: 11 integration tests verify: (1) chief prompt contains awareness + domain methodology + coordination template, (2) prefixed naming prevents collisions, (3) chief mode is "all" vs worker "subagent", (4) workers don't contain coordination
+- **Documentation updates**: Updated `src/features/squad/AGENTS.md` with L2-Squad architecture section (layer model, chief prompt assembly, naming convention), `README.md` with chief + naming info, root `AGENTS.md` with L2-Squad in layer diagram
+- **Append-only notes**: Appended task 14 learnings and issues to `learnings.md` and `issues.md` following the established pattern
+
+## Task 10: Integration Tests + Documentation (2026-03-01)
+
+### Learnings
+
+- **Real integration boundary**: Integration tests must not stub `loadOpenCodeAgents()` to `{}` or they stop validating actual `.opencode/agents/*.md` file loading behavior.
+- **Filename key contract**: OpenCode agents are keyed by filename (`course-creator.md` -> `course-creator`), so assertions must use hyphenated filename keys instead of snake_case aliases.
+- **Capability wiring requirement**: `write_paths` enforcement depends on carrying frontmatter into runtime capability resolution; an in-memory capability map is a minimal bridge without changing loader return shape.
+- **Config handler path behavior**: Project overrides are loaded through `loadOpenCodeProjectAgents(ctx.directory)`, and T0 filtering (`kord/dev/builder/planner`) must be preserved in integration expectations.
+- **Authority fallback model**: Agents without `write_paths` still fall back through `getAgentCapabilities()` to hardcoded defaults when applicable; unknown agents remain blocked.

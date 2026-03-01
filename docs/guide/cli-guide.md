@@ -194,6 +194,13 @@ The CLI searches for configuration files in the following locations (in priority
 1. **Project Level**: `.opencode/kord-aios.json`
 2. **User Level**: `~/.config/opencode/kord-aios.json`
 
+Custom OpenCode agents are loaded separately from:
+
+- `.opencode/agents/*.md` (project)
+- `~/.config/opencode/agents/*.md` (user)
+
+Agent keys come from filenames, and frontmatter `write_paths` is enforced by the `agent-authority` hook.
+
 ### JSONC Support
 
 Configuration files support **JSONC (JSON with Comments)** format. You can use comments and trailing commas.

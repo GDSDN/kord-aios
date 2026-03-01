@@ -13,6 +13,10 @@
  */
 
 import { DEFAULT_AGENT_ALLOWLIST } from "../hooks/agent-authority/constants"
+import {
+  getAgentFrontmatterCapabilities,
+  type StoredAgentFrontmatterCapabilities,
+} from "./agent-frontmatter-capabilities-store"
 
 /**
  * Core capabilities interface for an agent.
@@ -33,12 +37,7 @@ export interface AgentCapabilities {
  * Agent frontmatter capabilities (lowest priority - used as defaults).
  * This comes from agent .md files in .opencode/agents/ or ~/.config/opencode/agents/
  */
-export interface AgentFrontmatterCapabilities {
-  write_paths?: string[]
-  tool_allowlist?: string[]
-  tool_denylist?: string[]
-  can_delegate?: boolean
-}
+export interface AgentFrontmatterCapabilities extends StoredAgentFrontmatterCapabilities {}
 
 /**
  * Squad manifest tool permissions for squad agents.
@@ -100,6 +99,7 @@ export function getAgentCapabilities(
   sources: AgentCapabilitySources = {}
 ): AgentCapabilities {
   const normalizedAgentName = agentName.toLowerCase()
+  const frontmatterDefaults = sources.frontmatter ?? getAgentFrontmatterCapabilities(normalizedAgentName)
 
   // Start with empty base capabilities
   const result: AgentCapabilities = {
@@ -110,18 +110,18 @@ export function getAgentCapabilities(
   // Apply sources in precedence order (lowest to highest)
 
   // 1. Apply frontmatter as base defaults (lowest priority)
-  if (sources.frontmatter) {
-    if (sources.frontmatter.write_paths !== undefined) {
-      result.write_paths = sources.frontmatter.write_paths
+  if (frontmatterDefaults) {
+    if (frontmatterDefaults.write_paths !== undefined) {
+      result.write_paths = frontmatterDefaults.write_paths
     }
-    if (sources.frontmatter.tool_allowlist !== undefined) {
-      result.tool_allowlist = sources.frontmatter.tool_allowlist
+    if (frontmatterDefaults.tool_allowlist !== undefined) {
+      result.tool_allowlist = frontmatterDefaults.tool_allowlist
     }
-    if (sources.frontmatter.tool_denylist !== undefined) {
-      result.tool_denylist = sources.frontmatter.tool_denylist
+    if (frontmatterDefaults.tool_denylist !== undefined) {
+      result.tool_denylist = frontmatterDefaults.tool_denylist
     }
-    if (sources.frontmatter.can_delegate !== undefined) {
-      result.can_delegate = sources.frontmatter.can_delegate
+    if (frontmatterDefaults.can_delegate !== undefined) {
+      result.can_delegate = frontmatterDefaults.can_delegate
     }
   }
 
@@ -160,7 +160,7 @@ export function getAgentCapabilities(
   // 4. Apply hardcoded defaults for T0/T1 agents (if no paths set from sources)
   // This acts as a fallback when no explicit sources provided
   const hasExplicitWritePaths =
-    sources.frontmatter?.write_paths !== undefined ||
+    frontmatterDefaults?.write_paths !== undefined ||
     sources.squad?.write_paths !== undefined ||
     sources.config?.write_paths !== undefined
 

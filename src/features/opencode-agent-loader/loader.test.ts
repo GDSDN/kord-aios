@@ -2,11 +2,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { existsSync, mkdirSync, writeFileSync, rmSync } from "fs"
 import { join } from "path"
 import { loadOpenCodeAgents } from "./loader"
+import { clearAgentFrontmatterCapabilities } from "../../shared/agent-frontmatter-capabilities-store"
 
 describe("opencode-agent-loader", () => {
   const testDir = join(process.cwd(), ".test-opencode-agents")
 
   beforeEach(() => {
+    clearAgentFrontmatterCapabilities()
     // Create test directory
     if (!existsSync(testDir)) {
       mkdirSync(testDir, { recursive: true })
@@ -14,6 +16,7 @@ describe("opencode-agent-loader", () => {
   })
 
   afterEach(() => {
+    clearAgentFrontmatterCapabilities()
     // Clean up test directory
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true })

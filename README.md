@@ -273,6 +273,14 @@ JSONC supported — comments and trailing commas work.
 - Built-in MCPs (websearch, context7, grep_app)
 - LSP and experimental features
 
+### OpenCode Agent Overrides
+
+You can override methodology agents from disk with `.opencode/agents/*.md` and `~/.config/opencode/agents/*.md`.
+
+- Agent keys are derived from filename (`course-creator.md` -> `course-creator`).
+- Frontmatter `write_paths` is enforced by `agent-authority` to gate file writes.
+- T0 agents (`kord`, `dev`, `builder`, `planner`) are protected and cannot be overridden from OpenCode agent files.
+
 See the full [Configuration Documentation](docs/configurations.md) for details.
 
 ## Uninstallation

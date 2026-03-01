@@ -4,6 +4,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
+import { setAgentFrontmatterCapabilities } from "../../shared/agent-frontmatter-capabilities-store"
 import { compareVersions } from "../../shared/opencode-version"
 import type { OpenCodeAgentFrontmatter, LoadedOpenCodeAgent } from "./types"
 import { parseOpenCodeAgentFrontmatter } from "./types"
@@ -139,6 +140,11 @@ function loadAgentsFromDir(agentsDir: string): Record<string, AgentConfig> {
       if (toolsConfig) {
         config.tools = toolsConfig
       }
+
+      setAgentFrontmatterCapabilities(agentName, {
+        write_paths: validatedData.write_paths,
+        tool_allowlist: validatedData.tool_allowlist,
+      })
 
       // Key by filename without .md, as per task requirements
       result[agentName] = config

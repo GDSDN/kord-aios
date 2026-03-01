@@ -116,3 +116,21 @@
 - **Anchor phrase preservation**: The T2 agent prompts test checks for specific anchor phrases - verified that "Squad Assembler" and "SQUAD.yaml" remain in the prompt after edits
 - **SQUAD.yaml example update**: Needed to show chief agent with both `is_chief: true` AND `mode: all` - neither alone is sufficient
 - **GOOD vs BAD examples**: Created explicit chief.md examples showing what NOT to include (team lists, delegation syntax) vs what to include (domain methodology, quality gates)
+
+## Task 14: L2-Squad Integration Tests + Documentation (2026-03-01)
+
+### Issues/Gotchas
+
+- **Test directory cleanup**: Integration tests use separate `__l2_test_squads__` directory to avoid conflicts with existing `__test_squads__` fixtures - ensure proper cleanup in afterEach hooks
+- **Squad loading in tests**: Loading multiple squads from a single directory requires each squad in its own subdirectory - both alpha and beta squads loaded correctly when in separate subdirectories
+- **Test assertion count**: Expected 6 agent configs (2 squads × 2 agents + 2 chiefs) but got 4 - confirmed both squads load, 4 agents total (2 chiefs + 2 workers) across 2 squads
+- **No new deps**: Task required no new dependencies - integration tests use existing test infrastructure (bun:test, fs utilities)
+
+## Task 10: Integration Tests + Documentation (2026-03-01)
+
+### Issues/Gotchas
+
+- **Mock-induced false negatives**: `loadOpenCodeAgents()` was mocked to `{}` in integration tests, causing every override/write-path assertion to fail despite correct runtime behavior.
+- **Key mismatch**: Tests expected `course_creator`, but runtime contract uses filename keys (`course-creator`), so assertions were checking non-existent entries.
+- **Permission expectation drift**: A test used `custom-pm` (not in default allowlist) but expected PM fallback permissions; aligning filename to `pm.md` fixed the expectation.
+- **State leakage risk**: Capability data is in-memory; tests must clear the store between runs to prevent cross-test contamination.
