@@ -188,23 +188,31 @@ jobs:
           if [ -n "${{ steps.version.outputs.dist_tag }}" ]; then
             TAG_ARG="--tag ${{ steps.version.outputs.dist_tag }}"
           fi
+          NPM_PUBLISH_ARGS=("--access" "public" "--provenance")
+          if [ -n "${TAG_ARG}" ]; then
+            NPM_PUBLISH_ARGS+=("${TAG_ARG}")
+          fi
+
+          USERCONFIG_ARGS=()
           if [ -n "${NODE_AUTH_TOKEN}" ]; then
             echo "Publishing with NODE_AUTH_TOKEN"
             NPMRC="${RUNNER_TEMP}/.npmrc"
             printf "//registry.npmjs.org/:_authToken=%s\n" "${NODE_AUTH_TOKEN}" > "${NPMRC}"
-            npm publish --userconfig "${NPMRC}" --access public --provenance $TAG_ARG
-            exit 0
+            USERCONFIG_ARGS=("--userconfig" "${NPMRC}")
+          else
+            echo "NODE_AUTH_TOKEN is empty; attempting OIDC trusted publishing"
           fi
 
-          echo "NODE_AUTH_TOKEN is empty; attempting OIDC trusted publishing"
           set +e
-          OUTPUT=$(npm publish --access public --provenance $TAG_ARG 2>&1)
+          OUTPUT=$(npm publish "${USERCONFIG_ARGS[@]}" "${NPM_PUBLISH_ARGS[@]}" 2>&1)
           STATUS=$?
           set -e
           echo "$OUTPUT"
           if [ $STATUS -ne 0 ]; then
             if echo "$OUTPUT" | grep -q "ENEEDAUTH"; then
               echo "::error::npm publish failed with ENEEDAUTH. Set repo/org secret NPM_TOKEN (or NODE_AUTH_TOKEN), or configure npm Trusted Publisher (OIDC) for this workflow file (publish.yml)."
+            elif echo "$OUTPUT" | grep -q "E403" && echo "$OUTPUT" | grep -qi "two-factor"; then
+              echo "::error::npm publish failed with E403 (2FA required). Create an npm *Automation* token (classic) or a granular token with 'bypass 2FA' enabled, then update the GitHub secret NPM_TOKEN (or NODE_AUTH_TOKEN)."
             fi
             exit $STATUS
           fi
