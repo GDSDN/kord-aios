@@ -3,12 +3,12 @@ import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 import { parseFrontmatter } from "../shared/frontmatter"
-import devopsPromptMd from "../features/builtin-agents/devops.md" with { type: "text" }
+import { devopsPrompt } from "../features/builtin-agents/prompts"
 
 const MODE: AgentMode = "subagent"
 
 // Extract prompt body from embedded .md (excludes YAML frontmatter)
-const { body: devopsPromptBody } = parseFrontmatter(devopsPromptMd)
+const { body: devopsPromptBody } = parseFrontmatter(devopsPrompt)
 const DEVOPS_SYSTEM_PROMPT = devopsPromptBody + SKILLS_PROTOCOL_SECTION
 
 /**

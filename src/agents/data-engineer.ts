@@ -3,10 +3,10 @@ import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 import { parseFrontmatter } from "../shared/frontmatter"
-import dataEngineerPromptMd from "../features/builtin-agents/data-engineer.md" with { type: "text" }
+import { dataEngineerPrompt } from "../features/builtin-agents/prompts"
 
 const MODE: AgentMode = "subagent"
-const { body: dataEngineerPromptBody } = parseFrontmatter(dataEngineerPromptMd)
+const { body: dataEngineerPromptBody } = parseFrontmatter(dataEngineerPrompt)
 const DATA_ENGINEER_SYSTEM_PROMPT = dataEngineerPromptBody + SKILLS_PROTOCOL_SECTION
 
 /**

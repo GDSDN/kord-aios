@@ -3,10 +3,10 @@ import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 import { parseFrontmatter } from "../shared/frontmatter"
-import squadCreatorPromptMd from "../features/builtin-agents/squad-creator.md" with { type: "text" }
+import { squadCreatorPrompt } from "../features/builtin-agents/prompts"
 
 const MODE: AgentMode = "subagent"
-const { body: squadCreatorPromptBody } = parseFrontmatter(squadCreatorPromptMd)
+const { body: squadCreatorPromptBody } = parseFrontmatter(squadCreatorPrompt)
 const SQUAD_CREATOR_SYSTEM_PROMPT = squadCreatorPromptBody + SKILLS_PROTOCOL_SECTION
 
 /**

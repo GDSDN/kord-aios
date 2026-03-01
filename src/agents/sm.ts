@@ -3,12 +3,12 @@ import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 import { parseFrontmatter } from "../shared/frontmatter"
-import smPromptMd from "../features/builtin-agents/sm.md" with { type: "text" }
+import { smPrompt } from "../features/builtin-agents/prompts"
 
 const MODE: AgentMode = "subagent"
 
 // Extract prompt body from embedded .md (excludes YAML frontmatter)
-const { body: smPromptBody } = parseFrontmatter(smPromptMd)
+const { body: smPromptBody } = parseFrontmatter(smPrompt)
 const SM_SYSTEM_PROMPT = smPromptBody + SKILLS_PROTOCOL_SECTION
 
 /**

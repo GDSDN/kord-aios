@@ -61,6 +61,8 @@
 - **Broken raw import quoting**: `pm.ts`, `po.ts`, `sm.ts`, `qa.ts`, and `devops.ts` had missing closing quotes on `*.md?raw` imports, causing immediate TypeScript parse failures.
 - **Duplicate prompt constants**: Partial migration left both parsed-body and legacy inline `*_SYSTEM_PROMPT` constants in the same files, creating redeclarations and inconsistent prompt sources.
 - **Partial conversion drift**: Some T2 wrappers still used embedded template literals while related `.md` defaults already existed, so runtime behavior diverged from the intended three-layer embedding pattern.
+- **TypeScript ?raw import incompatibility**: The `?raw` import suffix (Vite/Bun feature) doesn't work with TypeScript out of the box - even with `moduleResolution: "bundler"`. TypeScript would fail with "Cannot find module" errors.
+- **Solution**: Created `script/build-agent-prompts.ts` that runs at build time to generate `src/features/builtin-agents/prompts.ts` with all .md content embedded as template literals. Agent wrappers now import from this generated TypeScript file, which compiles cleanly.
 
 ## Task 6.5: Squad Agent Namespace + Chief L2 Awareness (2026-03-01)
 
@@ -70,3 +72,13 @@
 - **Prompt lookup pitfall**: Switching runtime names to prefixed values can accidentally break `prompt_file` hydration if lookup is changed from YAML key to prefixed key.
 - **Chief-only awareness boundary**: Awareness injection must be constrained to `is_chief` agents only; worker prompts should remain unmodified.
 - **Delegation syntax drift**: Prompt builder content must be updated consistently to prefixed subagent names to avoid stale examples.
+
+## Task: Fix Config Allowlist Override Regression (2026-03-01)
+
+### Issues/Gotchas
+
+- **Regression in agent-authority hook**: The `resolveAllowlist(config)` function existed in `src/hooks/agent-authority/index.ts` (lines 123-131) but was never called - the hook ignored `config.allowlist` entirely.
+- **Test failure**: E2E test "config allowlist override" failed because `createAgentAuthorityHook(ctx, { allowlist: { pm: ["src/**"] } })` did not grant write access to `src/**`.
+- **Fix**: After determining base allowlist from `getAgentCapabilities()` or `DEFAULT_AGENT_ALLOWLIST`, merge in any additional paths from `config.allowlist` using case-insensitive agent key matching.
+- **Additive behavior**: Config allowlist entries are merged additively (extend, not replace), so agents retain access to default paths plus any custom paths.
+- **Verification**: All 22 agent-authority E2E tests pass, full test suite (3066 tests) passes with no regressions.

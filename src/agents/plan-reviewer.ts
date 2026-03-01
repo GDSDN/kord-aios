@@ -4,10 +4,10 @@ import { isGptModel } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 import { parseFrontmatter } from "../shared/frontmatter"
-import planReviewerPromptMd from "../features/builtin-agents/plan-reviewer.md" with { type: "text" }
+import { planReviewerPrompt } from "../features/builtin-agents/prompts"
 
 const MODE: AgentMode = "subagent"
-export const PLAN_REVIEWER_SYSTEM_PROMPT = parseFrontmatter(planReviewerPromptMd).body
+export const PLAN_REVIEWER_SYSTEM_PROMPT = parseFrontmatter(planReviewerPrompt).body
 
 /**
  * Plan Reviewer - Plan Review & Blocker Detection Agent

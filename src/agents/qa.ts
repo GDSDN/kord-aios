@@ -4,12 +4,12 @@ import { isGptModel } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 import { parseFrontmatter } from "../shared/frontmatter"
-import qaPromptMd from "../features/builtin-agents/qa.md" with { type: "text" }
+import { qaPrompt } from "../features/builtin-agents/prompts"
 
 const MODE: AgentMode = "subagent"
 
 // Extract prompt body from embedded .md (excludes YAML frontmatter)
-const { body: qaPromptBody } = parseFrontmatter(qaPromptMd)
+const { body: qaPromptBody } = parseFrontmatter(qaPrompt)
 
 /**
  * QA - Quality Guardian Agent

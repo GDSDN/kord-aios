@@ -3,10 +3,10 @@ import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 import { parseFrontmatter } from "../shared/frontmatter"
-import uxDesignExpertPromptMd from "../features/builtin-agents/ux-design-expert.md" with { type: "text" }
+import { uxDesignExpertPrompt } from "../features/builtin-agents/prompts"
 
 const MODE: AgentMode = "subagent"
-const { body: uxDesignExpertPromptBody } = parseFrontmatter(uxDesignExpertPromptMd)
+const { body: uxDesignExpertPromptBody } = parseFrontmatter(uxDesignExpertPrompt)
 const UX_DESIGN_EXPERT_SYSTEM_PROMPT = uxDesignExpertPromptBody + SKILLS_PROTOCOL_SECTION
 
 /**

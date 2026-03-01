@@ -204,7 +204,7 @@ export function createAgentAuthorityHook(ctx: PluginInput, config?: AgentAuthori
       let allowlist: string[]
 
       if (capabilities.write_paths && capabilities.write_paths.length > 0) {
-        allowlist = capabilities.write_paths
+        allowlist = [...capabilities.write_paths]
         log(`[${HOOK_NAME}] Using capabilities write_paths`, {
           sessionID: input.sessionID,
           agent: agentName,
@@ -213,7 +213,7 @@ export function createAgentAuthorityHook(ctx: PluginInput, config?: AgentAuthori
         })
       } else if (agentName in DEFAULT_AGENT_ALLOWLIST) {
         // Fallback to hardcoded allowlist for legacy agents without capabilities
-        allowlist = DEFAULT_AGENT_ALLOWLIST[agentName]
+        allowlist = [...DEFAULT_AGENT_ALLOWLIST[agentName]]
         log(`[${HOOK_NAME}] Using DEFAULT_AGENT_ALLOWLIST fallback`, {
           sessionID: input.sessionID,
           agent: agentName,
@@ -228,6 +228,26 @@ export function createAgentAuthorityHook(ctx: PluginInput, config?: AgentAuthori
           agent: agentName,
           source: "none",
         })
+      }
+
+      // Merge config.allowlist additions (additive - extends, doesn't replace)
+      if (config?.allowlist) {
+        for (const [configAgent, configPaths] of Object.entries(config.allowlist)) {
+          if (normalizeAgentKey(configAgent) === agentName) {
+            const normalizedPaths = configPaths.map((p) => normalizePath(p))
+            const existingSet = new Set(allowlist.map((p) => normalizePath(p)))
+            for (const path of normalizedPaths) {
+              if (!existingSet.has(path)) {
+                allowlist.push(path)
+              }
+            }
+            log(`[${HOOK_NAME}] Merged config allowlist for ${agentName}`, {
+              sessionID: input.sessionID,
+              addedPaths: normalizedPaths,
+            })
+            break
+          }
+        }
       }
 
       if (!isAllowedPath(relativePath, allowlist)) {

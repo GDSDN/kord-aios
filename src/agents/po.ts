@@ -3,12 +3,12 @@ import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 import { parseFrontmatter } from "../shared/frontmatter"
-import poPromptMd from "../features/builtin-agents/po.md" with { type: "text" }
+import { poPrompt } from "../features/builtin-agents/prompts"
 
 const MODE: AgentMode = "subagent"
 
 // Extract prompt body from embedded .md (excludes YAML frontmatter)
-const { body: poPromptBody } = parseFrontmatter(poPromptMd)
+const { body: poPromptBody } = parseFrontmatter(poPrompt)
 const PO_SYSTEM_PROMPT = poPromptBody + SKILLS_PROTOCOL_SECTION
 
 /**

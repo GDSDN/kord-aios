@@ -3,10 +3,10 @@ import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 import { parseFrontmatter } from "../shared/frontmatter"
-import analystPromptMd from "../features/builtin-agents/analyst.md" with { type: "text" }
+import { analystPrompt } from "../features/builtin-agents/prompts"
 
 const MODE: AgentMode = "subagent"
-export const ANALYST_SYSTEM_PROMPT = parseFrontmatter(analystPromptMd).body
+export const ANALYST_SYSTEM_PROMPT = parseFrontmatter(analystPrompt).body
 
 /**
  * Analyst - Plan Consultant Agent

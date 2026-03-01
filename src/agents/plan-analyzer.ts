@@ -3,10 +3,10 @@ import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 import { parseFrontmatter } from "../shared/frontmatter"
-import planAnalyzerPromptMd from "../features/builtin-agents/plan-analyzer.md" with { type: "text" }
+import { planAnalyzerPrompt } from "../features/builtin-agents/prompts"
 
 const MODE: AgentMode = "subagent"
-export const PLAN_ANALYZER_SYSTEM_PROMPT = parseFrontmatter(planAnalyzerPromptMd).body
+export const PLAN_ANALYZER_SYSTEM_PROMPT = parseFrontmatter(planAnalyzerPrompt).body
 
 /**
  * Plan Analyzer - Pre-Planning Gap Analysis Agent
