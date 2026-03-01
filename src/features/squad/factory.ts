@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { SquadManifest, SquadAgent, SquadCategory } from "./schema"
 import type { LoadedSquad } from "./loader"
+import { CHIEF_COORDINATION_TEMPLATE } from "./chief-template"
 
 function getPrefixedSquadAgentName(squadName: string, yamlKey: string): string {
   return `squad-${squadName}-${yamlKey}`
@@ -39,9 +40,25 @@ function buildChiefAwarenessSection(manifest: SquadManifest): string {
   return lines.join("\n")
 }
 
-function appendChiefAwarenessSection(basePrompt: string, manifest?: SquadManifest): string {
+function appendChiefAwarenessSection(
+  basePrompt: string,
+  manifest?: SquadManifest,
+  customDomainContent?: string,
+): string {
   if (!manifest) return basePrompt
-  return `${basePrompt.trimEnd()}\n\n${buildChiefAwarenessSection(manifest)}`
+
+  const awarenessSection = buildChiefAwarenessSection(manifest)
+  const parts = [basePrompt.trimEnd(), awarenessSection]
+
+  // Add custom domain methodology content if exists (only add if custom content exists)
+  if (customDomainContent) {
+    parts.push(customDomainContent)
+  }
+
+  // Append coordination protocol template
+  parts.push(CHIEF_COORDINATION_TEMPLATE)
+
+  return parts.join("\n\n")
 }
 
 /** Squad agent entry for prompt builder injection */
@@ -73,8 +90,14 @@ export function createSquadAgentConfig(
 ): AgentConfig {
   const yamlKey = options?.yamlKey ?? agentName
   const resolvedPrompt = resolvedPrompts?.[yamlKey]
-  const basePrompt = resolvedPrompt ?? agentDef.prompt ?? buildDefaultSquadAgentPrompt(agentName, agentDef, squadName)
-  const systemPrompt = agentDef.is_chief ? appendChiefAwarenessSection(basePrompt, options?.manifest) : basePrompt
+  const customDomainContent = resolvedPrompt ?? agentDef.prompt ?? undefined
+
+  // Identity header is always the default prompt for chiefs
+  const identityHeader = buildDefaultSquadAgentPrompt(agentName, agentDef, squadName)
+
+  const systemPrompt = agentDef.is_chief
+    ? appendChiefAwarenessSection(identityHeader, options?.manifest, customDomainContent)
+    : (customDomainContent ?? identityHeader)
 
   const config: AgentConfig = {
     description: `(${squadName} squad) ${agentDef.description}`,

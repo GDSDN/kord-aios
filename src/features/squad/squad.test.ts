@@ -542,6 +542,107 @@ describe("createSquadAgentConfig", () => {
     //#then
     expect(config.prompt).not.toContain("## Squad Awareness")
   })
+
+  test("chief prompt includes coordination protocol template", () => {
+    //#given
+    const agentDef: SquadAgent = {
+      description: "Squad chief",
+      mode: "subagent",
+      skills: [],
+      is_chief: true,
+    }
+
+    //#when
+    const manifest = squadSchema.parse(require("js-yaml").load(MINIMAL_SQUAD_YAML.replace("worker", "chief")))
+    const config = createSquadAgentConfig("squad-test-chief", agentDef, "test", {}, {
+      yamlKey: "chief",
+      manifest,
+    })
+
+    //#then
+    expect(config.prompt).toContain("## Coordination Protocol")
+    expect(config.prompt).toContain("Delegation Guidelines")
+    expect(config.prompt).toContain("Quality Gates")
+  })
+
+  test("worker prompt does not include coordination protocol template", () => {
+    //#given
+    const agentDef: SquadAgent = {
+      description: "Worker",
+      mode: "subagent",
+      skills: [],
+      is_chief: false,
+    }
+
+    //#when
+    const manifest = squadSchema.parse(require("js-yaml").load(MINIMAL_SQUAD_YAML))
+    const config = createSquadAgentConfig("squad-test-worker", agentDef, "test", {}, {
+      yamlKey: "worker",
+      manifest,
+    })
+
+    //#then
+    expect(config.prompt).not.toContain("## Coordination Protocol")
+  })
+
+  test("chief prompt includes custom domain content between awareness and coordination", () => {
+    //#given
+    const customDomainContent = "Custom domain methodology: Always prioritize data-driven decisions."
+    const agentDef: SquadAgent = {
+      description: "Squad chief",
+      mode: "subagent",
+      prompt: customDomainContent,
+      skills: [],
+      is_chief: true,
+    }
+
+    //#when
+    const manifest = squadSchema.parse(require("js-yaml").load(MINIMAL_SQUAD_YAML.replace("worker", "chief")))
+    const config = createSquadAgentConfig("squad-test-chief", agentDef, "test", {}, {
+      yamlKey: "chief",
+      manifest,
+    })
+
+    //#then
+    // Identity header comes first (default prompt starts with "You are squad-test-chief")
+    expect(config.prompt).toContain("You are squad-test-chief")
+    // Awareness comes after identity
+    expect(config.prompt.indexOf("## Squad Awareness")).toBeGreaterThan(0)
+    // Custom content comes after awareness
+    const awarenessIdx = config.prompt.indexOf("## Squad Awareness")
+    const customIdx = config.prompt.indexOf("Custom domain methodology")
+    expect(customIdx).toBeGreaterThan(awarenessIdx)
+    // Coordination protocol comes after custom content
+    const coordinationIdx = config.prompt.indexOf("## Coordination Protocol")
+    expect(coordinationIdx).toBeGreaterThan(customIdx)
+  })
+
+  test("chief prompt with prompt_file includes resolved content between awareness and coordination", () => {
+    //#given
+    const agentDef: SquadAgent = {
+      description: "Squad chief",
+      mode: "subagent",
+      prompt_file: "agents/chief.md",
+      skills: [],
+      is_chief: true,
+    }
+    const resolvedPrompts = { "chief": "Custom methodology from prompt_file." }
+
+    //#when
+    const manifest = squadSchema.parse(require("js-yaml").load(MINIMAL_SQUAD_YAML.replace("worker", "chief")))
+    const config = createSquadAgentConfig("squad-test-chief", agentDef, "test", resolvedPrompts, {
+      yamlKey: "chief",
+      manifest,
+    })
+
+    //#then
+    // Custom content from prompt_file should be in the prompt
+    expect(config.prompt).toContain("Custom methodology from prompt_file.")
+    // Awareness should come before the custom content
+    expect(config.prompt.indexOf("## Squad Awareness")).toBeLessThan(config.prompt.indexOf("Custom methodology from prompt_file."))
+    // Coordination should come after custom content
+    expect(config.prompt.indexOf("## Coordination Protocol")).toBeGreaterThan(config.prompt.indexOf("Custom methodology from prompt_file."))
+  })
 })
 
 describe("getSquadAgents", () => {
