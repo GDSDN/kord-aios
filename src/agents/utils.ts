@@ -495,8 +495,7 @@ export async function createBuiltinAgents(
           undefined,
           availableSkills,
           availableCategories,
-          undefined,
-          squads
+          undefined
         )
 
         devConfig = { ...devConfig, variant: devResolvedVariant ?? "medium" }
