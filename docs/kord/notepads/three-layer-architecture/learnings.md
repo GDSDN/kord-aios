@@ -82,3 +82,13 @@
 - **Content mapping boundaries**: Keeping command extraction scoped to `builtin-commands/templates/` (excluding `*.test.ts`) preserves methodology artifacts without pulling implementation wiring files.
 - **Global path reliability**: Reusing `getOpenCodeConfigDir({ binary: "opencode", checkExisting: false })` gives stable cross-platform global extraction behavior and honors `OPENCODE_CONFIG_DIR` in tests.
 - **Safe overwrite semantics**: `--force` as explicit opt-in plus default skip behavior avoids accidental local customization loss in `.opencode/`.
+
+## Task 11: Create CHIEF_COORDINATION_TEMPLATE Constant (2026-03-01)
+
+### Learnings
+
+- **Template Compilation**: The template is a pure string constant compiled at build time, not read at runtime - this ensures fast initialization and no filesystem dependencies.
+- **Coordination Protocol Design**: Followed existing orchestration patterns from kord.ts (task management sections) and factory.ts (delegation syntax formatting).
+- **Three-Pillar Structure**: Template covers coordination (delegation workflow), self-optimization (performance reflection), and quality gates (checklist-driven validation).
+- **Domain-Agnostic Placeholders**: Used `{squad}` and `{agent}` placeholders to ensure the template works for any squad without domain-specific content.
+- **Test Coverage**: Created 11 test cases covering all required sections, delegation syntax presence, and domain-agnostic placeholders.

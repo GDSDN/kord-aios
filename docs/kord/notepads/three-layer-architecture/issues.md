@@ -90,3 +90,11 @@
 - **T2-only agent scope ambiguity**: The source directory currently contains only T2 agent markdown defaults, so extraction uses `src/features/builtin-agents/*.md` directly; if other tiers are added later in the same directory, filtering logic will need to be tightened.
 - **Skill destination collisions**: Extracting to `skills/{skill}/SKILL.md` drops domain segments by design, which can collide if two domains introduce the same skill folder name.
 - **Diff-mode expectations**: `--diff` intentionally reports both `[WRITE]` and `[SKIP]` decisions while performing no filesystem writes, so summary counts are simulation counts rather than persisted outputs.
+
+## Task 11: Create CHIEF_COORDINATION_TEMPLATE Constant (2026-03-01)
+
+### Issues/Gotchas
+
+- **Export Location**: Placed template in `src/features/squad/chief-template.ts` to keep it alongside other squad factory code (not in the factory file itself per Task 12 requirements).
+- **Test File Convention**: Created separate `chief-template.test.ts` following the existing pattern of one test file per source file in the squad module.
+- **Literal Syntax Requirement**: Task required delegation syntax as literal example - used backticks to escape the string properly in the template.
