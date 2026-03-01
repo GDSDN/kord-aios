@@ -124,8 +124,8 @@ import { createModelCacheState } from "./plugin-state";
 import { createConfigHandler } from "./plugin-handlers";
 import { consumeToolMetadata } from "./features/tool-metadata-store";
 
-const OhMyOpenCodePlugin: Plugin = async (ctx) => {
-  log("[OhMyOpenCodePlugin] ENTRY - plugin loading", {
+const KordAIOSPlugin: Plugin = async (ctx) => {
+  log("[KordAIOS] ENTRY - plugin loading", {
     directory: ctx.directory,
   });
   injectServerAuthIntoClient(ctx.client);
@@ -982,7 +982,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   };
 };
 
-export default OhMyOpenCodePlugin;
+export default KordAIOSPlugin;
 
 export type {
   OhMyOpenCodeConfig,
