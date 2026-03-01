@@ -139,12 +139,14 @@ jobs:
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           
-          if [[ "$VERSION" == *"-"* ]]; then
-            DIST_TAG=$(echo "$VERSION" | cut -d'-' -f2 | cut -d'.' -f1)
-            echo "dist_tag=${DIST_TAG:-next}" >> $GITHUB_OUTPUT
-          else
-            echo "dist_tag=latest" >> $GITHUB_OUTPUT
-          fi
+           if [[ "$VERSION" == *"-"* ]]; then
+             DIST_TAG=$(echo "$VERSION" | cut -d'-' -f2 | cut -d'.' -f1)
+             echo "dist_tag=${DIST_TAG:-next}" >> $GITHUB_OUTPUT
+           else
+             # Always pass an explicit dist-tag.
+             # npm refuses to implicitly apply "latest" when publishing a version lower than a previously published version.
+             echo "dist_tag=latest" >> $GITHUB_OUTPUT
+           fi
           
           echo "Version: $VERSION"
 
@@ -184,10 +186,13 @@ jobs:
       - name: Publish main package
         if: steps.check.outputs.skip != 'true'
         run: |
-          DIST_TAG="${{ steps.version.outputs.dist_tag }}"
+          TAG_ARG=""
+          if [ -n "${{ steps.version.outputs.dist_tag }}" ]; then
+            TAG_ARG="--tag ${{ steps.version.outputs.dist_tag }}"
+          fi
           NPM_PUBLISH_ARGS=("--access" "public" "--provenance")
-          if [ -n "${DIST_TAG}" ]; then
-            NPM_PUBLISH_ARGS+=("--tag" "${DIST_TAG}")
+          if [ -n "${TAG_ARG}" ]; then
+            NPM_PUBLISH_ARGS+=("${TAG_ARG}")
           fi
 
           USERCONFIG_ARGS=()
