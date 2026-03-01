@@ -9,10 +9,13 @@ Squads are portable, reusable agent team configurations. A squad brings domain-s
 squad/
 ├── schema.ts          # Zod schemas for SQUAD.yaml v2 (109 lines)
 ├── loader.ts          # Squad discovery + loading from all paths (166 lines)
-├── factory.ts         # SquadAgent → AgentConfig, prompt section builder (194 lines)
-├── squad.test.ts      # Schema, loader, factory tests
+├── factory.ts         # SquadAgent → AgentConfig, prompt section builder (282 lines)
+├── chief-template.ts  # CHIEF_COORDINATION_TEMPLATE constant (93 lines)
+├── squad.test.ts      # Schema, loader, factory tests (886 lines)
+├── l2-squad-integration.test.ts  # L2-Squad integration tests (11 tests)
 ├── index.ts           # Barrel exports
-└── __test_squads__/   # Test fixtures (project-docs/docs/kord/squads/research/)
+├── __test_squads__/   # Test fixtures
+└── __l2_test_squads__/ # Integration test fixtures
 ```
 
 ## SQUAD.YAML v2 SCHEMA
@@ -91,6 +94,62 @@ kord:
   - skills per member
   - tool permission summary (`default` when no explicit `tools` map)
   - delegation syntax lines using prefixed names
+
+## L2-SQUAD ARCHITECTURE
+
+The L2-Squad system provides a hierarchical agent structure with chief (L2) and worker (L1) agents.
+
+### Layer Model
+
+| Layer | Agent Type | Mode | Capabilities |
+|-------|-----------|------|-------------|
+| L2 | Chief | `all` | Awareness + Coordination + Domain |
+| L1 | Worker | `subagent` | Domain only |
+
+### Chief Prompt Assembly
+
+Chief agent prompts are assembled in four layers:
+
+```
+1. Identity Header (buildDefaultSquadAgentPrompt)
+   ↓
+2. Squad Awareness Section (auto-generated from SQUAD.yaml)
+   ↓
+3. Custom Domain Content (prompt_file or inline prompt)
+   ↓
+4. Coordination Protocol Template (CHIEF_COORDINATION_TEMPLATE)
+```
+
+The factory function `createSquadAgentConfig()` performs this assembly:
+- For chiefs: `appendChiefAwarenessSection(identityHeader, manifest, customDomainContent)`
+- For workers: `customDomainContent ?? identityHeader`
+
+### Naming Convention
+
+| Field | Example | Purpose |
+|-------|---------|---------|
+| Squad name | `marketing` | kebab-case identifier |
+| YAML key | `copywriter` | Original agent key in SQUAD.yaml |
+| Runtime name | `squad-marketing-copywriter` | Full delegation target |
+| Category | `marketing:creative` | Namespaced routing |
+
+### Chief vs Worker Behavior
+
+| Behavior | Chief | Worker |
+|----------|-------|--------|
+| Runtime mode | `all` (forced) | `subagent` (default) or `all` |
+| Squad Awareness | Yes (auto-generated) | No |
+| Coordination Template | Yes (CHIEF_COORDINATION_TEMPLATE) | No |
+| Custom domain content | Appended after awareness | Full prompt (if provided) |
+| Can delegate via `task()` | Yes | No |
+
+### Integration Tests
+
+See `l2-squad-integration.test.ts` for end-to-end verification:
+- Chief prompt contains awareness + domain methodology + coordination template
+- Prefixed naming prevents collisions across squads
+- Chief mode is "all"; workers mode is "subagent"
+- Workers do not contain coordination template
 
 ## LOADER PIPELINE (`loader.ts`)
 

@@ -106,15 +106,25 @@ Kord AIOS ships a full development team. All agents are customizable — overrid
 
 Define domain-specific agent teams via `SQUAD.yaml` manifests. Each squad declares its agents, categories for task routing, and skill dependencies. The built-in `dev` squad provides the default development team.
 
+**Chief + Worker Model:** Squads support L2 (chief) and L1 (worker) agent hierarchy. Chiefs have `is_chief: true` with auto-generated Squad Awareness and coordination protocol. Workers are standard subagents.
+
+**Naming Convention:** Squad agents are registered with prefixed names (`squad-{squadName}-{yamlKey}`) to prevent collisions across squads.
+
 ```yaml
 # .opencode/squads/my-squad/SQUAD.yaml
 name: my-squad
 description: My custom agent team
+
 agents:
+  chief:
+    description: "Squad leader"
+    is_chief: true
+    mode: all
   specialist:
     description: "Domain expert"
     model: anthropic/claude-sonnet-4-5
     prompt: "You are a domain specialist..."
+
 categories:
   my-domain:
     description: "Domain-specific tasks"

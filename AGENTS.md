@@ -118,7 +118,17 @@ This is an **international open-source project**. To ensure accessibility and ma
 
 ## OVERVIEW
 
-Kord AIOS is an OpenCode plugin that combines multi-model agent orchestration with story-driven development methodology. 20+ specialized agents (full dev team: orchestrators, developers, architect, PM, PO, QA, scrum master, DevOps, data engineer, UX), 40+ lifecycle hooks, 25+ tools (LSP, AST-Grep, delegation), squad system (SQUAD.yaml v2), 149 skills (144 methodology + 5 hardcoded), background agents with concurrency, and full Claude Code compatibility.
+Kord AIOS is an OpenCode plugin that combines multi-model agent orchestration with story-driven development methodology. 20+ specialized agents (full dev team: orchestrators, developers, architect, PM, PO, QA, scrum master, DevOps, data engineer, UX), 40+ lifecycle hooks, 25+ tools (LSP, AST-Grep, delegation), squad system (SQUAD.yaml v2, L2-Squad chief/worker hierarchy), 149 skills (144 methodology + 5 hardcoded), background agents with concurrency, and full Claude Code compatibility.
+
+## AGENT LAYERS
+
+| Layer | Type | Description |
+|-------|------|-------------|
+| T0 | Orchestrator | Kord, Dev, Builder, Planner - core orchestration |
+| T1 | Specialist | Architect, Librarian, Explore, UX - domain experts |
+| T2 | Methodology | PM, PO, QA, SM, Analyst - process agents |
+| L2-Squad | Chief | Squad chief with awareness + coordination (from SQUAD.yaml) |
+| L1-Squad | Worker | Squad specialist with domain prompt only |
 
 ## STRUCTURE
 
