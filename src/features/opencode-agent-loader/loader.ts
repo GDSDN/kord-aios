@@ -1,11 +1,52 @@
 import { existsSync, readdirSync, readFileSync } from "fs"
-import { join, basename } from "path"
+import { join, basename, dirname } from "path"
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
+import { compareVersions } from "../../shared/opencode-version"
 import type { OpenCodeAgentFrontmatter, LoadedOpenCodeAgent } from "./types"
 import { parseOpenCodeAgentFrontmatter } from "./types"
+
+// Cache for plugin version - read once at runtime
+const NOT_CACHED = Symbol("NOT_CACHED")
+let cachedPluginVersion: string | null | typeof NOT_CACHED = NOT_CACHED
+
+/**
+ * Get the current plugin version from package.json.
+ * Cached after first read to avoid repeated filesystem access.
+ */
+function getCurrentPluginVersion(): string {
+  if (cachedPluginVersion !== NOT_CACHED) {
+    return cachedPluginVersion ?? "0.0.0"
+  }
+
+  try {
+    // Find package.json in the plugin directory
+    const possiblePaths = [
+      join(dirname(process.execPath), "package.json"),
+      join(process.cwd(), "package.json"),
+      join(dirname(process.argv[1] || ""), "package.json"),
+    ]
+
+    for (const packageJsonPath of possiblePaths) {
+      if (existsSync(packageJsonPath)) {
+        const content = readFileSync(packageJsonPath, "utf-8")
+        const pkg = JSON.parse(content)
+        if (pkg.version && typeof pkg.version === "string") {
+          cachedPluginVersion = pkg.version
+          return pkg.version
+        }
+      }
+    }
+
+    cachedPluginVersion = null
+    return "0.0.0"
+  } catch {
+    cachedPluginVersion = null
+    return "0.0.0"
+  }
+}
 
 function parseToolsConfig(toolsStr?: string): Record<string, boolean> | undefined {
   if (!toolsStr) return undefined
@@ -56,6 +97,21 @@ function loadAgentsFromDir(agentsDir: string): Record<string, AgentConfig> {
       }
 
       const validatedData = validationResult.value
+
+      // Check engine_min_version compatibility gating
+      if (validatedData.engine_min_version) {
+        const currentVersion = getCurrentPluginVersion()
+        const requiredVersion = validatedData.engine_min_version
+
+        // If current plugin version is less than required, skip loading this agent
+        if (compareVersions(currentVersion, requiredVersion) < 0) {
+          // Log warning but don't block startup - skip silently
+          console.warn(
+            `[kord-aios] Skipping agent "${agentName}": requires engine_min_version ${requiredVersion}, current version is ${currentVersion}`,
+          )
+          continue
+        }
+      }
 
       const name = validatedData.name || agentName
       const originalDescription = validatedData.description || ""

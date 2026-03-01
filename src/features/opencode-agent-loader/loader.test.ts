@@ -303,4 +303,79 @@ Prompt for version agent.
     expect(result).toHaveProperty("version-agent")
     expect(result["version-agent"].description).toContain("version-agent")
   })
+
+  //#given: Agent requires engine_min_version higher than current plugin version
+  //#when: loadOpenCodeAgents is called
+  //#then: Should skip the agent and log warning
+  it("should skip agent when engine_min_version is higher than current version", () => {
+    const content = `---
+name: future-agent
+description: Agent requiring future version
+engine_min_version: 999.0.0
+---
+
+This agent requires a newer version.
+`
+    writeFileSync(join(testDir, "future-agent.md"), content)
+
+    // Mock console.warn to capture the warning
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+
+    // Mock getCurrentPluginVersion to return a low version
+    // We need to mock at the module level - let's use a different approach
+    // by patching the module's internal function
+
+    const result = loadOpenCodeAgents(testDir)
+
+    // Agent should be skipped
+    expect(result).not.toHaveProperty("future-agent")
+
+    // Warning should be logged
+    expect(warnSpy).toHaveBeenCalled()
+    expect(warnSpy.mock.calls[0][0]).toContain("Skipping agent")
+    expect(warnSpy.mock.calls[0][0]).toContain("999.0.0")
+
+    warnSpy.mockRestore()
+  })
+
+  //#given: Agent requires engine_min_version lower than current plugin version
+  //#when: loadOpenCodeAgents is called
+  //#then: Should load the agent normally
+  it("should load agent when engine_min_version is lower than current version", () => {
+    const content = `---
+name: compatible-agent
+description: Agent compatible with current version
+engine_min_version: 0.0.1
+---
+
+This agent is compatible.
+`
+    writeFileSync(join(testDir, "compatible-agent.md"), content)
+
+    const result = loadOpenCodeAgents(testDir)
+
+    // Agent should be loaded
+    expect(result).toHaveProperty("compatible-agent")
+    expect(result["compatible-agent"].description).toContain("compatible-agent")
+  })
+
+  //#given: Agent has no engine_min_version
+  //#when: loadOpenCodeAgents is called
+  //#then: Should load the agent normally
+  it("should load agent without engine_min_version", () => {
+    const content = `---
+name: no-version-agent
+description: Agent without version requirement
+---
+
+This agent has no version requirement.
+`
+    writeFileSync(join(testDir, "no-version-agent.md"), content)
+
+    const result = loadOpenCodeAgents(testDir)
+
+    // Agent should be loaded
+    expect(result).toHaveProperty("no-version-agent")
+    expect(result["no-version-agent"].description).toContain("no-version-agent")
+  })
 })
