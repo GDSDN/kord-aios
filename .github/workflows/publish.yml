@@ -184,13 +184,10 @@ jobs:
       - name: Publish main package
         if: steps.check.outputs.skip != 'true'
         run: |
-          TAG_ARG=""
-          if [ -n "${{ steps.version.outputs.dist_tag }}" ]; then
-            TAG_ARG="--tag ${{ steps.version.outputs.dist_tag }}"
-          fi
+          DIST_TAG="${{ steps.version.outputs.dist_tag }}"
           NPM_PUBLISH_ARGS=("--access" "public" "--provenance")
-          if [ -n "${TAG_ARG}" ]; then
-            NPM_PUBLISH_ARGS+=("${TAG_ARG}")
+          if [ -n "${DIST_TAG}" ]; then
+            NPM_PUBLISH_ARGS+=("--tag" "${DIST_TAG}")
           fi
 
           USERCONFIG_ARGS=()
