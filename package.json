@@ -1,6 +1,6 @@
 {
   "name": "kord-aios",
-  "version": "3.3.1",
+  "version": "1.0.0",
   "description": "Kord AIOS: multi-model orchestration with story-driven development methodology",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -82,13 +82,13 @@
     "typescript": "^5.7.3"
   },
   "optionalDependencies": {
-    "kord-aios-darwin-arm64": "3.3.1",
-    "kord-aios-darwin-x64": "3.3.1",
-    "kord-aios-linux-arm64": "3.3.1",
-    "kord-aios-linux-arm64-musl": "3.3.1",
-    "kord-aios-linux-x64": "3.3.1",
-    "kord-aios-linux-x64-musl": "3.3.1",
-    "kord-aios-windows-x64": "3.3.1"
+    "kord-aios-darwin-arm64": "1.0.0",
+    "kord-aios-darwin-x64": "1.0.0",
+    "kord-aios-linux-arm64": "1.0.0",
+    "kord-aios-linux-arm64-musl": "1.0.0",
+    "kord-aios-linux-x64": "1.0.0",
+    "kord-aios-linux-x64-musl": "1.0.0",
+    "kord-aios-windows-x64": "1.0.0"
   },
   "trustedDependencies": [
     "@ast-grep/cli",
