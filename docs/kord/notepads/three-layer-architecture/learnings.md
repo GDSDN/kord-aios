@@ -92,3 +92,23 @@
 - **Three-Pillar Structure**: Template covers coordination (delegation workflow), self-optimization (performance reflection), and quality gates (checklist-driven validation).
 - **Domain-Agnostic Placeholders**: Used `{squad}` and `{agent}` placeholders to ensure the template works for any squad without domain-specific content.
 - **Test Coverage**: Created 11 test cases covering all required sections, delegation syntax presence, and domain-agnostic placeholders.
+
+## Task 12: Integrate Chief Template into Factory Prompt Assembly (2026-03-01)
+
+### Learnings
+
+- **Three-layer chief prompt composition**: Chiefs now get: (1) identity header from default prompt, (2) Squad Awareness section, (3) custom domain content (if any), (4) coordination protocol template
+- **Custom content resolution**: Both `prompt_file` (resolved via yamlKey) and inline `prompt` are extracted as custom domain content, placed after awareness but before coordination
+- **Identity header separation**: For chiefs, the base identity is always the default prompt - custom content from prompt_file/inline is added separately to maintain clear layering
+- **Non-chief behavior preserved**: Worker prompts remain unchanged - they receive custom content OR default prompt, no awareness or coordination sections injected
+- **Test verification**: Added 4 new tests covering coordination protocol presence, absence in workers, and ordering of awareness/custom/coordination sections
+
+## Task 13: Upgrade Squad Creator to Generate L2-Aware Chief Prompts (2026-03-01)
+
+### Learnings
+
+- **Prompt assembly alignment**: The squad-creator.md prompt must align with actual factory.ts behavior - awareness is auto-generated from SQUAD.yaml, delegation syntax is auto-generated, CHIEF_COORDINATION_TEMPLATE is appended
+- **Chief.md content boundaries**: Chief prompt files should contain ONLY domain methodology + quality gates - NOT team lists, NOT delegation syntax, NOT coordination protocols (factory handles these)
+- **YAML configuration requirements**: Chief requires both `is_chief: true` AND `mode: all` in SQUAD.yaml - is_chief triggers factory assembly, mode:all enables primary+subagent invocation
+- **Runtime naming**: Factory prefixes agent names as `squad-{squadName}-{yamlKey}` - chief.md should NOT hardcode these, should refer to domain roles instead
+- **GOOD vs BAD examples**: Providing concrete examples of what to include vs exclude helps squad-creator generate proper chief prompts

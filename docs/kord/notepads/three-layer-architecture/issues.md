@@ -98,3 +98,21 @@
 - **Export Location**: Placed template in `src/features/squad/chief-template.ts` to keep it alongside other squad factory code (not in the factory file itself per Task 12 requirements).
 - **Test File Convention**: Created separate `chief-template.test.ts` following the existing pattern of one test file per source file in the squad module.
 - **Literal Syntax Requirement**: Task required delegation syntax as literal example - used backticks to escape the string properly in the template.
+
+## Task 12: Integrate Chief Template into Factory Prompt Assembly (2026-03-01)
+
+### Issues/Gotchas
+
+- **Prompt key resolution**: The `resolvedPrompts` lookup still uses the original YAML key (not the prefixed runtime name) - this is intentional and must be preserved
+- **Custom content duplication risk**: Initially implemented incorrectly where custom content appeared twice - fixed by using separate `identityHeader` and `customDomainContent` variables
+- **Test assertion syntax**: Using `expect(string).indexOf()` doesn't work - must use `expect(string.indexOf())` for proper assertion
+- **Section ordering verification**: Tests validate that custom content appears between awareness and coordination, not just that all sections exist
+
+## Task 13: Upgrade Squad Creator to Generate L2-Aware Chief Prompts (2026-03-01)
+
+### Issues/Gotchas
+
+- **Prompt-reality alignment**: Must verify squad-creator.md instructions match actual factory.ts behavior - this required reading factory.ts to confirm auto-awareness generation and coordination template appending
+- **Anchor phrase preservation**: The T2 agent prompts test checks for specific anchor phrases - verified that "Squad Assembler" and "SQUAD.yaml" remain in the prompt after edits
+- **SQUAD.yaml example update**: Needed to show chief agent with both `is_chief: true` AND `mode: all` - neither alone is sufficient
+- **GOOD vs BAD examples**: Created explicit chief.md examples showing what NOT to include (team lists, delegation syntax) vs what to include (domain methodology, quality gates)
