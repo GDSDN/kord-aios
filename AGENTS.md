@@ -225,6 +225,12 @@ You are a course creator agent that designs educational content.
 | Orchestrator | `src/hooks/build/` | Main orchestration hook (build/index.ts, 913 lines) |
 | Delegation | `src/tools/delegate-task/` | Category routing (executor.ts 983 lines) |
 
+## Installation (End Users)
+
+- Install/update: `bunx kord-aios@latest install`
+- Initialize a project: `bunx kord-aios@latest init`
+- Verify npm version: `npm view kord-aios version`
+
 ## TDD (Test-Driven Development)
 
 **MANDATORY.** RED-GREEN-REFACTOR:

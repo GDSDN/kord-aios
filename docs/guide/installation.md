@@ -15,9 +15,10 @@ https://raw.githubusercontent.com/GDSDN/kord-aios/refs/heads/dev/docs/guide/inst
 Run the interactive installer:
 
 ```bash
-bunx kord-aios install # recommended
-npx kord-aios install # alternative
+bunx kord-aios@latest install
 ```
+
+> **Tip**: Use `@latest` explicitly. Kord AIOS may reset public semver to `1.x` while older upstream versions still exist on npm.
 
 > **Note**: The CLI ships with standalone binaries for all major platforms. No runtime (Bun/Node.js) is required for CLI execution after installation.
 >
@@ -30,7 +31,7 @@ The `install` command registers the plugin globally and writes the project confi
 Running `install` again will perform a smart merge, preserving your existing configuration. It automatically skips provider questions if you are already configured. To force the installer to ask provider questions again, use the `--reconfigure` flag:
 
 ```bash
-bunx kord-aios install --reconfigure
+bunx kord-aios@latest install --reconfigure
 ```
 
 ### Project Initialization
@@ -38,7 +39,7 @@ bunx kord-aios install --reconfigure
 If you have already installed Kord AIOS globally and just want to initialize a new project, run:
 
 ```bash
-bunx kord-aios init
+bunx kord-aios@latest init
 ```
 
 This creates a project-specific configuration (`.opencode/kord-aios.json`) and scaffolds the Kord project structure (like `.kord/` and `docs/kord/`). It **does not** modify your global configuration.
@@ -114,7 +115,7 @@ Spawn a subagent to handle installation and report back - to save context.
 
 **For Project Initialization Only** (if the user already installed globally):
 ```bash
-bunx kord-aios init
+bunx kord-aios@latest init
 ```
 This creates a project config (`.opencode/kord-aios.json`) and scaffolds directories, but **does not** modify the global config.
 
@@ -122,21 +123,21 @@ This creates a project config (`.opencode/kord-aios.json`) and scaffolds directo
 Based on user's answers, run the CLI installer with appropriate flags:
 
 ```bash
-bunx kord-aios install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>]
+bunx kord-aios@latest install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>]
 ```
 
 If the user already has a configuration, `install` will preserve it through a smart merge. If provider flags are omitted during re-installation, it reuses the existing config. To force reconfiguration, append `--reconfigure`.
 
 **Examples:**
-- User has all native subscriptions: `bunx kord-aios install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no`
-- User has only Claude: `bunx kord-aios install --no-tui --claude=yes --gemini=no --copilot=no`
-- User has Claude + OpenAI: `bunx kord-aios install --no-tui --claude=yes --openai=yes --gemini=no --copilot=no`
-- User has only GitHub Copilot: `bunx kord-aios install --no-tui --claude=no --gemini=no --copilot=yes`
-- User has Z.ai for Librarian: `bunx kord-aios install --no-tui --claude=yes --gemini=no --copilot=no --zai-coding-plan=yes`
-- User has only OpenCode Zen: `bunx kord-aios install --no-tui --claude=no --gemini=no --copilot=no --opencode-zen=yes`
-- User has no subscriptions: `bunx kord-aios install --no-tui --claude=no --gemini=no --copilot=no`
-- Re-install while keeping existing config: `bunx kord-aios install --no-tui`
-- Force reconfiguration: `bunx kord-aios install --no-tui --reconfigure --claude=yes`
+- User has all native subscriptions: `bunx kord-aios@latest install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no`
+- User has only Claude: `bunx kord-aios@latest install --no-tui --claude=yes --gemini=no --copilot=no`
+- User has Claude + OpenAI: `bunx kord-aios@latest install --no-tui --claude=yes --openai=yes --gemini=no --copilot=no`
+- User has only GitHub Copilot: `bunx kord-aios@latest install --no-tui --claude=no --gemini=no --copilot=yes`
+- User has Z.ai for Librarian: `bunx kord-aios@latest install --no-tui --claude=yes --gemini=no --copilot=no --zai-coding-plan=yes`
+- User has only OpenCode Zen: `bunx kord-aios@latest install --no-tui --claude=no --gemini=no --copilot=no --opencode-zen=yes`
+- User has no subscriptions: `bunx kord-aios@latest install --no-tui --claude=no --gemini=no --copilot=no`
+- Re-install while keeping existing config: `bunx kord-aios@latest install --no-tui`
+- Force reconfiguration: `bunx kord-aios@latest install --no-tui --reconfigure --claude=yes`
 
 The CLI will:
 - Register the plugin in `opencode.json`
