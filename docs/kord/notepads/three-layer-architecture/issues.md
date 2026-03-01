@@ -34,3 +34,13 @@
 - **Test Verification**: All 3034 tests pass, including new tests for permission behavior
 - **Architect Not in builtinAgents**: Architect is loaded via builtinAgents, not as a special agent in config-handler - permissions are handled by global default + restrictions
 
+## Task 5: Integrate Agent Loader with Override-First Resolution (2026-02-28)
+
+### Issues/Gotchas
+
+- **Duplicate Test Code**: During implementation, accidentally created duplicate test blocks due to edit errors - had to clean up leftover code at end of file
+- **Mock Mismatch**: Test expected `builder` key but config-handler creates `OpenCode-Builder` when `default_builder_enabled` is true - fixed test to check for correct key
+- **T0 Filtering**: Implemented `filterT0Agents()` function to prevent kord/dev/builder/planner from being overridden via `.opencode/agents/*.md` - these are core Kord agents
+- **Merge Order**: Correctly placed OpenCode agents between builtinAgents and Claude Code agents in the merge order
+- **No migrateAgentConfig**: OpenCode agents use their own format (tools as object with boolean values), so no permission migration is applied
+

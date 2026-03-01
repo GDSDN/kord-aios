@@ -23,12 +23,14 @@ import {
   loadUserAgents,
   loadProjectAgents,
 } from "../features/claude-code-agent-loader";
+import { loadOpenCodeAgents } from "../features/opencode-agent-loader/loader";
 import { loadMcpConfigs } from "../features/claude-code-mcp-loader";
 import { loadAllPluginComponents } from "../features/claude-code-plugin-loader";
 import { createBuiltinMcps } from "../mcp";
 import type { OhMyOpenCodeConfig } from "../config";
 import { log, fetchAvailableModels, readConnectedProvidersCache, resolveModelPipeline } from "../shared";
-import { getOpenCodeConfigPaths } from "../shared/opencode-config-dir";
+import { join } from "node:path";
+import { getOpenCodeConfigPaths, getOpenCodeConfigDir } from "../shared/opencode-config-dir";
 import { migrateAgentConfig } from "../shared/permission-compat";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
@@ -51,6 +53,47 @@ export function resolveCategoryConfig(
 }
 
 const CORE_AGENT_ORDER = ["kord", "dev", "planner", "builder"] as const;
+
+/**
+ * T0 agents that cannot be overridden by OpenCode agent files.
+ * These are core orchestration agents managed by Kord AIOS.
+ */
+const T0_AGENTS = new Set(["kord", "dev", "builder", "planner"]);
+
+/**
+ * Filter out T0 agents from OpenCode agent configs.
+ * T0 agents (kord, dev, builder, planner) are managed by Kord AIOS
+ * and cannot be overridden via .opencode/agents/*.md files.
+ */
+function filterT0Agents(agents: Record<string, unknown>): Record<string, unknown> {
+  const filtered: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(agents)) {
+    if (!T0_AGENTS.has(key)) {
+      filtered[key] = value;
+    }
+  }
+  return filtered;
+}
+
+/**
+ * Load OpenCode agents from user global directory (~/.config/opencode/agents/)
+ * with T0 agents filtered out.
+ */
+function loadOpenCodeUserAgents(): Record<string, unknown> {
+  const userAgentsDir = join(getOpenCodeConfigDir({ binary: "opencode", checkExisting: false }), "agents");
+  const agents = loadOpenCodeAgents(userAgentsDir);
+  return filterT0Agents(agents);
+}
+
+/**
+ * Load OpenCode agents from project directory (.opencode/agents/)
+ * with T0 agents filtered out.
+ */
+function loadOpenCodeProjectAgents(projectDir: string): Record<string, unknown> {
+  const projectAgentsDir = join(projectDir, ".opencode", "agents");
+  const agents = loadOpenCodeAgents(projectAgentsDir);
+  return filterT0Agents(agents);
+}
 
 function reorderAgentsByPriority(agents: Record<string, unknown>): Record<string, unknown> {
   const ordered: Record<string, unknown> = {};
@@ -192,6 +235,17 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         v ? migrateAgentConfig(v as Record<string, unknown>) : v,
       ])
     );
+
+    // OpenCode agents: Load from user global and project directories
+    // Do NOT apply migrateAgentConfig() - OpenCode agents use their own format
+    // T0 agents (kord, dev, builder, planner) are filtered out in the loader functions
+    const openCodeUserAgents = loadOpenCodeUserAgents();
+    const openCodeProjectAgents = loadOpenCodeProjectAgents(ctx.directory);
+
+    log(`[config-handler] Loaded OpenCode agents: ${Object.keys(openCodeUserAgents).length} user, ${Object.keys(openCodeProjectAgents).length} project`, {
+      userAgents: Object.keys(openCodeUserAgents),
+      projectAgents: Object.keys(openCodeProjectAgents),
+    });
 
     const isKordEnabled = pluginConfig.kord_agent?.disabled !== true;
     const builderEnabled =
@@ -377,13 +431,26 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
 
       // NOTE: Squads can define agent names that overlap with core agents (e.g. dev-junior).
       // Core/builtin agent configs must win; squads should only contribute additional agents.
+      //
+      // Agent merge order (later sources override earlier):
+      // 1. squadAgentConfigs (lowest - from SQUAD.yaml)
+      // 2. agentConfig (kord, dev-junior, builder, planner)
+      // 3. builtinAgents (other built-in agents)
+      // 4. openCodeUserAgents (~/.config/opencode/agents/*.md)
+      // 5. userAgents (Claude Code: ~/.claude/agents/*.md)
+      // 6. openCodeProjectAgents (.opencode/agents/*.md)
+      // 7. projectAgents (Claude Code: .claude/agents/*.md)
+      // 8. pluginAgents (from plugins)
+      // 9. filteredConfigAgents (highest - from kord-aios.json)
       config.agent = {
         ...Object.fromEntries(squadAgentConfigs), // Add squad agents (lowest precedence)
         ...agentConfig,
         ...Object.fromEntries(
           Object.entries(builtinAgents).filter(([k]) => k !== "kord")
         ),
+        ...openCodeUserAgents,
         ...userAgents,
+        ...openCodeProjectAgents,
         ...projectAgents,
         ...pluginAgents,
         ...filteredConfigAgents,
@@ -397,10 +464,21 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       const squadAgentConfigs = createAllSquadAgentConfigs(squadLoadResult.squads);
 
       // Squads should not override builtin/user/project agent configs.
+      // OpenCode agents are included in merge order:
+      // 1. squadAgentConfigs (lowest)
+      // 2. builtinAgents
+      // 3. openCodeUserAgents
+      // 4. userAgents (Claude Code)
+      // 5. openCodeProjectAgents
+      // 6. projectAgents (Claude Code)
+      // 7. pluginAgents
+      // 8. configAgent (highest - from opencode.json)
       config.agent = {
         ...Object.fromEntries(squadAgentConfigs), // Add squad agents (lowest precedence)
         ...builtinAgents,
+        ...openCodeUserAgents,
         ...userAgents,
+        ...openCodeProjectAgents,
         ...projectAgents,
         ...pluginAgents,
         ...configAgent,

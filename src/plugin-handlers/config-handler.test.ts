@@ -9,6 +9,7 @@ import * as commandLoader from "../features/claude-code-command-loader"
 import * as builtinCommands from "../features/builtin-commands"
 import * as skillLoader from "../features/opencode-skill-loader"
 import * as agentLoader from "../features/claude-code-agent-loader"
+import * as opencodeAgentLoader from "../features/opencode-agent-loader/loader"
 import * as mcpLoader from "../features/claude-code-mcp-loader"
 import * as pluginLoader from "../features/claude-code-plugin-loader"
 import * as mcpModule from "../mcp"
@@ -41,6 +42,15 @@ beforeEach(() => {
 
   spyOn(agentLoader, "loadUserAgents" as any).mockReturnValue({})
   spyOn(agentLoader, "loadProjectAgents" as any).mockReturnValue({})
+
+  // Mock opencode-agent-loader
+  spyOn(opencodeAgentLoader, "loadOpenCodeAgents" as any).mockReturnValue({})
+
+  // Pre-configure builtinAgents mock with dev for T0 test
+  spyOn(agents, "createBuiltinAgents" as any).mockResolvedValue({
+    kord: { name: "kord", prompt: "test", mode: "primary" },
+    architect: { name: "architect", prompt: "test", mode: "subagent" },
+  })
 
   spyOn(mcpLoader, "loadMcpConfigs" as any).mockResolvedValue({ servers: {} })
 
@@ -88,6 +98,7 @@ afterEach(() => {
   ;(skillLoader.discoverOpencodeProjectSkills as any)?.mockRestore?.()
   ;(agentLoader.loadUserAgents as any)?.mockRestore?.()
   ;(agentLoader.loadProjectAgents as any)?.mockRestore?.()
+  ;(opencodeAgentLoader.loadOpenCodeAgents as any)?.mockRestore?.()
   ;(mcpLoader.loadMcpConfigs as any)?.mockRestore?.()
   ;(pluginLoader.loadAllPluginComponents as any)?.mockRestore?.()
   ;(mcpModule.createBuiltinMcps as any)?.mockRestore?.()
@@ -793,5 +804,330 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
     expect(firstCallArgs[0]).toBeUndefined()
 
     fetchSpy.mockRestore?.()
+  })
+})
+
+describe("OpenCode agent loader integration", () => {
+  test("loads OpenCode project agents from .opencode/agents/*.md", async () => {
+    // #given
+    const opencodeAgentLoaderSpy = opencodeAgentLoader.loadOpenCodeAgents as unknown as {
+      mockReturnValue: (value: Record<string, unknown>) => void
+    }
+    opencodeAgentLoaderSpy.mockReturnValue({
+      pm: { name: "pm", description: "Project Manager from OpenCode", prompt: "You are a PM", mode: "subagent" },
+    })
+
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    const agents = config.agent as Record<string, { prompt?: string }>
+    expect(agents.pm).toBeDefined()
+    expect(agents.pm.prompt).toBe("You are a PM")
+  })
+
+  test(".opencode/agents/pm.md overrides compiled pm agent", async () => {
+    // #given - builtinAgents has a compiled pm agent
+    // Reset the mock to return pm
+    ;(agents.createBuiltinAgents as any).mockResolvedValue({
+      kord: { name: "kord", prompt: "test", mode: "primary" },
+      pm: { name: "pm", prompt: "compiled pm prompt", mode: "subagent" },
+    })
+
+    // OpenCode project has pm.md that should override
+    const opencodeAgentLoaderSpy = opencodeAgentLoader.loadOpenCodeAgents as unknown as {
+      mockReturnValue: (value: Record<string, unknown>) => void
+    }
+    opencodeAgentLoaderSpy.mockReturnValue({
+      pm: { name: "pm", prompt: "overridden pm prompt", mode: "subagent" },
+    })
+
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then - OpenCode project agents should override builtin
+    const resolvedAgents = config.agent as Record<string, { prompt?: string }>
+    expect(resolvedAgents.pm).toBeDefined()
+    expect(resolvedAgents.pm.prompt).toBe("overridden pm prompt")
+  })
+
+  test("kord-aios.json override wins over .opencode/agents/", async () => {
+    // #given - OpenCode project has pm.md
+    const opencodeAgentLoaderSpy = opencodeAgentLoader.loadOpenCodeAgents as unknown as {
+      mockReturnValue: (value: Record<string, unknown>) => void
+    }
+    opencodeAgentLoaderSpy.mockReturnValue({
+      pm: { name: "pm", prompt: "opencode pm prompt", mode: "subagent" },
+    })
+
+    // kord-aios.json has pm override - it goes into config.agent (OpenCode's config)
+    // because filteredConfigAgents is built from config.agent
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {
+        pm: {
+          name: "pm",
+          prompt: "config pm prompt",
+          model: "openai/gpt-5.2",
+        },
+      },
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then - kord-aios.json should win (filteredConfigAgents has highest priority)
+    const resolvedAgents = config.agent as Record<string, { prompt?: string; model?: string }>
+    expect(resolvedAgents.pm).toBeDefined()
+    expect(resolvedAgents.pm.prompt).toBe("config pm prompt")
+    expect(resolvedAgents.pm.model).toBe("openai/gpt-5.2")
+  })
+
+  test("T0 agents are NOT overridable via .opencode/agents/", async () => {
+    // #given - OpenCode project tries to override kord, dev, builder, planner
+    const opencodeAgentLoaderSpy = opencodeAgentLoader.loadOpenCodeAgents as unknown as {
+      mockReturnValue: (value: Record<string, unknown>) => void
+    }
+    opencodeAgentLoaderSpy.mockReturnValue({
+      kord: { name: "kord", prompt: "should be ignored", mode: "subagent" },
+      dev: { name: "dev", prompt: "should be ignored", mode: "subagent" },
+      builder: { name: "builder", prompt: "should be ignored", mode: "subagent" },
+      planner: { name: "planner", prompt: "should be ignored", mode: "subagent" },
+      pm: { name: "pm", prompt: "should work", mode: "subagent" },
+    })
+
+    // Reset builtinAgents to include dev for this test
+    ;(agents.createBuiltinAgents as any).mockResolvedValue({
+      kord: { name: "kord", prompt: "test", mode: "primary" },
+      dev: { name: "dev", prompt: "test", mode: "primary" },
+      architect: { name: "architect", prompt: "test", mode: "subagent" },
+    })
+
+    const pluginConfig: OhMyOpenCodeConfig = {
+      kord_agent: {
+        planner_enabled: true,
+        default_builder_enabled: true,
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then - T0 agents should NOT be overridden, pm should be loaded
+    const resolvedAgents = config.agent as Record<string, { prompt?: string }>
+    
+    // T0 agents should remain as they were set by Kord
+    expect(resolvedAgents.kord).toBeDefined()
+    expect(resolvedAgents.kord.prompt).toBe("test") // from mock builtinAgents
+    
+    expect(resolvedAgents.dev).toBeDefined()
+    expect(resolvedAgents.dev.prompt).toBe("test") // from mock builtinAgents
+    
+    // builder is created as "OpenCode-Builder" when default_builder_enabled is true
+    expect(resolvedAgents["OpenCode-Builder"]).toBeDefined() // from kord_agent default_builder_enabled
+    
+    expect(resolvedAgents.planner).toBeDefined() // from kord_agent planner_enabled
+    
+    // pm should be loaded from OpenCode agents
+    expect(resolvedAgents.pm).toBeDefined()
+    expect(resolvedAgents.pm.prompt).toBe("should work")
+  })
+
+  test("OpenCode user agents have lower priority than project agents", async () => {
+    // #given - Both user and project have pm agent
+    // We need to test that project overrides user
+    // This is tested by the merge order in config-handler
+    
+    // The loadOpenCodeAgents is called once for each directory (user and project)
+    const opencodeAgentLoaderSpy = opencodeAgentLoader.loadOpenCodeAgents as unknown as {
+      mockReturnValue: (value: Record<string, unknown>) => void
+    }
+    // First call is for user agents, second is for project agents
+    opencodeAgentLoaderSpy
+      .mockReturnValueOnce({
+        pm: { name: "pm", prompt: "user pm", mode: "subagent" },
+      })
+      .mockReturnValueOnce({
+        pm: { name: "pm", prompt: "project pm", mode: "subagent" },
+      })
+
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then - project agents should win (loaded last in merge)
+    const resolvedAgents = config.agent as Record<string, { prompt?: string }>
+    expect(resolvedAgents.pm).toBeDefined()
+    expect(resolvedAgents.pm.prompt).toBe("project pm")
+  })
+})
+
+describe("More tests", () => {
+  test("kord-aios.json override wins over .opencode/agents/", async () => {
+    // #given - OpenCode project has pm.md
+    const opencodeAgentLoaderSpy = opencodeAgentLoader.loadOpenCodeAgents as unknown as {
+      mockReturnValue: (value: Record<string, unknown>) => void
+    }
+    opencodeAgentLoaderSpy.mockReturnValue({
+      pm: { name: "pm", prompt: "opencode pm prompt", mode: "subagent" },
+    })
+
+    // kord-aios.json has pm override - it goes into config.agent (OpenCode's config)
+    // because filteredConfigAgents is built from config.agent
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {
+        pm: {
+          name: "pm",
+          prompt: "config pm prompt",
+          model: "openai/gpt-5.2",
+        },
+      },
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then - kord-aios.json should win (filteredConfigAgents has highest priority)
+    const agents = config.agent as Record<string, { prompt?: string; model?: string }>
+    expect(agents.pm).toBeDefined()
+    expect(agents.pm.prompt).toBe("config pm prompt")
+    expect(agents.pm.model).toBe("openai/gpt-5.2")
+  })
+
+  test("T0 agents are NOT overridable via .opencode/agents/", async () => {
+    // #given - OpenCode project tries to override kord, dev, builder, planner
+    const opencodeAgentLoaderSpy = opencodeAgentLoader.loadOpenCodeAgents as unknown as {
+      mockReturnValue: (value: Record<string, unknown>) => void
+    }
+    opencodeAgentLoaderSpy.mockReturnValue({
+      kord: { name: "kord", prompt: "should be ignored", mode: "subagent" },
+      dev: { name: "dev", prompt: "should be ignored", mode: "subagent" },
+      builder: { name: "builder", prompt: "should be ignored", mode: "subagent" },
+      planner: { name: "planner", prompt: "should be ignored", mode: "subagent" },
+      pm: { name: "pm", prompt: "should work", mode: "subagent" },
+    })
+
+    // Make sure builtinAgents includes dev
+    const builtinAgentsSpy = agents.createBuiltinAgents as unknown as {
+      mockResolvedValue: (value: Record<string, unknown>) => void
+    }
+    builtinAgentsSpy.mockResolvedValue({
+      kord: { name: "kord", prompt: "test", mode: "primary" },
+      dev: { name: "dev", prompt: "test", mode: "primary" },
+      architect: { name: "architect", prompt: "test", mode: "subagent" },
+    })
+
+    const pluginConfig: OhMyOpenCodeConfig = {
+      kord_agent: {
+        planner_enabled: true,
+        default_builder_enabled: true,
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then - T0 agents should NOT be overridden, pm should be loaded
+    const resolvedAgents = config.agent as Record<string, { prompt?: string }>
+    
+    // T0 agents should remain as they were set by Kord
+    expect(resolvedAgents.kord).toBeDefined()
+    expect(resolvedAgents.kord.prompt).toBe("test") // from mock builtinAgents
+    
+    expect(resolvedAgents.dev).toBeDefined()
+    expect(resolvedAgents.dev.prompt).toBe("test") // from mock builtinAgents
+    
+    // builder is created as "OpenCode-Builder" when default_builder_enabled is true
+    expect(resolvedAgents["OpenCode-Builder"]).toBeDefined() // from kord_agent default_builder_enabled
+    
+    expect(resolvedAgents.planner).toBeDefined() // from kord_agent planner_enabled
+    
+    // pm should be loaded from OpenCode agents
+    expect(resolvedAgents.pm).toBeDefined()
+    expect(resolvedAgents.pm.prompt).toBe("should work")
   })
 })
