@@ -24,12 +24,13 @@
 - **Backward Compatibility**: All fields are optional to maintain compatibility with existing agents that might not have all fields
 - **Validation Layering**: Zod validates the shape, but we also added runtime checks for array types to handle edge cases where YAML parsing might produce unexpected types
 
-## Task 3: Implement Declarative Permission Model (2026-02-28)
+## Task 4: Enable call_kord_agent by Default (2026-02-28)
 
 ### Issues/Gotchas
 
-- **Test Assertion Mismatch**: Wrote test descriptions saying "empty write paths" but expected `["**"]` - discovered that `explore` and `librarian` are NOT in DEFAULT_AGENT_ALLOWLIST, so they should return `[]` (deny all) not `["**"]`
-- **Agent Name Case Sensitivity**: Implemented case-insensitive matching by normalizing to lowercase - important for user-provided agent names
-- **Module Coupling Decision**: Imported DEFAULT_AGENT_ALLOWLIST from agent-authority/constants.ts directly - acceptable since we are NOT modifying that file, only using it as fallback
-- **can_delegate Default**: Can_delegate defaults to true when not explicitly set anywhere in the precedence chain - this matches expected behavior from task spec
+- **Tool Naming**: Must use exact tool name `call_kord_agent` (not `call_kord_agent_*`)
+- **Merge Order**: Global permission is spread first, then per-agent overrides are applied - this allows agents like kord to explicitly deny what global allows
+- **No task Override**: Global permission keeps `task: "deny"` - only `call_kord_agent` is allowed, not `task`
+- **Test Verification**: All 3034 tests pass, including new tests for permission behavior
+- **Architect Not in builtinAgents**: Architect is loaded via builtinAgents, not as a special agent in config-handler - permissions are handled by global default + restrictions
 

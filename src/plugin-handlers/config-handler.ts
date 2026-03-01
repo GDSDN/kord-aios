@@ -464,6 +464,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       webfetch: "allow",
       external_directory: "allow",
       task: "deny",
+      call_kord_agent: "allow",
     };
 
     const mcpResult = (pluginConfig.claude_code?.mcp ?? true)

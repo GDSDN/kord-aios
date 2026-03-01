@@ -330,6 +330,166 @@ describe("Agent permission defaults", () => {
     expect(agentConfig.dev).toBeDefined()
     expect(agentConfig.dev.permission?.task).toBe("allow")
   })
+
+  test("global permission should allow call_kord_agent by default", async () => {
+    // #given
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+      permission: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    const globalPermission = config.permission as Record<string, string>
+    expect(globalPermission.call_kord_agent).toBe("allow")
+    expect(globalPermission.task).toBe("deny") // task should still be denied globally
+  })
+
+  test("kord agent should deny call_kord_agent", async () => {
+    // #given
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mockResolvedValue: (value: Record<string, unknown>) => void
+    }
+    createBuiltinAgentsMock.mockResolvedValue({
+      kord: { name: "kord", prompt: "test", mode: "primary" },
+    })
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    const agentConfig = config.agent as Record<string, { permission?: Record<string, string> }>
+    expect(agentConfig.kord).toBeDefined()
+    expect(agentConfig.kord.permission?.call_kord_agent).toBe("deny")
+  })
+
+  test("dev agent should deny call_kord_agent", async () => {
+    // #given
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mockResolvedValue: (value: Record<string, unknown>) => void
+    }
+    createBuiltinAgentsMock.mockResolvedValue({
+      kord: { name: "kord", prompt: "test", mode: "primary" },
+      dev: { name: "dev", prompt: "test", mode: "primary" },
+    })
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    const agentConfig = config.agent as Record<string, { permission?: Record<string, string> }>
+    expect(agentConfig.dev).toBeDefined()
+    expect(agentConfig.dev.permission?.call_kord_agent).toBe("deny")
+  })
+
+  test("builder agent should deny call_kord_agent", async () => {
+    // #given
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mockResolvedValue: (value: Record<string, unknown>) => void
+    }
+    createBuiltinAgentsMock.mockResolvedValue({
+      kord: { name: "kord", prompt: "test", mode: "primary" },
+      builder: { name: "builder", prompt: "test", mode: "subagent" },
+    })
+    const pluginConfig: OhMyOpenCodeConfig = {
+      kord_agent: {
+        default_builder_enabled: true,
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    const agentConfig = config.agent as Record<string, { permission?: Record<string, string> }>
+    expect(agentConfig.builder).toBeDefined()
+    expect(agentConfig.builder.permission?.call_kord_agent).toBe("deny")
+  })
+
+  test("planner agent should deny call_kord_agent", async () => {
+    // #given
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mockResolvedValue: (value: Record<string, unknown>) => void
+    }
+    createBuiltinAgentsMock.mockResolvedValue({
+      kord: { name: "kord", prompt: "test", mode: "primary" },
+    })
+    const pluginConfig: OhMyOpenCodeConfig = {
+      kord_agent: {
+        planner_enabled: true,
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    const agentConfig = config.agent as Record<string, { permission?: Record<string, string> }>
+    expect(agentConfig.planner).toBeDefined()
+    expect(agentConfig.planner.permission?.call_kord_agent).toBe("deny")
+  })
 })
 
 describe("Plan category config resolution", () => {

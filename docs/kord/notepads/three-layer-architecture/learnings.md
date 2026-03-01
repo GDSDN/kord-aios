@@ -26,15 +26,20 @@
 - **Loader Integration**: Updated loader to use the new parser, skipping agents with invalid frontmatter shapes without crashing
 - **Additional Validation**: Added runtime checks for `write_paths` and `tool_allowlist` being arrays (defense in depth beyond Zod)
 
-## Task 3: Implement Declarative Permission Model (2026-02-28)
+## Task 4: Enable call_kord_agent by Default (2026-02-28)
 
 ### Learnings
 
-- **Source Type Design**: Created `AgentCapabilitySources` interface to represent input sources (frontmatter, squad, config) - keeps module pure and testable
-- **Precedence Implementation**: Resolver applies sources in order (frontmatter -> squad -> config) with later sources overwriting earlier ones
-- **Fallback Chain**: Implemented 4-level fallback: (1) explicit sources, (2) T0/T1 hardcoded, (3) DEFAULT_AGENT_ALLOWLIST, (4) empty array for unknown agents
-- **Case Insensitivity**: Agent name matching is case-insensitive (normalized to lowercase for lookups)
-- **TDD Approach**: Wrote 30 tests covering all scenarios - caught 2 test bugs where expected values didn't match test descriptions
-- **DEFAULT_AGENT_ALLOWLIST Integration**: Successfully reused existing constant as fallback source (no duplication needed)
-- **Barrel Export Pattern**: Added export to shared/index.ts following existing pattern for other utilities
+- **Two-Layer Permission System**: Kord AIOS has two permission layers:
+  1. Global permissions in `config.permission` (applied to all agents)
+  2. Per-agent permission overrides in `config-handler.ts`
+- **Default Permission Behavior**: Unknown tools are DENIED by default in OpenCode, so we must explicitly `allow` tools we want available
+- **call_kord_agent vs task**: `call_kord_agent` is for spawning explore/librarian (read-only), while `task` is for category-based delegation
+- **Architect Access**: Removed architect from restriction deny list to allow them to spawn explore/librarian
+- **Explore/Librarian Lockdown**: These agents still cannot call `call_kord_agent` (denied in agent-tool-restrictions.ts EXPLORATION_AGENT_DENYLIST)
+- **Test Coverage**: Added tests for:
+  - Global permission includes call_kord_agent: "allow"
+  - kord/dev/planner/builder deny call_kord_agent
+  - explore/librarian deny call_kord_agent in restrictions
+  - architect no longer denies call_kord_agent (now allowed by global default)
 

@@ -20,7 +20,6 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
   // by the agent-authority hook.
   architect: {
     task: false,
-    call_kord_agent: false,
   },
 
   analyst: {
