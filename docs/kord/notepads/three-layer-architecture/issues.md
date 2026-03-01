@@ -82,3 +82,11 @@
 - **Fix**: After determining base allowlist from `getAgentCapabilities()` or `DEFAULT_AGENT_ALLOWLIST`, merge in any additional paths from `config.allowlist` using case-insensitive agent key matching.
 - **Additive behavior**: Config allowlist entries are merged additively (extend, not replace), so agents retain access to default paths plus any custom paths.
 - **Verification**: All 22 agent-authority E2E tests pass, full test suite (3066 tests) passes with no regressions.
+
+## Task 8: Create `kord-aios extract` CLI command (2026-03-01)
+
+### Issues/Gotchas
+
+- **T2-only agent scope ambiguity**: The source directory currently contains only T2 agent markdown defaults, so extraction uses `src/features/builtin-agents/*.md` directly; if other tiers are added later in the same directory, filtering logic will need to be tightened.
+- **Skill destination collisions**: Extracting to `skills/{skill}/SKILL.md` drops domain segments by design, which can collide if two domains introduce the same skill folder name.
+- **Diff-mode expectations**: `--diff` intentionally reports both `[WRITE]` and `[SKIP]` decisions while performing no filesystem writes, so summary counts are simulation counts rather than persisted outputs.

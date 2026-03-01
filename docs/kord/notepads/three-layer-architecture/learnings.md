@@ -73,3 +73,12 @@
 - **Prompt key stability**: `prompt_file` resolution must continue to use the original YAML key (`resolvedPrompts[yamlKey]`), even after runtime name prefixing.
 - **Chief runtime policy**: `is_chief` works best as an authority flag that enforces runtime `mode: "all"`, independent of declared YAML mode.
 - **L2 awareness composition**: Chief prompts can be safely augmented with an auto-generated awareness section containing members, skills, tools summary, and exact prefixed delegation syntax.
+
+## Task 8: Create `kord-aios extract` CLI command (2026-03-01)
+
+### Learnings
+
+- **Consistent flag strategy**: Category filters (`--agents-only`, `--skills-only`, `--squads-only`, `--commands-only`) work as a combinable include set; when no filter is passed, extraction defaults to all content sets.
+- **Content mapping boundaries**: Keeping command extraction scoped to `builtin-commands/templates/` (excluding `*.test.ts`) preserves methodology artifacts without pulling implementation wiring files.
+- **Global path reliability**: Reusing `getOpenCodeConfigDir({ binary: "opencode", checkExisting: false })` gives stable cross-platform global extraction behavior and honors `OPENCODE_CONFIG_DIR` in tests.
+- **Safe overwrite semantics**: `--force` as explicit opt-in plus default skip behavior avoids accidental local customization loss in `.opencode/`.

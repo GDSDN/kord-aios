@@ -6,6 +6,7 @@ import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
 import { createMcpOAuthCommand } from "./mcp-oauth"
+import { extract } from "./extract"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -195,6 +196,37 @@ Categories:
       category: options.category,
     }
     const exitCode = await doctor(doctorOptions)
+    process.exit(exitCode)
+  })
+
+program
+  .command("extract")
+  .description("Extract bundled methodology content into local or global OpenCode directories")
+  .option("--global", "Extract into global OpenCode config directory")
+  .option("--agents-only", "Extract only builtin T2 agent defaults")
+  .option("--skills-only", "Extract only builtin skills")
+  .option("--squads-only", "Extract only builtin squads")
+  .option("--commands-only", "Extract only builtin command templates")
+  .option("--force", "Overwrite existing files")
+  .option("--diff", "Dry-run; print what would be written")
+  .addHelpText("after", `
+Examples:
+  $ bunx kord-aios extract
+  $ bunx kord-aios extract --global
+  $ bunx kord-aios extract --skills-only --commands-only
+  $ bunx kord-aios extract --diff
+  $ bunx kord-aios extract --agents-only --force
+`)
+  .action(async (options) => {
+    const exitCode = await extract({
+      global: options.global ?? false,
+      agentsOnly: options.agentsOnly ?? false,
+      skillsOnly: options.skillsOnly ?? false,
+      squadsOnly: options.squadsOnly ?? false,
+      commandsOnly: options.commandsOnly ?? false,
+      force: options.force ?? false,
+      diff: options.diff ?? false,
+    })
     process.exit(exitCode)
   })
 
