@@ -135,6 +135,13 @@ Components are loaded from multiple sources and merged. Later sources override e
 
 **Note**: T0 agents (kord, dev, builder, planner) cannot be overridden via `.opencode/agents/*.md` — they are managed by Kord AIOS core.
 
+## OPENCODE AGENT LOADING + PRECEDENCE
+
+- OpenCode agents are loaded from both `~/.config/opencode/agents/` and `.opencode/agents/` using `loadOpenCodeAgents()`.
+- Project loading path is `loadOpenCodeProjectAgents(ctx.directory)`; this is the source used for per-repo overrides.
+- Merge order keeps OpenCode project agents above builtin/user sources but below explicit runtime config (`config.agent`).
+- T0 filtering is applied before merge, so `kord`, `dev`, `builder`, and `planner` from OpenCode files are always dropped.
+
 ## AGENT NAME MIGRATION
 
 Old agent names are automatically migrated via `AGENT_NAME_MAP` from `src/shared/migration.ts`:

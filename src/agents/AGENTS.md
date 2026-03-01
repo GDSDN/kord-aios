@@ -93,4 +93,9 @@ agents/
 - **High temp**: Don't use >0.3 for code agents
 - **Sequential calls**: Use `task` with `run_in_background` for exploration
 - **Plan writing code**: Planner only - never implements
-'
+
+## OPENCODE AGENT OVERRIDES + WRITE AUTHORITY
+
+- OpenCode custom agents are keyed by filename (for example, `course-creator.md` -> `course-creator`), not by frontmatter `name`.
+- `write_paths` and tool restrictions from `.opencode/agents/*.md` are loaded as frontmatter capabilities and consumed by the authority layer.
+- T0 orchestration agents (`kord`, `dev`, `builder`, `planner`) are protected and cannot be overridden by OpenCode agent files.
