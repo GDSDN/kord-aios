@@ -5,6 +5,7 @@ import { parseFrontmatter } from "../../shared/frontmatter"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 import type { OpenCodeAgentFrontmatter, LoadedOpenCodeAgent } from "./types"
+import { parseOpenCodeAgentFrontmatter } from "./types"
 
 function parseToolsConfig(toolsStr?: string): Record<string, boolean> | undefined {
   if (!toolsStr) return undefined
@@ -47,8 +48,17 @@ function loadAgentsFromDir(agentsDir: string): Record<string, AgentConfig> {
         continue
       }
 
-      const name = data.name || agentName
-      const originalDescription = data.description || ""
+      // Validate frontmatter data shape using Zod schema
+      const validationResult = parseOpenCodeAgentFrontmatter(data)
+      if (!validationResult.ok) {
+        // Invalid frontmatter shape - skip gracefully without crashing
+        continue
+      }
+
+      const validatedData = validationResult.value
+
+      const name = validatedData.name || agentName
+      const originalDescription = validatedData.description || ""
       const formattedDescription = originalDescription
         ? `${name}: ${originalDescription}`
         : name
@@ -59,7 +69,17 @@ function loadAgentsFromDir(agentsDir: string): Record<string, AgentConfig> {
         prompt: body.trim(),
       }
 
-      const toolsConfig = parseToolsConfig(data.tools)
+      // Add model if specified
+      if (validatedData.model) {
+        config.model = validatedData.model
+      }
+
+      // Add temperature if specified
+      if (validatedData.temperature !== undefined) {
+        config.temperature = validatedData.temperature
+      }
+
+      const toolsConfig = parseToolsConfig(validatedData.tools)
       if (toolsConfig) {
         config.tools = toolsConfig
       }

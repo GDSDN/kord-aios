@@ -161,4 +161,146 @@ Prompt for tool agent.
       bash: true,
     })
   })
+
+  //#given: Agent file has model and temperature in frontmatter
+  //#when: loadOpenCodeAgents is called
+  //#then: Should set model and temperature in config
+  it("should parse model and temperature from frontmatter", () => {
+    const content = `---
+name: model-agent
+description: Agent with model and temperature
+model: anthropic/claude-opus-4-6
+temperature: 0.5
+---
+
+Prompt for model agent.
+`
+    writeFileSync(join(testDir, "model-agent.md"), content)
+
+    const result = loadOpenCodeAgents(testDir)
+
+    expect(result["model-agent"].model).toBe("anthropic/claude-opus-4-6")
+    expect(result["model-agent"].temperature).toBe(0.5)
+  })
+
+  //#given: Agent file has invalid write_paths (not an array)
+  //#when: loadOpenCodeAgents is called
+  //#then: Should skip the file gracefully
+  it("should skip agent with invalid write_paths (not array)", () => {
+    const content = `---
+name: invalid-agent
+description: Agent with invalid write_paths
+write_paths: not-an-array
+---
+
+Prompt for invalid agent.
+`
+    writeFileSync(join(testDir, "invalid-agent.md"), content)
+
+    const result = loadOpenCodeAgents(testDir)
+
+    expect(result).toEqual({})
+  })
+
+  //#given: Agent file has invalid tool_allowlist (not an array)
+  //#when: loadOpenCodeAgents is called
+  //#then: Should skip the file gracefully
+  it("should skip agent with invalid tool_allowlist (not array)", () => {
+    const content = `---
+name: invalid-allowlist-agent
+description: Agent with invalid tool_allowlist
+tool_allowlist: not-an-array
+---
+
+Prompt for invalid agent.
+`
+    writeFileSync(join(testDir, "invalid-allowlist-agent.md"), content)
+
+    const result = loadOpenCodeAgents(testDir)
+
+    expect(result).toEqual({})
+  })
+
+  //#given: Agent file has invalid engine_min_version (not valid semver)
+  //#when: loadOpenCodeAgents is called
+  //#then: Should skip the file gracefully
+  it("should skip agent with invalid engine_min_version", () => {
+    const content = `---
+name: invalid-version-agent
+description: Agent with invalid version
+engine_min_version: not-semver
+---
+
+Prompt for invalid agent.
+`
+    writeFileSync(join(testDir, "invalid-version-agent.md"), content)
+
+    const result = loadOpenCodeAgents(testDir)
+
+    expect(result).toEqual({})
+  })
+
+  //#given: Agent file has valid write_paths array
+  //#when: loadOpenCodeAgents is called
+  //#then: Should load agent (write_paths are validated but not used in config yet)
+  it("should load agent with valid write_paths array", () => {
+    const content = `---
+name: write-agent
+description: Agent with write paths
+write_paths:
+  - src/
+  - tests/
+---
+
+Prompt for write agent.
+`
+    writeFileSync(join(testDir, "write-agent.md"), content)
+
+    const result = loadOpenCodeAgents(testDir)
+
+    expect(result).toHaveProperty("write-agent")
+    expect(result["write-agent"].description).toContain("write-agent")
+  })
+
+  //#given: Agent file has valid tool_allowlist array
+  //#when: loadOpenCodeAgents is called
+  //#then: Should load agent (tool_allowlist validated but not used in config yet)
+  it("should load agent with valid tool_allowlist array", () => {
+    const content = `---
+name: allowlist-agent
+description: Agent with tool allowlist
+tool_allowlist:
+  - Read
+  - Edit
+---
+
+Prompt for allowlist agent.
+`
+    writeFileSync(join(testDir, "allowlist-agent.md"), content)
+
+    const result = loadOpenCodeAgents(testDir)
+
+    expect(result).toHaveProperty("allowlist-agent")
+    expect(result["allowlist-agent"].description).toContain("allowlist-agent")
+  })
+
+  //#given: Agent file has valid engine_min_version (semver format)
+  //#when: loadOpenCodeAgents is called
+  //#then: Should load agent (version validated but not used for gating yet)
+  it("should load agent with valid engine_min_version", () => {
+    const content = `---
+name: version-agent
+description: Agent with version
+engine_min_version: 1.0.0
+---
+
+Prompt for version agent.
+`
+    writeFileSync(join(testDir, "version-agent.md"), content)
+
+    const result = loadOpenCodeAgents(testDir)
+
+    expect(result).toHaveProperty("version-agent")
+    expect(result["version-agent"].description).toContain("version-agent")
+  })
 })
