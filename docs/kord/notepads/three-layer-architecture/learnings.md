@@ -25,3 +25,16 @@
 - **Type Safety**: Used Zod's `safeParse()` with explicit type casting to handle ZodError issues array
 - **Loader Integration**: Updated loader to use the new parser, skipping agents with invalid frontmatter shapes without crashing
 - **Additional Validation**: Added runtime checks for `write_paths` and `tool_allowlist` being arrays (defense in depth beyond Zod)
+
+## Task 3: Implement Declarative Permission Model (2026-02-28)
+
+### Learnings
+
+- **Source Type Design**: Created `AgentCapabilitySources` interface to represent input sources (frontmatter, squad, config) - keeps module pure and testable
+- **Precedence Implementation**: Resolver applies sources in order (frontmatter -> squad -> config) with later sources overwriting earlier ones
+- **Fallback Chain**: Implemented 4-level fallback: (1) explicit sources, (2) T0/T1 hardcoded, (3) DEFAULT_AGENT_ALLOWLIST, (4) empty array for unknown agents
+- **Case Insensitivity**: Agent name matching is case-insensitive (normalized to lowercase for lookups)
+- **TDD Approach**: Wrote 30 tests covering all scenarios - caught 2 test bugs where expected values didn't match test descriptions
+- **DEFAULT_AGENT_ALLOWLIST Integration**: Successfully reused existing constant as fallback source (no duplication needed)
+- **Barrel Export Pattern**: Added export to shared/index.ts following existing pattern for other utilities
+
