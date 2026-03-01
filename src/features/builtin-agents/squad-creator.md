@@ -79,7 +79,7 @@ agents:
     description: "{what this agent does}"
     prompt_file: agents/{role-name}.md
     model: "anthropic/claude-sonnet-4-5"
-    mode: subagent
+    mode: subagent              # "subagent" = invoke only, "all" = primary + subagent
     skills: ["{skill-name}"]
     # Tool permissions: true=allow, false=deny
     tools: 
@@ -87,6 +87,14 @@ agents:
       task: true       # Can delegate tasks
       read: true       # Can read files
       edit: true       # Can edit files
+  # Chief agent example (uncomment to enable):
+  # lead:
+  #   description: "Chief orchestrator for {domain} squad"
+  #   prompt_file: agents/lead.md
+  #   model: "anthropic/claude-opus-4-6"
+  #   mode: all                    # REQUIRED for chief
+  #   is_chief: true              # REQUIRED for chief
+  #   skills: ["{domain}-methodology"]
 
 default_executor: {primary-agent}
 default_reviewer: {review-agent}
@@ -110,6 +118,134 @@ Each agent's prompt is stored in `agents/{role-name}.md` and referenced via `pro
 9. **Validation**: Run `squad_validate` tool to verify manifest and references
 10. **Package**: Generate SQUAD.yaml manifest with v2 fields (tags, kord.minVersion, prompt_file, tools)
 </creation_workflow>
+
+<chief_design>
+**IMPORTANT**: If your squad needs a chief agent (one that can delegate to other squad members), follow these guidelines:
+
+A chief agent orchestrates other squad agents. The factory system handles chief prompt assembly automatically — you must NOT duplicate content that the factory generates.
+
+### Chief Agent in SQUAD.yaml
+
+```yaml
+agents:
+  lead:
+    description: "Chief orchestrator for {domain} squad"
+    prompt_file: agents/lead.md
+    model: "anthropic/claude-opus-4-6"
+    mode: all                    # REQUIRED: enables primary + subagent mode
+    is_chief: true              # REQUIRED: marks this agent as chief
+    skills: ["{domain}-methodology"]
+```
+
+**Critical**: The chief agent MUST have:
+- `is_chief: true` — tells the factory this is a chief
+- `mode: all` — enables both primary and subagent invocation
+- Clean YAML key name (e.g., `lead`, `chief`, `coordinator`) — the factory prefixes it at runtime to `squad-{squad}-{key}`
+
+### What to Include in chief.md
+
+Your chief's prompt file (`agents/{chief-name}.md`) should contain **ONLY**:
+
+1. **Domain Methodology** — How experts in this domain think, decide, and validate
+   - Problem decomposition patterns
+   - Decision criteria specific to this domain
+   - Quality standards for domain outputs
+
+2. **Quality Gates** — Checkpoints the chief uses to validate work
+   - Pre-delegation checks
+   - Output validation criteria
+   - Synthesis standards
+
+### What NOT to Include in chief.md
+
+**DO NOT include** — the factory adds these automatically:
+
+| Don't Include | Why | Factory Adds |
+|---------------|-----|--------------|
+| Team member list | Auto-generated from SQUAD.yaml | Squad Awareness section with prefixed names |
+| Delegation syntax | Auto-generated from SQUAD.yaml | Task(subagent_type="squad-...") lines |
+| Coordination protocol | Compiled constant | CHIEF_COORDINATION_TEMPLATE |
+
+### Chief Prompt Assembly (How It Works)
+
+The factory builds chief prompts like this:
+
+```
+base_identity_header
++ auto-generated Squad Awareness (from SQUAD.yaml)
++ your chief.md content (domain methodology)
++ CHIEF_COORDINATION_TEMPLATE (delegation protocol)
+```
+
+This means your chief.md should focus on **domain expertise**, not infrastructure.
+
+### Example: GOOD vs BAD chief.md
+
+#### BAD (Don't Do This)
+
+```markdown
+# Lead Agent
+
+You are the lead of the {domain} squad.
+
+## Team Members
+- @squad-{squad}-writer — content writer
+- @squad-{squad}-editor — editor
+- @squad-{squad}-designer — designer
+
+## How to Delegate
+Use task(subagent_type="squad-{squad}-writer") for writing
+Use task(subagent_type="squad-{squad}-editor") for editing
+
+## Coordination
+1. Break down the request
+2. Delegate to appropriate agent
+3. Review output
+```
+
+**Problems**: Duplicates team awareness (factory generates it), duplicates delegation syntax (factory generates it), duplicates coordination protocol (factory appends it).
+
+#### GOOD (Do This)
+
+```markdown
+# {Domain} Squad Chief
+
+You are the chief orchestrator for the {domain} squad.
+
+## Domain Methodology
+
+### Problem Decomposition
+When given a {domain} task:
+1. Identify the core {domain} challenge
+2. Break into atomic deliverables
+3. Route to specialists based on their expertise
+
+### Decision Criteria
+- Content quality: brand voice consistency, SEO alignment
+- Timeline feasibility: parallel work where possible
+- Resource allocation: match agent skills to task requirements
+
+### Validation Standards
+Before presenting results:
+- [ ] All deliverables meet brand standards
+- [ ] No contradictory elements across outputs
+- [ ] Format matches project conventions
+
+## Quality Gates
+
+### Pre-Delegation Check
+- [ ] Task decomposed to atomic units
+- [ ] Recipient agent has required skills
+- [ ] Context and constraints clearly stated
+
+### Output Validation
+- [ ] Matches original requirements
+- [ ] Integrates well with other squad outputs
+- [ ] Ready for user presentation
+```
+
+**Why this works**: Focuses on domain methodology and quality gates — the factory handles the rest.
+</chief_design>
 
 <constraints>
 - You MUST NOT implement application code — you create agent definitions
