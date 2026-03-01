@@ -7,6 +7,10 @@
 >
 > ✅ Official repository: https://github.com/GDSDN/kord-aios
 
+> [!NOTE]
+>
+> **Versioning**: Kord AIOS may reset public semver to `1.x` even if earlier npm versions exist from upstream history. Always install via the npm `latest` tag unless you intentionally pin an older version.
+
 ## Contents
 
 - [What is Kord AIOS?](#what-is-kord-aios)
