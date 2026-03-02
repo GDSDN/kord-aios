@@ -12,8 +12,11 @@ Delegation prompt for @devops:
 2. EXPECTED OUTCOME: PR exists/updated; returns PR URL.
 3. REQUIRED TOOLS: bash (git), gh.
 4. MUST DO:
-   - Determine target base branch: If user specified a base branch in USER ARGS (e.g. "dev", "main"), use it. Otherwise, use the repository's default integration branch (typically \`dev\` or \`main\`).
-   - Do NOT push in this command; if branch is not on origin, stop and instruct user to run \`git push -u origin <branch>\`.
+   - Determine target base branch using this priority order:
+     1. If user specified a branch in USER ARGS (e.g. "/git-create-pr dev"), use it.
+     2. Otherwise, run \`git rev-parse --abbrev-ref @{upstream}\` to get the tracked upstream branch (e.g. origin/dev → "dev"). Use that.
+     3. If no upstream is set, stop and ask the user: "Which branch should this PR target? (e.g. dev, main)"
+   - Do NOT push in this command; if current branch is not on origin, stop and instruct user to run \`git push -u origin <current-branch>\`.
    - If PR already exists for the current branch, update (gh pr edit) instead of creating a duplicate.
    - Generate title/body from commits + diff if user didn't specify.
 5. MUST NOT DO:
