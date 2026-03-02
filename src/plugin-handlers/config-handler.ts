@@ -1,4 +1,8 @@
-import { createBuiltinAgents } from "../agents";
+import {
+  createBuiltinAgents,
+  createPlanAnalyzerAgent,
+  createPlanReviewerAgent,
+} from "../agents";
 import { createDevJuniorAgentWithOverrides } from "../agents/dev-junior";
 import { loadAllSquads } from "../features/squad/loader";
 import { createAllSquadAgentConfigs, buildSquadPromptSection } from "../features/squad/factory";
@@ -34,10 +38,18 @@ import { getOpenCodeConfigPaths, getOpenCodeConfigDir } from "../shared/opencode
 import { migrateAgentConfig } from "../shared/permission-compat";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
-import { PLAN_SYSTEM_PROMPT, PLAN_PERMISSION } from "../agents/plan";
+import { PLAN_SYSTEM_PROMPT, PLAN_PERMISSION } from "../agents/planner";
 import { DEFAULT_CATEGORIES } from "../tools/delegate-task/constants";
 import type { ModelCacheState } from "../plugin-state";
 import type { CategoryConfig } from "../config/schema";
+
+function pickFirstFallbackModel(requirement: { fallbackChain: { providers: string[]; model: string }[] } | undefined): string | undefined {
+  const first = requirement?.fallbackChain?.[0]
+  const provider = first?.providers?.[0]
+  const model = first?.model
+  if (!provider || !model) return undefined
+  return `${provider}/${model}`
+}
 
 export interface ConfigHandlerDeps {
   ctx: { directory: string; client?: any };
@@ -174,9 +186,9 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     }
 
     // Migrate disabled_agents from old names to new names
-    const migratedDisabledAgents = (pluginConfig.disabled_agents ?? []).map(agent => {
+    const migratedDisabledAgents: string[] = (pluginConfig.disabled_agents ?? []).map(agent => {
       return AGENT_NAME_MAP[agent.toLowerCase()] ?? AGENT_NAME_MAP[agent] ?? agent
-    }) as typeof pluginConfig.disabled_agents
+    })
 
     const includeClaudeSkillsForAwareness = pluginConfig.claude_code?.skills ?? true;
     const [
@@ -400,6 +412,32 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           agentConfig["planner"] = merged;
         } else {
           agentConfig["planner"] = planBase;
+        }
+
+        // Ensure Plan workflow subagents exist even when model cache is missing.
+        // Without this, Planner cannot delegate to plan-analyzer/plan-reviewer and
+        // task() fails with "Unknown agent".
+        const isDisabled = (name: string) =>
+          migratedDisabledAgents.some((a) => a.toLowerCase() === name.toLowerCase())
+
+        if (!isDisabled("plan-analyzer") && !("plan-analyzer" in agentConfig)) {
+          const planAnalyzerRequirement = AGENT_MODEL_REQUIREMENTS["plan-analyzer"]
+          const fallback = resolvedModel
+            ?? pickFirstFallbackModel(planAnalyzerRequirement)
+            ?? pickFirstFallbackModel(planRequirement)
+          if (fallback) {
+            agentConfig["plan-analyzer"] = createPlanAnalyzerAgent(fallback)
+          }
+        }
+
+        if (!isDisabled("plan-reviewer") && !("plan-reviewer" in agentConfig)) {
+          const planReviewerRequirement = AGENT_MODEL_REQUIREMENTS["plan-reviewer"]
+          const fallback = resolvedModel
+            ?? pickFirstFallbackModel(planReviewerRequirement)
+            ?? pickFirstFallbackModel(planRequirement)
+          if (fallback) {
+            agentConfig["plan-reviewer"] = createPlanReviewerAgent(fallback)
+          }
         }
       }
 

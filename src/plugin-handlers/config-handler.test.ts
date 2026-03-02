@@ -762,6 +762,37 @@ describe("Plan direct override priority over category", () => {
     expect(agents.planner.prompt).toContain(customInstructions)
     expect(agents.planner.prompt!.endsWith(customInstructions)).toBe(true)
   })
+
+  test("planner registers plan-analyzer and plan-reviewer for planning workflow", async () => {
+    // #given
+    const pluginConfig: OhMyOpenCodeConfig = {
+      kord_agent: {
+        planner_enabled: true,
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    const agents = config.agent as Record<string, { mode?: string }>
+    expect(agents["plan-analyzer"]).toBeDefined()
+    expect(agents["plan-analyzer"].mode).toBe("subagent")
+    expect(agents["plan-reviewer"]).toBeDefined()
+    expect(agents["plan-reviewer"].mode).toBe("subagent")
+  })
 })
 
 describe("Deadlock prevention - fetchAvailableModels must not receive client", () => {
