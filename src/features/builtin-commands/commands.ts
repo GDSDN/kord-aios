@@ -10,7 +10,7 @@ import { STATUS_TEMPLATE } from "./templates/status"
 import { SQUAD_TEMPLATE } from "./templates/squad"
 import { SQUAD_CREATE_TEMPLATE } from "./templates/squad-create"
 import { GIT_COMMIT_TEMPLATE } from "./templates/git-commit"
-import { GIT_PR_CREATE_TEMPLATE } from "./templates/git-pr-create"
+import { GIT_CREATE_PR_TEMPLATE } from "./templates/git-create-pr"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -128,16 +128,16 @@ $ARGUMENTS
 </user-request>`,
     argumentHint: "[--staged|--all] [--message=\"...\"]",
   },
-  "git-pr-create": {
-    description: "(builtin) Create GitHub PR targeting dev (DevOps)",
+  "git-create-pr": {
+    description: "(builtin) Create GitHub PR (DevOps)",
     template: `<command-instruction>
-${GIT_PR_CREATE_TEMPLATE}
+${GIT_CREATE_PR_TEMPLATE}
 </command-instruction>
 
 <user-request>
 $ARGUMENTS
 </user-request>`,
-    argumentHint: "[--title=\"...\"] [--base=dev]",
+    argumentHint: "[<base-branch>] [--title=\"...\"]",
   },
 }
 

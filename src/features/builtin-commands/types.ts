@@ -13,7 +13,7 @@ export type BuiltinCommandName =
   | "squad"
   | "squad-create"
   | "git-commit"
-  | "git-pr-create"
+  | "git-create-pr"
 
 export interface BuiltinCommandConfig {
   disabled_commands?: BuiltinCommandName[]
