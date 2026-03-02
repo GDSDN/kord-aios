@@ -797,17 +797,17 @@ export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
   }
 }
 
-function detectProvidersFromKordAiosConfig(): { hasOpenAI: boolean; hasOpencodeZen: boolean; hasZaiCodingPlan: boolean; hasKimiForCoding: boolean } {
+export function detectProvidersFromKordAiosConfig(): { hasOpenAI: boolean; hasOpencodeZen: boolean; hasZaiCodingPlan: boolean; hasKimiForCoding: boolean } {
   const kordAiosConfigPath = getKordAiosConfig()
   if (!existsSync(kordAiosConfigPath)) {
-    return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false }
+    return { hasOpenAI: false, hasOpencodeZen: false, hasZaiCodingPlan: false, hasKimiForCoding: false }
   }
 
   try {
     const content = readFileSync(kordAiosConfigPath, "utf-8")
     const kordAiosConfig = parseJsonc<Record<string, unknown>>(content)
     if (!kordAiosConfig || typeof kordAiosConfig !== "object") {
-      return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false }
+      return { hasOpenAI: false, hasOpencodeZen: false, hasZaiCodingPlan: false, hasKimiForCoding: false }
     }
 
     const configStr = JSON.stringify(kordAiosConfig)
@@ -818,19 +818,19 @@ function detectProvidersFromKordAiosConfig(): { hasOpenAI: boolean; hasOpencodeZ
 
     return { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding }
   } catch {
-    return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false }
+    return { hasOpenAI: false, hasOpencodeZen: false, hasZaiCodingPlan: false, hasKimiForCoding: false }
   }
 }
 
 export function detectCurrentConfig(): DetectedConfig {
   const result: DetectedConfig = {
     isInstalled: false,
-    hasClaude: true,
-    isMax20: true,
-    hasOpenAI: true,
+    hasClaude: false,
+    isMax20: false,
+    hasOpenAI: false,
     hasGemini: false,
     hasCopilot: false,
-    hasOpencodeZen: true,
+    hasOpencodeZen: false,
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
   }
