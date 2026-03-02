@@ -162,6 +162,7 @@ kord-aios/
 | Add MCP | `src/mcp/` | Create config, add to `createBuiltinMcps()` |
 | Add skill | `src/features/builtin-skills/` | Create dir with SKILL.md |
 | Add squad | `src/features/builtin-squads/` | Create dir with SQUAD.yaml |
+| Built-in default squad | `src/features/builtin-squads/code/SQUAD.yaml` | Default shipped squad is `code` |
 
 ## CUSTOM AGENT LOADING
 
@@ -224,6 +225,16 @@ You are a course creator agent that designs educational content.
 | Background agents | `src/features/background-agent/` | manager.ts (1556 lines) |
 | Orchestrator | `src/hooks/build/` | Main orchestration hook (build/index.ts, 913 lines) |
 | Delegation | `src/tools/delegate-task/` | Category routing (executor.ts 983 lines) |
+
+## SQUAD EXECUTION NOTES
+
+- Built-in squad name is `code` (not `dev`).
+- `SQUAD.yaml` agent fields include `fallback` and `write_paths` (validated: relative only, no `..`, no root `**`, no `docs/kord/` prefix).
+- Chief agents auto-enable `permission.task = "allow"` unless overridden in the `tools` map.
+- Chief coordination template placeholders (`{SQUAD_NAME}`) are substituted in squad factory assembly.
+- Squad agents receive convention write paths (`docs/kord/squads/{squad}/**`, `docs/{squad}/**`) and are explicitly denied from `docs/kord/boulder.json`.
+- Fallback resolution for `squad-*` agents checks squad manifest fallback store before hardcoded requirements.
+- Squad names are collision-guarded against reserved built-in agent names.
 
 ## Installation (End Users)
 

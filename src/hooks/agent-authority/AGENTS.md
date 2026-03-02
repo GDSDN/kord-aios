@@ -61,6 +61,17 @@ Override allowlist via `kord-aios.json`:
 
 Config allowlist entries are **additive** - they extend the default paths rather than replacing them.
 
+## Squad Convention Paths and Deny Rules
+
+For runtime squad agents (`squad-{squadName}-{agentKey}`), the hook applies additional conventions:
+
+- Adds convention write paths:
+  - `docs/kord/squads/{squadName}/**`
+  - `docs/{squadName}/**`
+- Keeps capability/config allowlists additive (convention paths are merged, not replacing existing allowlist paths)
+- Explicitly denies `docs/kord/boulder.json` for all squad agents (protected orchestration state)
+- Validates extracted `squadName` as kebab-case before applying squad-specific logic
+
 ## Task 10 Integration Notes
 
 - Custom OpenCode agent keys follow filename rules (`course-creator.md` -> `course-creator`).

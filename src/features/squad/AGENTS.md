@@ -73,6 +73,15 @@ kord:
 | `tools` | Record<string, boolean> | — | Tool enable/disable overrides |
 | `temperature` | number | — | 0-1 |
 | `is_chief` | boolean | false | Can delegate via task() |
+| `fallback` | { model, variant? }[] | — | Per-agent fallback chain (max 4 slots) |
+| `write_paths` | string[] | — | Extra write authority paths (validated) |
+
+`write_paths` validation rules (schema-level):
+- must be relative (cannot start with `/`)
+- must not contain `..`
+- must not contain root wildcard `**`
+- must not start with `docs/kord/`
+- must not contain empty strings
 
 ### Prompt Resolution Priority
 ```
@@ -85,8 +94,10 @@ kord:
 
 - Runtime agent registration name is always prefixed: `squad-{manifest.name}-{yamlKey}`
 - Prefixing prevents collisions when multiple squads define the same YAML key (for example, `worker`)
+- Squad manifest names are also collision-guarded against reserved built-in agent names (throws `SquadNameCollisionError`)
 - `prompt_file` resolution still keys by original YAML key, not the prefixed runtime name
 - `is_chief: true` forces runtime `mode: "all"` (primary + subagent)
+- Chiefs auto-enable `permission.task = "allow"` unless explicitly overridden in `tools` (for example, `tools: { task: false }`)
 - Non-chief agents default to runtime `mode: "subagent"`
 - Chief prompts include an auto-generated **Squad Awareness** section:
   - prefixed member names (`@squad-...`)
@@ -94,6 +105,7 @@ kord:
   - skills per member
   - tool permission summary (`default` when no explicit `tools` map)
   - delegation syntax lines using prefixed names
+- Chief coordination template placeholders (`{SQUAD_NAME}`) are substituted in the factory before prompt injection
 
 ## L2-SQUAD ARCHITECTURE
 

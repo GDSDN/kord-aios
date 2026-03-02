@@ -104,11 +104,15 @@ Kord AIOS ships a full development team. All agents are customizable — overrid
 
 ### Squads
 
-Define domain-specific agent teams via `SQUAD.yaml` manifests. Each squad declares its agents, categories for task routing, and skill dependencies. The built-in `dev` squad provides the default development team.
+Define domain-specific agent teams via `SQUAD.yaml` manifests. Each squad declares its agents, categories for task routing, and skill dependencies. The built-in default is `code` (`src/features/builtin-squads/code/SQUAD.yaml`).
 
 **Chief + Worker Model:** Squads support L2 (chief) and L1 (worker) agent hierarchy. Chiefs have `is_chief: true` with auto-generated Squad Awareness and coordination protocol. Workers are standard subagents.
 
 **Naming Convention:** Squad agents are registered with prefixed names (`squad-{squadName}-{yamlKey}`) to prevent collisions across squads.
+
+**Agent Fields:** `fallback` (per-agent fallback chain) and `write_paths` (extra write authority paths) are supported in `SQUAD.yaml`. `write_paths` is validated (relative only, no `..`, no root `**`, no `docs/kord/` prefix).
+
+**Chief Permissions:** Chiefs auto-enable `permission.task = "allow"` unless `tools` explicitly overrides `task`.
 
 ```yaml
 # .opencode/squads/my-squad/SQUAD.yaml
