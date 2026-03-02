@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createKordDirectory } from "./kord-directory"
-import { KORD_INPUT_SUBDIRS } from "./project-layout"
+import { KORD_ACTIVE_SUBDIRS, KORD_RESERVED_SUBDIRS } from "./project-layout"
 
 describe("createKordDirectory", () => {
   let tempDir: string
@@ -20,61 +20,113 @@ describe("createKordDirectory", () => {
     }
   })
 
-  test("should create .kord/ directory with all subdirectories", () => {
+  test("should create .kord/ directory", () => {
     //#given - a project directory with no .kord/
 
     //#when - creating the kord directory
     const result = createKordDirectory(tempDir)
 
-    //#then - all subdirectories should exist
+    //#then - .kord/ directory should exist
     expect(result.success).toBe(true)
     expect(result.created).toBe(true)
-    for (const subdir of KORD_INPUT_SUBDIRS) {
-      expect(existsSync(join(tempDir, ".kord", subdir))).toBe(true)
-    }
+    expect(existsSync(join(tempDir, ".kord"))).toBe(true)
   })
 
-  test("should create scripts, templates, checklists, skills, squads subdirectories", () => {
+  test("should create .kord/templates/ subdirectory", () => {
+    //#given - a project directory
+
+    //#when - creating the kord directory
+    const result = createKordDirectory(tempDir)
+
+    //#then - templates subdir should exist
+    expect(result.success).toBe(true)
+    expect(existsSync(join(tempDir, ".kord", "templates"))).toBe(true)
+  })
+
+  test("should create .kord/squads/ subdirectory", () => {
+    //#given - a project directory
+
+    //#when - creating the kord directory
+    const result = createKordDirectory(tempDir)
+
+    //#then - squads subdir should exist
+    expect(result.success).toBe(true)
+    expect(existsSync(join(tempDir, ".kord", "squads"))).toBe(true)
+  })
+
+  test("should NOT create .kord/scripts/ subdirectory", () => {
     //#given - a project directory
 
     //#when - creating the kord directory
     createKordDirectory(tempDir)
 
-    //#then - specific required subdirs should exist
-    expect(existsSync(join(tempDir, ".kord", "scripts"))).toBe(true)
-    expect(existsSync(join(tempDir, ".kord", "templates"))).toBe(true)
-    expect(existsSync(join(tempDir, ".kord", "checklists"))).toBe(true)
-    expect(existsSync(join(tempDir, ".kord", "skills"))).toBe(true)
-    expect(existsSync(join(tempDir, ".kord", "squads"))).toBe(true)
+    //#then - scripts subdir should NOT exist
+    expect(existsSync(join(tempDir, ".kord", "scripts"))).toBe(false)
   })
 
-  test("should handle existing .kord/ directory gracefully (skip mode)", () => {
+  test("should NOT create .kord/checklists/ subdirectory", () => {
+    //#given - a project directory
+
+    //#when - creating the kord directory
+    createKordDirectory(tempDir)
+
+    //#then - checklists subdir should NOT exist
+    expect(existsSync(join(tempDir, ".kord", "checklists"))).toBe(false)
+  })
+
+  test("should NOT create .kord/skills/ subdirectory", () => {
+    //#given - a project directory
+
+    //#when - creating the kord directory
+    createKordDirectory(tempDir)
+
+    //#then - skills subdir should NOT exist
+    expect(existsSync(join(tempDir, ".kord", "skills"))).toBe(false)
+  })
+
+  test("should create only active subdirs (templates, squads)", () => {
+    //#given - a project directory
+
+    //#when - creating the kord directory
+    createKordDirectory(tempDir)
+
+    //#then - only active subdirs should exist
+    for (const subdir of KORD_ACTIVE_SUBDIRS) {
+      expect(existsSync(join(tempDir, ".kord", subdir))).toBe(true)
+    }
+    //#and - reserved subdirs should NOT exist
+    for (const subdir of KORD_RESERVED_SUBDIRS) {
+      expect(existsSync(join(tempDir, ".kord", subdir))).toBe(false)
+    }
+  })
+
+  test("should be idempotent - running twice succeeds", () => {
+    //#given - a project directory
+
+    //#when - creating the kord directory twice
+    const result1 = createKordDirectory(tempDir)
+    const result2 = createKordDirectory(tempDir)
+
+    //#then - both should succeed
+    expect(result1.success).toBe(true)
+    expect(result1.created).toBe(true)
+    expect(result2.success).toBe(true)
+    expect(result2.created).toBe(false)
+  })
+
+  test("should preserve existing files in .kord/ when re-running", () => {
     //#given - a project directory with existing .kord/
     const kordDir = join(tempDir, ".kord")
     mkdirSync(kordDir, { recursive: true })
     const markerFile = join(kordDir, "existing-file.txt")
     writeFileSync(markerFile, "keep me")
 
-    //#when - creating the kord directory
+    //#when - creating the kord directory again
     const result = createKordDirectory(tempDir)
 
     //#then - should succeed and preserve existing files
     expect(result.success).toBe(true)
-    expect(result.created).toBe(false)
     expect(readFileSync(markerFile, "utf-8")).toBe("keep me")
-  })
-
-  test("should still create missing subdirs when .kord/ exists", () => {
-    //#given - a project directory with existing .kord/ but missing subdirs
-    mkdirSync(join(tempDir, ".kord"), { recursive: true })
-
-    //#when - creating the kord directory
-    createKordDirectory(tempDir)
-
-    //#then - missing subdirs should be created
-    for (const subdir of KORD_INPUT_SUBDIRS) {
-      expect(existsSync(join(tempDir, ".kord", subdir))).toBe(true)
-    }
   })
 
   test("should return kordPath in result", () => {
