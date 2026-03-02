@@ -1,6 +1,44 @@
 import { z } from "zod"
 
 /**
+ * Schema for agent fallback entries in SQUAD.yaml.
+ * Mirrors AgentFallbackSlotSchema from src/config/schema.ts
+ */
+const squadAgentFallbackSchema = z.object({
+  /** Model identifier in provider/model format (e.g., anthropic/claude-sonnet-4-5) */
+  model: z.string().regex(/^[^/\s]+\/.+$/, "Expected provider/model format"),
+  /** Optional model variant */
+  variant: z.string().optional(),
+})
+
+/**
+ * Schema for write_paths validation in SQUAD.yaml.
+ * Rejects unsafe path patterns to prevent privilege escalation.
+ */
+const writePathsSchema = z
+  .array(z.string())
+  .refine(
+    (paths) => !paths.some((p) => p === ""),
+    { message: "write_paths cannot contain empty strings" }
+  )
+  .refine(
+    (paths) => !paths.some((p) => p.startsWith("/")),
+    { message: "write_paths entries must not start with '/' (use relative paths)" }
+  )
+  .refine(
+    (paths) => !paths.some((p) => p.includes("..")),
+    { message: "write_paths entries must not contain '..' (path traversal)" }
+  )
+  .refine(
+    (paths) => !paths.some((p) => p === "**"),
+    { message: "write_paths cannot contain root wildcard '**'" }
+  )
+  .refine(
+    (paths) => !paths.some((p) => p.startsWith("docs/kord/")),
+    { message: "write_paths cannot start with 'docs/kord/' (reserved for Kord internals)" }
+  )
+
+/**
  * SQUAD.yaml schema — defines a portable agent team for a specific domain.
  *
  * Squads bring:
@@ -31,6 +69,10 @@ export const squadAgentSchema = z.object({
   temperature: z.number().min(0).max(1).optional(),
   /** If true, agent can delegate via task() */
   is_chief: z.boolean().default(false),
+  /** Fallback model chain for this agent (max 4 slots) */
+  fallback: z.array(squadAgentFallbackSchema).max(4).optional(),
+  /** Write permission paths for agent authority (validated for safety) */
+  write_paths: writePathsSchema.optional(),
 })
 
 /** Category definition within a squad */
@@ -67,8 +109,8 @@ export const squadKordSchema = z.object({
 
 /** Top-level SQUAD.yaml manifest */
 export const squadSchema = z.object({
-  /** Squad identifier (kebab-case) */
-  name: z.string().min(1),
+  /** Squad identifier (kebab-case, e.g., 'my-squad') */
+  name: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "Squad name must be kebab-case (lowercase letters and numbers, separated by hyphens)"),
   /** Human-readable squad description */
   description: z.string(),
   /** Semantic version */

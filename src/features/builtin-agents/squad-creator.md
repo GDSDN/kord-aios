@@ -122,7 +122,14 @@ Each agent's prompt is stored in `agents/{role-name}.md` and referenced via `pro
 <chief_design>
 **IMPORTANT**: If your squad needs a chief agent (one that can delegate to other squad members), follow these guidelines:
 
-A chief agent orchestrates other squad agents. The factory system handles chief prompt assembly automatically — you must NOT duplicate content that the factory generates.
+A chief is a hybrid role:
+- **Dev-style autonomy** for execution decisions and end-to-end completion
+- **Kord-style orchestration** for delegation, synthesis, and quality control
+- **Domain expertise** for methodology and acceptance standards
+
+Chiefs should track internal execution using `todowrite()` as the single source of truth for internal steps.
+
+The factory system handles chief prompt assembly automatically — you must NOT duplicate content that the factory generates.
 
 ### Chief Agent in SQUAD.yaml
 
@@ -137,10 +144,45 @@ agents:
     skills: ["{domain}-methodology"]
 ```
 
+### Optional Agent Fields (Chief and Workers)
+
+```yaml
+agents:
+  lead:
+    description: "Chief orchestrator for {domain} squad"
+    prompt_file: agents/lead.md
+    model: "anthropic/claude-opus-4-6"
+    mode: all
+    is_chief: true
+    fallback: [{ model: "anthropic/claude-sonnet-4-5", variant: "fast" }]
+    write_paths: ["src/components/**"]
+```
+
+`fallback` notes:
+- `fallback` is optional
+- Max 4 entries per agent
+- Each entry must use provider/model format (for example `anthropic/claude-sonnet-4-5`)
+- `variant` is optional
+
+`write_paths` safety rules:
+- Must be relative paths (must not start with `/`)
+- Must not include `..`
+- Must not be `**`
+- Must not start with `docs/kord/`
+
 **Critical**: The chief agent MUST have:
 - `is_chief: true` — tells the factory this is a chief
 - `mode: all` — enables both primary and subagent invocation
 - Clean YAML key name (e.g., `lead`, `chief`, `coordinator`) — the factory prefixes it at runtime to `squad-{squad}-{key}`
+
+### Convention Workspaces
+
+Squad execution and outputs should follow these convention workspaces:
+- `docs/kord/squads/{squad}/`
+- `docs/{squad}/`
+
+Chiefs should delegate to workers with runtime-prefixed names like `task(subagent_type="squad-{squad}-{key}")`.
+Do not embed team-member lists or delegation target lists directly in prompt files; the factory generates awareness, delegation syntax, and coordination protocol automatically.
 
 ### What to Include in chief.md
 
@@ -244,7 +286,7 @@ Before presenting results:
 - [ ] Ready for user presentation
 ```
 
-**Why this works**: Focuses on domain methodology and quality gates — the factory handles the rest.
+**Why this works**: Focuses on domain methodology and quality gates — factory-generated squad awareness, delegation syntax, and coordination protocol handle orchestration scaffolding automatically.
 </chief_design>
 
 <constraints>

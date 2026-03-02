@@ -2,6 +2,49 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { SquadManifest, SquadAgent, SquadCategory } from "./schema"
 import type { LoadedSquad } from "./loader"
 import { CHIEF_COORDINATION_TEMPLATE } from "./chief-template"
+import { convertAgentFallbackSlots } from "../../shared/agent-fallback"
+import { setSquadAgentFallback } from "../../shared/squad-fallback-store"
+import { setAgentFrontmatterCapabilities } from "../../shared/agent-frontmatter-capabilities-store"
+
+/**
+ * Built-in Kord AIOS agent names that cannot be used as squad names.
+ * This prevents naming collisions that would break agent resolution.
+ */
+const BUILTIN_AGENT_NAMES = new Set([
+  "kord",
+  "dev",
+  "dev-junior",
+  "builder",
+  "planner",
+  "architect",
+  "librarian",
+  "explore",
+  "vision",
+  "analyst",
+  "plan-analyzer",
+  "plan-reviewer",
+  "qa",
+  "sm",
+  "pm",
+  "po",
+  "devops",
+  "data-engineer",
+  "ux-design-expert",
+  "squad-creator",
+])
+
+/**
+ * Error thrown when a squad name collides with a built-in agent name.
+ */
+export class SquadNameCollisionError extends Error {
+  constructor(public readonly squadName: string) {
+    super(
+      `Squad name "${squadName}" collides with built-in Kord AIOS agent name. ` +
+      `Reserved names: ${[...BUILTIN_AGENT_NAMES].sort().join(", ")}`
+    )
+    this.name = "SquadNameCollisionError"
+  }
+}
 
 function getPrefixedSquadAgentName(squadName: string, yamlKey: string): string {
   return `squad-${squadName}-${yamlKey}`
@@ -56,7 +99,7 @@ function appendChiefAwarenessSection(
   }
 
   // Append coordination protocol template
-  parts.push(CHIEF_COORDINATION_TEMPLATE)
+  parts.push(CHIEF_COORDINATION_TEMPLATE.replace(/\{SQUAD_NAME\}/g, manifest.name))
 
   return parts.join("\n\n")
 }
@@ -116,6 +159,15 @@ export function createSquadAgentConfig(
       permission[tool] = enabled ? "allow" : "deny"
     }
     config.permission = permission
+  }
+
+  // Auto-enable task permission for chiefs unless explicitly overridden in SQUAD.yaml
+  // Chiefs need task delegation to coordinate workers
+  if (agentDef.is_chief) {
+    const permission = config.permission as Record<string, "allow" | "deny"> | undefined
+    if (permission?.task === undefined) {
+      config.permission = { ...permission, task: "allow" } as typeof config.permission
+    }
   }
 
   return config
@@ -263,9 +315,17 @@ export function buildSquadPromptSection(squads: LoadedSquad[]): string {
 
 /**
  * Creates all AgentConfigs from loaded squads.
+ * Validates squad names don't collide with built-in agent names.
  */
 export function createAllSquadAgentConfigs(squads: LoadedSquad[]): Map<string, AgentConfig> {
   const configs = new Map<string, AgentConfig>()
+
+  // Validate squad names don't collide with built-in agent names
+  for (const { manifest } of squads) {
+    if (BUILTIN_AGENT_NAMES.has(manifest.name)) {
+      throw new SquadNameCollisionError(manifest.name)
+    }
+  }
 
   for (const { manifest, resolvedPrompts } of squads) {
     const agentEntries = Object.entries(manifest.agents) as [string, SquadAgent][]
@@ -275,6 +335,22 @@ export function createAllSquadAgentConfigs(squads: LoadedSquad[]): Map<string, A
         prefixedName,
         createSquadAgentConfig(prefixedName, agentDef, manifest.name, resolvedPrompts, { yamlKey, manifest }),
       )
+
+      // Populate squad fallback store if agent has fallback defined
+      if (agentDef.fallback && agentDef.fallback.length > 0) {
+        const fallbackEntries = convertAgentFallbackSlots(agentDef.fallback)
+        if (fallbackEntries && fallbackEntries.length > 0) {
+          setSquadAgentFallback(prefixedName, fallbackEntries)
+        }
+      }
+
+      // Populate write paths: convention paths + SQUAD.yaml write_paths
+      const conventionPaths = [
+        `docs/kord/squads/${manifest.name}/**`,
+        `docs/${manifest.name}/**`,
+      ]
+      const mergedPaths = [...conventionPaths, ...(agentDef.write_paths ?? [])]
+      setAgentFrontmatterCapabilities(prefixedName, { write_paths: mergedPaths })
     }
   }
 

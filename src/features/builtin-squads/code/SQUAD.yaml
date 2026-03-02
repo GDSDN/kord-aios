@@ -1,9 +1,9 @@
-name: dev
+name: code
 description: Software development team — the default squad for code-related work
 version: 1.0.0
 
 agents:
-  dev-junior:
+  developer:
     description: "Implementation specialist — writes code, tests, and fixes bugs"
     mode: subagent
     skills:
@@ -20,14 +20,14 @@ categories:
   artistry:
     description: "Creative coding, animations, data visualization"
 
-default_executor: dev-junior
+default_executor: developer
 contract_type: story
 
 plan_template: |
   # Plan: {title}
-  Squad: dev
+  Squad: code
   Contract Type: story
 
   ## Tasks
 
-  - [ ] **Task 1** (executor: @dev-junior, verify: tests)
+  - [ ] **Task 1** (executor: @developer, verify: tests)

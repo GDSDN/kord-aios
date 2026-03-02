@@ -330,16 +330,16 @@ describe("loadSquadsFromDir", () => {
 })
 
 describe("loadAllSquads", () => {
-  test("loads built-in dev squad", () => {
+  test("loads built-in code squad", () => {
     //#when
     const result = loadAllSquads()
 
     //#then
     expect(result.squads.length).toBeGreaterThanOrEqual(1)
-    const devSquad = result.squads.find(s => s.manifest.name === "dev")
-    expect(devSquad).toBeDefined()
-    expect(devSquad!.source).toBe("builtin")
-    expect(devSquad!.manifest.default_executor).toBe("dev-junior")
+    const codeSquad = result.squads.find(s => s.manifest.name === "code")
+    expect(codeSquad).toBeDefined()
+    expect(codeSquad!.source).toBe("builtin")
+    expect(codeSquad!.manifest.default_executor).toBe("developer")
   })
 
   test("searches .kord/squads/ path", () => {
@@ -655,9 +655,9 @@ describe("getSquadAgents", () => {
 
     //#then
     expect(agents.length).toBeGreaterThan(0)
-    const devJunior = agents.find(a => a.name === "squad-dev-dev-junior")
+    const devJunior = agents.find(a => a.name === "squad-code-developer")
     expect(devJunior).toBeDefined()
-    expect(devJunior!.squadName).toBe("dev")
+    expect(devJunior!.squadName).toBe("code")
   })
 })
 
@@ -671,9 +671,9 @@ describe("getSquadCategories", () => {
 
     //#then
     expect(categories.length).toBeGreaterThan(0)
-    const quickCat = categories.find(c => c.name === "dev:quick")
+    const quickCat = categories.find(c => c.name === "code:quick")
     expect(quickCat).toBeDefined()
-    expect(quickCat!.squadName).toBe("dev")
+    expect(quickCat!.squadName).toBe("code")
   })
 })
 
@@ -691,8 +691,8 @@ describe("buildSquadPromptSection", () => {
 
     //#then
     expect(section).toContain("### Available Squads")
-    expect(section).toContain("| dev |")
-    expect(section).toContain("@squad-dev-dev-junior")
+    expect(section).toContain("| code |")
+    expect(section).toContain("@squad-code-developer")
     expect(section).toContain("### How to Delegate to Squad Agents")
   })
 
@@ -704,7 +704,7 @@ describe("buildSquadPromptSection", () => {
     const section = buildSquadPromptSection(result.squads)
 
     //#then
-    expect(section).toContain('task(subagent_type="squad-dev-dev-junior")')
+    expect(section).toContain('task(subagent_type="squad-code-developer")')
     expect(section).toContain("Use `task(subagent_type=...)` to invoke a specific squad agent:")
   })
 
@@ -715,9 +715,9 @@ describe("buildSquadPromptSection", () => {
     //#when
     const section = buildSquadPromptSection(result.squads)
 
-    //#then — dev squad has categories (quick, visual, ultrabrain, artistry)
+    //#then — code squad has categories (quick, visual, ultrabrain, artistry)
     expect(section).toContain("### Squad Categories")
-    expect(section).toContain('task(category="dev:quick")')
+    expect(section).toContain('task(category="code:quick")')
     expect(section).toContain("Use `task(category=...)` for domain-specific routing:")
   })
 
@@ -728,9 +728,9 @@ describe("buildSquadPromptSection", () => {
     //#when
     const section = buildSquadPromptSection(result.squads)
 
-    //#then — dev squad agents have skills
+    //#then — code squad agents have skills
     expect(section).toContain("### Squad Skills")
-    expect(section).toContain("**dev**:")
+    expect(section).toContain("**code**:")
   })
 
   test("omits categories section when no squads have categories", () => {
@@ -804,9 +804,9 @@ describe("createAllSquadAgentConfigs", () => {
 
     //#then
     expect(configs.size).toBeGreaterThan(0)
-    expect(configs.has("squad-dev-dev-junior")).toBe(true)
-    const devJuniorConfig = configs.get("squad-dev-dev-junior")!
-    expect(devJuniorConfig.prompt).toContain("squad-dev-dev-junior")
+    expect(configs.has("squad-code-developer")).toBe(true)
+    const devJuniorConfig = configs.get("squad-code-developer")!
+    expect(devJuniorConfig.prompt).toContain("squad-code-developer")
   })
 
   test("prevents yaml key collisions across squads via auto-prefixed names", () => {

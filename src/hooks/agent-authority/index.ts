@@ -13,6 +13,34 @@ import type { AgentAuthorityConfig } from "./types"
 const WRITE_TOOLS = new Set(["write", "edit", "write_file", "edit_file"])
 const BASH_TOOLS = new Set(["bash", "interactive_bash"])
 
+/**
+ * Regex pattern for valid kebab-case squad names.
+ * Must match: /^[a-z0-9]+(-[a-z0-9]+)*$/
+ */
+const KEBAB_CASE_REGEX = /^[a-z0-9]+(-[a-z0-9]+)*$/
+
+/**
+ * Path explicitly denied for all squad agents.
+ * This prevents squads from mutating the main orchestration state.
+ */
+const SQUAD_DENIED_PATHS = ["docs/kord/boulder.json"]
+
+/**
+ * Extracts squad name from agent name format: squad-{squadName}-{agentKey}
+ * Returns null if agent name doesn't match squad naming convention.
+ */
+function extractSquadName(agentName: string): string | null {
+  // Match: squad-{squadName}-{anything}
+  const match = agentName.match(/^squad-(.+?)-.+$/)
+  if (!match) return null
+
+  const squadName = match[1]
+  // Validate squad name is kebab-case
+  if (!KEBAB_CASE_REGEX.test(squadName)) return null
+
+  return squadName
+}
+
 function normalizePath(filePath: string): string {
   return filePath.replace(/\\/g, "/")
 }
@@ -247,6 +275,41 @@ export function createAgentAuthorityHook(ctx: PluginInput, config?: AgentAuthori
             })
             break
           }
+        }
+      }
+
+      // Apply squad convention paths for squad agents (agentName starts with "squad-")
+      // This provides safe default workspace for squads to write coordination artifacts
+      // and final deliverables without needing explicit frontmatter or config.
+      const squadName = extractSquadName(agentName)
+      if (squadName) {
+        const squadConventionPaths = [
+          `docs/kord/squads/${squadName}/**`,
+          `docs/${squadName}/**`,
+        ]
+        // Add convention paths to allowlist
+        for (const path of squadConventionPaths) {
+          if (!allowlist.includes(path)) {
+            allowlist.push(path)
+          }
+        }
+        log(`[${HOOK_NAME}] Added squad convention paths for ${agentName}`, {
+          sessionID: input.sessionID,
+          squadName,
+          conventionPaths: squadConventionPaths,
+        })
+
+        // Check explicit deny for boulder.json - squad agents cannot mutate orchestration state
+        if (isAllowedPath(relativePath, SQUAD_DENIED_PATHS)) {
+          log(`[${HOOK_NAME}] Blocked squad agent from writing to protected path`, {
+            sessionID: input.sessionID,
+            agent: agentName,
+            filePath: relativePath,
+          })
+          throw new Error(
+            `Agent ${getAgentDisplayName(agentName)} (squad agent) is explicitly denied from writing to ${relativePath}. ` +
+            `This path is reserved for Kord orchestration state.`
+          )
         }
       }
 

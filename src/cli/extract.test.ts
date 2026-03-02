@@ -39,7 +39,7 @@ describe("extract", () => {
     expect(exitCode).toBe(0)
     expect(existsSync(join(projectDir, ".opencode", "agents", "pm.md"))).toBe(true)
     expect(existsSync(join(projectDir, ".opencode", "skills", "advanced-elicitation", "SKILL.md"))).toBe(true)
-    expect(existsSync(join(projectDir, ".opencode", "squads", "dev", "SQUAD.yaml"))).toBe(true)
+    expect(existsSync(join(projectDir, ".opencode", "squads", "code", "SQUAD.yaml"))).toBe(true)
     expect(existsSync(join(projectDir, ".opencode", "commands", "status.ts"))).toBe(true)
   })
 
@@ -56,7 +56,7 @@ describe("extract", () => {
     expect(existsSync(join(projectDir, ".opencode", "skills", "advanced-elicitation", "SKILL.md"))).toBe(true)
     expect(existsSync(join(projectDir, ".opencode", "commands", "status.ts"))).toBe(true)
     expect(existsSync(join(projectDir, ".opencode", "agents", "pm.md"))).toBe(false)
-    expect(existsSync(join(projectDir, ".opencode", "squads", "dev", "SQUAD.yaml"))).toBe(false)
+    expect(existsSync(join(projectDir, ".opencode", "squads", "code", "SQUAD.yaml"))).toBe(false)
   })
 
   test("skips existing files unless --force is set", async () => {
