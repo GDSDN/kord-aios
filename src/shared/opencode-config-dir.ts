@@ -55,27 +55,32 @@ function getCliConfigDir(checkExisting: boolean): string {
   if (process.platform === "win32") {
     // OpenCode uses XDG-style resolution via xdg-basedir.
     // On Windows, that maps config to %APPDATA% by default.
-    // We still support the historical ~/.config/opencode location if it already exists.
+    // PRIORITY: Check ~/.config/opencode FIRST (cross-platform path that OpenCode uses)
+    // then fall back to %APPDATA%/opencode for historical compatibility.
+
+    const crossPlatformDir = join(homedir(), ".config", "opencode")
+    const crossPlatformConfig = join(crossPlatformDir, "opencode.json")
+    const crossPlatformConfigC = join(crossPlatformDir, "opencode.jsonc")
 
     const appData = process.env.APPDATA || join(homedir(), "AppData", "Roaming")
     const appdataDir = join(appData, "opencode")
     const appdataConfig = join(appdataDir, "opencode.json")
     const appdataConfigC = join(appdataDir, "opencode.jsonc")
 
-    const crossPlatformDir = join(homedir(), ".config", "opencode")
-    const crossPlatformConfig = join(crossPlatformDir, "opencode.json")
-    const crossPlatformConfigC = join(crossPlatformDir, "opencode.jsonc")
-
     if (checkExisting) {
-      if (existsSync(appdataConfig) || existsSync(appdataConfigC)) {
-        return appdataDir
-      }
-
+      // First check cross-platform path (~/.config/opencode) - this is where
+      // OpenCode stores config on all platforms including Windows
       if (existsSync(crossPlatformConfig) || existsSync(crossPlatformConfigC)) {
         return crossPlatformDir
       }
+
+      // Then check appdata path (%APPDATA%/opencode) - historical location
+      if (existsSync(appdataConfig) || existsSync(appdataConfigC)) {
+        return appdataDir
+      }
     }
 
+    // Default to appdata path if neither exists
     return appdataDir
   }
 
