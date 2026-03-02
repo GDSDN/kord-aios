@@ -9,10 +9,13 @@ Squads are portable, reusable agent team configurations. A squad brings domain-s
 squad/
 ├── schema.ts          # Zod schemas for SQUAD.yaml v2 (109 lines)
 ├── loader.ts          # Squad discovery + loading from all paths (166 lines)
-├── factory.ts         # SquadAgent → AgentConfig, prompt section builder (194 lines)
-├── squad.test.ts      # Schema, loader, factory tests
+├── factory.ts         # SquadAgent → AgentConfig, prompt section builder (282 lines)
+├── chief-template.ts  # CHIEF_COORDINATION_TEMPLATE constant (93 lines)
+├── squad.test.ts      # Schema, loader, factory tests (886 lines)
+├── l2-squad-integration.test.ts  # L2-Squad integration tests (11 tests)
 ├── index.ts           # Barrel exports
-└── __test_squads__/   # Test fixtures (project-docs/docs/kord/squads/research/)
+├── __test_squads__/   # Test fixtures
+└── __l2_test_squads__/ # Integration test fixtures
 ```
 
 ## SQUAD.YAML v2 SCHEMA
@@ -70,13 +73,95 @@ kord:
 | `tools` | Record<string, boolean> | — | Tool enable/disable overrides |
 | `temperature` | number | — | 0-1 |
 | `is_chief` | boolean | false | Can delegate via task() |
+| `fallback` | { model, variant? }[] | — | Per-agent fallback chain (max 4 slots) |
+| `write_paths` | string[] | — | Extra write authority paths (validated) |
+
+`write_paths` validation rules (schema-level):
+- must be relative (cannot start with `/`)
+- must not contain `..`
+- must not contain root wildcard `**`
+- must not start with `docs/kord/`
+- must not contain empty strings
 
 ### Prompt Resolution Priority
 ```
-1. resolvedPrompts[agentName] (loaded from prompt_file on disk)
+1. resolvedPrompts[yamlAgentKey] (loaded from prompt_file on disk)
 2. agentDef.prompt (inline YAML)
 3. buildDefaultSquadAgentPrompt() (auto-generated from name + description)
 ```
+
+## AGENT RUNTIME NAMESPACING + CHIEF BEHAVIOR
+
+- Runtime agent registration name is always prefixed: `squad-{manifest.name}-{yamlKey}`
+- Prefixing prevents collisions when multiple squads define the same YAML key (for example, `worker`)
+- Squad manifest names are also collision-guarded against reserved built-in agent names (throws `SquadNameCollisionError`)
+- `prompt_file` resolution still keys by original YAML key, not the prefixed runtime name
+- `is_chief: true` forces runtime `mode: "all"` (primary + subagent)
+- Chiefs auto-enable `permission.task = "allow"` unless explicitly overridden in `tools` (for example, `tools: { task: false }`)
+- Non-chief agents default to runtime `mode: "subagent"`
+- Chief prompts include an auto-generated **Squad Awareness** section:
+  - prefixed member names (`@squad-...`)
+  - member descriptions
+  - skills per member
+  - tool permission summary (`default` when no explicit `tools` map)
+  - delegation syntax lines using prefixed names
+- Chief coordination template placeholders (`{SQUAD_NAME}`) are substituted in the factory before prompt injection
+
+## L2-SQUAD ARCHITECTURE
+
+The L2-Squad system provides a hierarchical agent structure with chief (L2) and worker (L1) agents.
+
+### Layer Model
+
+| Layer | Agent Type | Mode | Capabilities |
+|-------|-----------|------|-------------|
+| L2 | Chief | `all` | Awareness + Coordination + Domain |
+| L1 | Worker | `subagent` | Domain only |
+
+### Chief Prompt Assembly
+
+Chief agent prompts are assembled in four layers:
+
+```
+1. Identity Header (buildDefaultSquadAgentPrompt)
+   ↓
+2. Squad Awareness Section (auto-generated from SQUAD.yaml)
+   ↓
+3. Custom Domain Content (prompt_file or inline prompt)
+   ↓
+4. Coordination Protocol Template (CHIEF_COORDINATION_TEMPLATE)
+```
+
+The factory function `createSquadAgentConfig()` performs this assembly:
+- For chiefs: `appendChiefAwarenessSection(identityHeader, manifest, customDomainContent)`
+- For workers: `customDomainContent ?? identityHeader`
+
+### Naming Convention
+
+| Field | Example | Purpose |
+|-------|---------|---------|
+| Squad name | `marketing` | kebab-case identifier |
+| YAML key | `copywriter` | Original agent key in SQUAD.yaml |
+| Runtime name | `squad-marketing-copywriter` | Full delegation target |
+| Category | `marketing:creative` | Namespaced routing |
+
+### Chief vs Worker Behavior
+
+| Behavior | Chief | Worker |
+|----------|-------|--------|
+| Runtime mode | `all` (forced) | `subagent` (default) or `all` |
+| Squad Awareness | Yes (auto-generated) | No |
+| Coordination Template | Yes (CHIEF_COORDINATION_TEMPLATE) | No |
+| Custom domain content | Appended after awareness | Full prompt (if provided) |
+| Can delegate via `task()` | Yes | No |
+
+### Integration Tests
+
+See `l2-squad-integration.test.ts` for end-to-end verification:
+- Chief prompt contains awareness + domain methodology + coordination template
+- Prefixed naming prevents collisions across squads
+- Chief mode is "all"; workers mode is "subagent"
+- Workers do not contain coordination template
 
 ## LOADER PIPELINE (`loader.ts`)
 
@@ -130,8 +215,8 @@ interface LoadedSquad {
 
 ### Prompt Section Output
 `buildSquadPromptSection()` generates:
-1. **Available Squads** table (squad name, domain, agents, chief)
-2. **How to Delegate** — `task(subagent_type="...")` syntax per agent
+1. **Available Squads** table (squad name, domain, prefixed agents, prefixed chief)
+2. **How to Delegate** — `task(subagent_type="squad-{squad}-{agent}")` syntax per agent
 3. **Squad Categories** — `task(category="squad:category")` routing
 4. **Squad Skills** — skills per squad
 
@@ -168,4 +253,6 @@ Invoked via `squad_validate` tool or automatically by `/squad-create` command.
 - **v1 fields**: NEVER reference `config.yaml`, `pack_name`, `SQS` — these are deprecated legacy formats
 - **Agents as record array**: Agents are a `Record<string, SquadAgent>` (keyed by name), NOT an array
 - **Missing prompt resolution**: Always pass `resolvedPrompts` to `createSquadAgentConfig()` — the prompt_file content won't appear otherwise
+- **Wrong prompt key**: `resolvedPrompts` must use original YAML key, not prefixed runtime agent name
 - **Category naming**: Categories are namespaced as `{squad}:{category}` — never use bare category names for squad categories
+- **Bare delegation names**: Never delegate with unprefixed `task(subagent_type="agent")` for squad agents

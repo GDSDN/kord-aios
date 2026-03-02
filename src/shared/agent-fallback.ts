@@ -1,6 +1,7 @@
 import type { AgentFallbackSlot, AgentOverrides, AgentOverrideConfig } from "../config/schema"
 import { AGENT_MODEL_REQUIREMENTS, type FallbackEntry } from "./model-requirements"
 import { log } from "./logger"
+import { getSquadAgentFallback } from "./squad-fallback-store"
 
 const AGENT_ALIASES: Record<string, string> = {
   plan: "planner",
@@ -74,6 +75,19 @@ export function resolveAgentFallbackChain(
       overrideAgentName: override?.name,
     })
     return overrideFallback
+  }
+
+  // Check squad fallback store for squad-* agents (after user config, before hardcoded)
+  if (agentName.startsWith("squad-")) {
+    const squadFallback = getSquadAgentFallback(agentName)
+    if (squadFallback && squadFallback.length > 0) {
+      log("[model-fallback] resolveAgentFallbackChain", {
+        agentName,
+        source: "squad-manifest",
+        chainLength: squadFallback.length,
+      })
+      return squadFallback
+    }
   }
 
   const normalized = normalizeAgentName(agentName)

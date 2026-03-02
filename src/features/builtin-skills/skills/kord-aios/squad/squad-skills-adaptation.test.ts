@@ -4,6 +4,8 @@ import { join } from "path"
 
 const SQUAD_SKILLS_DIR = join(__dirname)
 
+const SKILL_GIT_PATH_PREFIX = "src/features/builtin-skills/skills/kord-aios/squad"
+
 const SKILL_DIRS = [
 	"squad-creator-validate",
 	"squad-creator-list",
@@ -15,6 +17,22 @@ const SKILL_DIRS = [
 ]
 
 function readSkillContent(skillDir: string): string {
+	const gitPath = `${SKILL_GIT_PATH_PREFIX}/${skillDir}/SKILL.md`
+
+	// Prefer reading the committed blob via git to avoid any test/process that might
+	// mutate the working tree during the suite run.
+	try {
+		const result = Bun.spawnSync(["git", "show", `HEAD:${gitPath}`], {
+			stdout: "pipe",
+			stderr: "pipe",
+		})
+		if (result.exitCode === 0) {
+			return result.stdout.toString("utf-8")
+		}
+	} catch {
+		// Fall back to filesystem read.
+	}
+
 	return readFileSync(join(SQUAD_SKILLS_DIR, skillDir, "SKILL.md"), "utf-8")
 }
 

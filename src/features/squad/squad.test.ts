@@ -330,16 +330,16 @@ describe("loadSquadsFromDir", () => {
 })
 
 describe("loadAllSquads", () => {
-  test("loads built-in dev squad", () => {
+  test("loads built-in code squad", () => {
     //#when
     const result = loadAllSquads()
 
     //#then
     expect(result.squads.length).toBeGreaterThanOrEqual(1)
-    const devSquad = result.squads.find(s => s.manifest.name === "dev")
-    expect(devSquad).toBeDefined()
-    expect(devSquad!.source).toBe("builtin")
-    expect(devSquad!.manifest.default_executor).toBe("dev-junior")
+    const codeSquad = result.squads.find(s => s.manifest.name === "code")
+    expect(codeSquad).toBeDefined()
+    expect(codeSquad!.source).toBe("builtin")
+    expect(codeSquad!.manifest.default_executor).toBe("developer")
   })
 
   test("searches .kord/squads/ path", () => {
@@ -410,8 +410,8 @@ describe("createSquadAgentConfig", () => {
     const config = createSquadAgentConfig("test-agent", agentDef, "test-squad")
 
     //#then
-    expect(config.name).toBe("test-agent")
-    expect(config.system).toBe("You are a test agent.")
+    expect(config.description).toBe("(test-squad squad) Test agent")
+    expect(config.prompt).toBe("You are a test agent.")
     expect(config.model).toBe("anthropic/claude-sonnet-4-5")
   })
 
@@ -428,10 +428,12 @@ describe("createSquadAgentConfig", () => {
     const resolvedPrompts = { "test-agent": "Resolved from .md file" }
 
     //#when
-    const config = createSquadAgentConfig("test-agent", agentDef, "test-squad", resolvedPrompts)
+    const config = createSquadAgentConfig("squad-test-squad-test-agent", agentDef, "test-squad", resolvedPrompts, {
+      yamlKey: "test-agent",
+    })
 
     //#then
-    expect(config.system).toBe("Resolved from .md file")
+    expect(config.prompt).toBe("Resolved from .md file")
   })
 
   test("falls back to inline prompt when prompt_file not resolved", () => {
@@ -450,7 +452,7 @@ describe("createSquadAgentConfig", () => {
     const config = createSquadAgentConfig("test-agent", agentDef, "test-squad", resolvedPrompts)
 
     //#then
-    expect(config.system).toBe("Inline prompt")
+    expect(config.prompt).toBe("Inline prompt")
   })
 
   test("creates config with default prompt when none provided", () => {
@@ -466,9 +468,9 @@ describe("createSquadAgentConfig", () => {
     const config = createSquadAgentConfig("copywriter", agentDef, "marketing")
 
     //#then
-    expect(config.system).toContain("copywriter")
-    expect(config.system).toContain("marketing")
-    expect(config.system).toContain("Kord AIOS")
+    expect(config.prompt).toContain("copywriter")
+    expect(config.prompt).toContain("marketing")
+    expect(config.prompt).toContain("Kord AIOS")
   })
 
   test("chief agent prompt mentions delegation capability", () => {
@@ -481,11 +483,165 @@ describe("createSquadAgentConfig", () => {
     }
 
     //#when
-    const config = createSquadAgentConfig("chief", agentDef, "test")
+    const manifest = squadSchema.parse(require("js-yaml").load(MINIMAL_SQUAD_YAML.replace("worker", "chief")))
+    const config = createSquadAgentConfig("squad-test-chief", agentDef, "test", undefined, {
+      yamlKey: "chief",
+      manifest,
+    })
 
     //#then
-    expect(config.system).toContain("squad chief")
-    expect(config.system).toContain("delegate")
+    expect(config.prompt).toContain("Squad chief")
+    expect(config.prompt).toContain("delegate")
+    expect(config.prompt).toContain("## Squad Awareness")
+    expect(config.prompt).toContain("task(subagent_type=\"squad-minimal-chief\")")
+  })
+
+  test("chief mode is forced to all", () => {
+    //#given
+    const agentDef: SquadAgent = {
+      description: "Chief with subagent mode in yaml",
+      mode: "subagent",
+      skills: [],
+      is_chief: true,
+    }
+
+    //#when
+    const config = createSquadAgentConfig("squad-test-chief", agentDef, "test")
+
+    //#then
+    expect(config.mode).toBe("all")
+  })
+
+  test("worker mode defaults to subagent", () => {
+    //#given
+    const agentDef: SquadAgent = {
+      description: "Worker",
+      skills: [],
+      is_chief: false,
+    }
+
+    //#when
+    const config = createSquadAgentConfig("squad-test-worker", agentDef, "test")
+
+    //#then
+    expect(config.mode).toBe("subagent")
+  })
+
+  test("worker prompt does not include chief awareness section", () => {
+    //#given
+    const agentDef: SquadAgent = {
+      description: "Worker",
+      mode: "subagent",
+      skills: [],
+      is_chief: false,
+    }
+
+    //#when
+    const config = createSquadAgentConfig("squad-test-worker", agentDef, "test")
+
+    //#then
+    expect(config.prompt).not.toContain("## Squad Awareness")
+  })
+
+  test("chief prompt includes coordination protocol template", () => {
+    //#given
+    const agentDef: SquadAgent = {
+      description: "Squad chief",
+      mode: "subagent",
+      skills: [],
+      is_chief: true,
+    }
+
+    //#when
+    const manifest = squadSchema.parse(require("js-yaml").load(MINIMAL_SQUAD_YAML.replace("worker", "chief")))
+    const config = createSquadAgentConfig("squad-test-chief", agentDef, "test", {}, {
+      yamlKey: "chief",
+      manifest,
+    })
+
+    //#then
+    expect(config.prompt).toContain("## Coordination Protocol")
+    expect(config.prompt).toContain("Delegation Guidelines")
+    expect(config.prompt).toContain("Quality Gates")
+  })
+
+  test("worker prompt does not include coordination protocol template", () => {
+    //#given
+    const agentDef: SquadAgent = {
+      description: "Worker",
+      mode: "subagent",
+      skills: [],
+      is_chief: false,
+    }
+
+    //#when
+    const manifest = squadSchema.parse(require("js-yaml").load(MINIMAL_SQUAD_YAML))
+    const config = createSquadAgentConfig("squad-test-worker", agentDef, "test", {}, {
+      yamlKey: "worker",
+      manifest,
+    })
+
+    //#then
+    expect(config.prompt).not.toContain("## Coordination Protocol")
+  })
+
+  test("chief prompt includes custom domain content between awareness and coordination", () => {
+    //#given
+    const customDomainContent = "Custom domain methodology: Always prioritize data-driven decisions."
+    const agentDef: SquadAgent = {
+      description: "Squad chief",
+      mode: "subagent",
+      prompt: customDomainContent,
+      skills: [],
+      is_chief: true,
+    }
+
+    //#when
+    const manifest = squadSchema.parse(require("js-yaml").load(MINIMAL_SQUAD_YAML.replace("worker", "chief")))
+    const config = createSquadAgentConfig("squad-test-chief", agentDef, "test", {}, {
+      yamlKey: "chief",
+      manifest,
+    })
+
+    //#then
+    // Identity header comes first (default prompt starts with "You are squad-test-chief")
+    expect(config.prompt).toContain("You are squad-test-chief")
+    // Awareness comes after identity
+    expect(config.prompt.indexOf("## Squad Awareness")).toBeGreaterThan(0)
+    // Custom content comes after awareness
+    const awarenessIdx = config.prompt.indexOf("## Squad Awareness")
+    const customIdx = config.prompt.indexOf("Custom domain methodology")
+    expect(customIdx).toBeGreaterThan(awarenessIdx)
+    // Coordination protocol comes after custom content
+    const coordinationIdx = config.prompt.indexOf("## Coordination Protocol")
+    expect(coordinationIdx).toBeGreaterThan(customIdx)
+  })
+
+  test("chief prompt with prompt_file includes resolved content between awareness and coordination", () => {
+    //#given
+    const agentDef: SquadAgent = {
+      description: "Squad chief",
+      mode: "subagent",
+      prompt_file: "agents/chief.md",
+      skills: [],
+      is_chief: true,
+    }
+    const resolvedPrompts = { "chief": "Custom methodology from prompt_file." }
+
+    //#when
+    const manifest = squadSchema.parse(require("js-yaml").load(MINIMAL_SQUAD_YAML.replace("worker", "chief")))
+    const config = createSquadAgentConfig("squad-test-chief", agentDef, "test", resolvedPrompts, {
+      yamlKey: "chief",
+      manifest,
+    })
+
+    //#then
+    // Custom content from prompt_file should be in the prompt
+    expect(config.prompt).toContain("Custom methodology from prompt_file.")
+    // Awareness should come before the custom content
+    expect(config.prompt.indexOf("## Squad Awareness")).toBeLessThan(config.prompt.indexOf("Custom methodology from prompt_file."))
+    // Coordination should come after custom content
+    expect(config.prompt.indexOf("## Coordination Protocol")).toBeGreaterThan(config.prompt.indexOf("Custom methodology from prompt_file."))
   })
 })
 
@@ -499,9 +655,9 @@ describe("getSquadAgents", () => {
 
     //#then
     expect(agents.length).toBeGreaterThan(0)
-    const devJunior = agents.find(a => a.name === "dev-junior")
+    const devJunior = agents.find(a => a.name === "squad-code-developer")
     expect(devJunior).toBeDefined()
-    expect(devJunior!.squadName).toBe("dev")
+    expect(devJunior!.squadName).toBe("code")
   })
 })
 
@@ -515,9 +671,9 @@ describe("getSquadCategories", () => {
 
     //#then
     expect(categories.length).toBeGreaterThan(0)
-    const quickCat = categories.find(c => c.name === "dev:quick")
+    const quickCat = categories.find(c => c.name === "code:quick")
     expect(quickCat).toBeDefined()
-    expect(quickCat!.squadName).toBe("dev")
+    expect(quickCat!.squadName).toBe("code")
   })
 })
 
@@ -535,8 +691,8 @@ describe("buildSquadPromptSection", () => {
 
     //#then
     expect(section).toContain("### Available Squads")
-    expect(section).toContain("| dev |")
-    expect(section).toContain("@dev-junior")
+    expect(section).toContain("| code |")
+    expect(section).toContain("@squad-code-developer")
     expect(section).toContain("### How to Delegate to Squad Agents")
   })
 
@@ -548,7 +704,7 @@ describe("buildSquadPromptSection", () => {
     const section = buildSquadPromptSection(result.squads)
 
     //#then
-    expect(section).toContain('task(subagent_type="dev-junior")')
+    expect(section).toContain('task(subagent_type="squad-code-developer")')
     expect(section).toContain("Use `task(subagent_type=...)` to invoke a specific squad agent:")
   })
 
@@ -559,9 +715,9 @@ describe("buildSquadPromptSection", () => {
     //#when
     const section = buildSquadPromptSection(result.squads)
 
-    //#then — dev squad has categories (quick, visual, ultrabrain, artistry)
+    //#then — code squad has categories (quick, visual, ultrabrain, artistry)
     expect(section).toContain("### Squad Categories")
-    expect(section).toContain('task(category="dev:quick")')
+    expect(section).toContain('task(category="code:quick")')
     expect(section).toContain("Use `task(category=...)` for domain-specific routing:")
   })
 
@@ -572,9 +728,9 @@ describe("buildSquadPromptSection", () => {
     //#when
     const section = buildSquadPromptSection(result.squads)
 
-    //#then — dev squad agents have skills
+    //#then — code squad agents have skills
     expect(section).toContain("### Squad Skills")
-    expect(section).toContain("**dev**:")
+    expect(section).toContain("**code**:")
   })
 
   test("omits categories section when no squads have categories", () => {
@@ -628,10 +784,10 @@ describe("buildSquadPromptSection", () => {
     const section = buildSquadPromptSection(squads)
 
     //#then
-    expect(section).toContain('task(subagent_type="copywriter")')
-    expect(section).toContain('task(subagent_type="designer")')
-    expect(section).toContain('task(subagent_type="brand-chief")')
-    expect(section).toContain('task(subagent_type="worker")')
+    expect(section).toContain('task(subagent_type="squad-marketing-copywriter")')
+    expect(section).toContain('task(subagent_type="squad-marketing-designer")')
+    expect(section).toContain('task(subagent_type="squad-marketing-brand-chief")')
+    expect(section).toContain('task(subagent_type="squad-minimal-worker")')
     expect(section).toContain('task(category="marketing:creative")')
     expect(section).toContain('task(category="marketing:visual")')
     expect(section).toContain("**marketing**: brand-voice")
@@ -648,8 +804,83 @@ describe("createAllSquadAgentConfigs", () => {
 
     //#then
     expect(configs.size).toBeGreaterThan(0)
-    expect(configs.has("dev-junior")).toBe(true)
-    const devJuniorConfig = configs.get("dev-junior")!
-    expect(devJuniorConfig.system).toContain("dev-junior")
+    expect(configs.has("squad-code-developer")).toBe(true)
+    const devJuniorConfig = configs.get("squad-code-developer")!
+    expect(devJuniorConfig.prompt).toContain("squad-code-developer")
+  })
+
+  test("prevents yaml key collisions across squads via auto-prefixed names", () => {
+    //#given
+    const jsYaml = require("js-yaml")
+    const squadOne = squadSchema.parse(jsYaml.load(`
+name: alpha
+description: Alpha squad
+agents:
+  worker:
+    description: "Alpha worker"
+`))
+    const squadTwo = squadSchema.parse(jsYaml.load(`
+name: beta
+description: Beta squad
+agents:
+  worker:
+    description: "Beta worker"
+`))
+    const squads: LoadedSquad[] = [
+      { manifest: squadOne, source: "user", basePath: "/tmp/alpha", resolvedPrompts: {} },
+      { manifest: squadTwo, source: "user", basePath: "/tmp/beta", resolvedPrompts: {} },
+    ]
+
+    //#when
+    const configs = createAllSquadAgentConfigs(squads)
+
+    //#then
+    expect(configs.size).toBe(2)
+    expect(configs.has("squad-alpha-worker")).toBe(true)
+    expect(configs.has("squad-beta-worker")).toBe(true)
+    expect(configs.get("squad-alpha-worker")?.description).toContain("Alpha worker")
+    expect(configs.get("squad-beta-worker")?.description).toContain("Beta worker")
+  })
+
+  test("chief prompt includes L2 awareness details while worker prompt does not", () => {
+    //#given
+    const jsYaml = require("js-yaml")
+    const manifest = squadSchema.parse(jsYaml.load(`
+name: ops
+description: Operations squad
+agents:
+  chief:
+    description: "Operations chief"
+    is_chief: true
+    skills: [coordination]
+    tools: { task: true }
+  worker:
+    description: "Operations worker"
+    skills: [execution]
+`))
+    const squads: LoadedSquad[] = [{
+      manifest,
+      source: "user",
+      basePath: "/tmp/ops",
+      resolvedPrompts: {},
+    }]
+
+    //#when
+    const configs = createAllSquadAgentConfigs(squads)
+    const chiefPrompt = configs.get("squad-ops-chief")?.prompt
+    const workerPrompt = configs.get("squad-ops-worker")?.prompt
+
+    //#then
+    expect(chiefPrompt).toBeDefined()
+    expect(workerPrompt).toBeDefined()
+    expect(chiefPrompt).toContain("## Squad Awareness")
+    expect(chiefPrompt).toContain("@squad-ops-chief")
+    expect(chiefPrompt).toContain("@squad-ops-worker")
+    expect(chiefPrompt).toContain("skills: coordination")
+    expect(chiefPrompt).toContain("skills: execution")
+    expect(chiefPrompt).toContain("tools: task:allow")
+    expect(chiefPrompt).toContain("tools: default")
+    expect(chiefPrompt).toContain('task(subagent_type="squad-ops-worker")')
+    expect(workerPrompt).not.toContain("## Squad Awareness")
   })
 })

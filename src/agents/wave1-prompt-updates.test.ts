@@ -6,7 +6,7 @@ import { createArchitectAgent, ARCHITECT_PROMPT_METADATA } from "./architect"
 import { createAnalystAgent, analystPromptMetadata } from "./analyst"
 import { createVisionAgent, VISION_PROMPT_METADATA } from "./vision"
 import { builderPromptMetadata } from "./builder"
-import { PLAN_SYSTEM_PROMPT } from "./plan"
+import { PLAN_SYSTEM_PROMPT } from "./planner"
 
 const TEST_MODEL = "anthropic/claude-sonnet-4-5"
 

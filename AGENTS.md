@@ -118,7 +118,17 @@ This is an **international open-source project**. To ensure accessibility and ma
 
 ## OVERVIEW
 
-Kord AIOS is an OpenCode plugin that combines multi-model agent orchestration with story-driven development methodology. 20+ specialized agents (full dev team: orchestrators, developers, architect, PM, PO, QA, scrum master, DevOps, data engineer, UX), 40+ lifecycle hooks, 25+ tools (LSP, AST-Grep, delegation), squad system (SQUAD.yaml v2), 149 skills (144 methodology + 5 hardcoded), background agents with concurrency, and full Claude Code compatibility.
+Kord AIOS is an OpenCode plugin that combines multi-model agent orchestration with story-driven development methodology. 20+ specialized agents (full dev team: orchestrators, developers, architect, PM, PO, QA, scrum master, DevOps, data engineer, UX), 40+ lifecycle hooks, 25+ tools (LSP, AST-Grep, delegation), squad system (SQUAD.yaml v2, L2-Squad chief/worker hierarchy), 149 skills (144 methodology + 5 hardcoded), background agents with concurrency, and full Claude Code compatibility.
+
+## AGENT LAYERS
+
+| Layer | Type | Description |
+|-------|------|-------------|
+| T0 | Orchestrator | Kord, Dev, Builder, Planner - core orchestration |
+| T1 | Specialist | Architect, Librarian, Explore, UX - domain experts |
+| T2 | Methodology | PM, PO, QA, SM, Analyst - process agents |
+| L2-Squad | Chief | Squad chief with awareness + coordination (from SQUAD.yaml) |
+| L1-Squad | Worker | Squad specialist with domain prompt only |
 
 ## STRUCTURE
 
@@ -152,12 +162,85 @@ kord-aios/
 | Add MCP | `src/mcp/` | Create config, add to `createBuiltinMcps()` |
 | Add skill | `src/features/builtin-skills/` | Create dir with SKILL.md |
 | Add squad | `src/features/builtin-squads/` | Create dir with SQUAD.yaml |
+| Built-in default squad | `src/features/builtin-squads/code/SQUAD.yaml` | Default shipped squad is `code` |
+
+## CUSTOM AGENT LOADING
+
+Kord AIOS supports loading custom agents from `.opencode/agents/*.md` files. This enables methodology content (T2 agents) to be overridden from disk while keeping the execution engine compiled.
+
+### Agent File Format
+
+Agents are defined as Markdown files with YAML frontmatter:
+
+```markdown
+---
+name: Course Creator
+description: Creates educational content
+model: openai/gpt-5.2
+temperature: 0.3
+tools: Read,Write,Glob
+write_paths:
+  - docs/courses/**
+  - docs/curriculum/**
+tool_allowlist:
+  - Read
+  - Write
+engine_min_version: 1.0.0
+---
+
+You are a course creator agent that designs educational content.
+```
+
+### Frontmatter Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Agent display name |
+| `description` | string | Agent description |
+| `model` | string | Model to use (e.g., `openai/gpt-5.2`) |
+| `temperature` | number | Temperature (0-1) |
+| `tools` | string | Comma-separated tool names to enable |
+| `write_paths` | string[] | Paths agent can write to (for agent-authority) |
+| `tool_allowlist` | string[] | Specific tools allowed |
+| `engine_min_version` | string | Minimum plugin version required (semver) |
+
+### Loader Paths
+
+| Priority | Location | Description |
+|----------|----------|-------------|
+| 1 (lowest) | Builtin | Compiled T2 agent prompts from `src/features/builtin-agents/` |
+| 2 | `~/.config/opencode/agents/*.md` | User-global custom agents |
+| 3 | `.opencode/agents/*.md` | Project-specific custom agents |
+| 4 (highest) | `kord-aios.json` | Explicit agent configuration in config file |
+
+### Key Behaviors
+
+- **Filename as key**: Agents are keyed by filename (e.g., `course-creator.md` → `course-creator`)
+- **T0 Protection**: kord, dev, builder, planner cannot be overridden via `.opencode/agents/`
+- **Authority wiring**: `write_paths` frontmatter is loaded into in-memory capabilities and enforced by `src/hooks/agent-authority/index.ts`
+- **Extraction**: Use `bunx kord-aios extract` to export builtin agents/skills for customization
 | Add command | `src/features/builtin-commands/` | Add template + register in commands.ts |
 | Config schema | `src/config/schema.ts` | Zod schema, run `bun run build:schema` |
 | Plugin config | `src/plugin-handlers/config-handler.ts` | JSONC loading, merging, migration |
 | Background agents | `src/features/background-agent/` | manager.ts (1556 lines) |
 | Orchestrator | `src/hooks/build/` | Main orchestration hook (build/index.ts, 913 lines) |
 | Delegation | `src/tools/delegate-task/` | Category routing (executor.ts 983 lines) |
+
+## SQUAD EXECUTION NOTES
+
+- Built-in squad name is `code` (not `dev`).
+- `SQUAD.yaml` agent fields include `fallback` and `write_paths` (validated: relative only, no `..`, no root `**`, no `docs/kord/` prefix).
+- Chief agents auto-enable `permission.task = "allow"` unless overridden in the `tools` map.
+- Chief coordination template placeholders (`{SQUAD_NAME}`) are substituted in squad factory assembly.
+- Squad agents receive convention write paths (`docs/kord/squads/{squad}/**`, `docs/{squad}/**`) and are explicitly denied from `docs/kord/boulder.json`.
+- Fallback resolution for `squad-*` agents checks squad manifest fallback store before hardcoded requirements.
+- Squad names are collision-guarded against reserved built-in agent names.
+
+## Installation (End Users)
+
+- Install/update: `bunx kord-aios@latest install`
+- Initialize a project: `bunx kord-aios@latest init`
+- Verify npm version: `npm view kord-aios version`
 
 ## TDD (Test-Driven Development)
 

@@ -2,20 +2,20 @@
 
 ## OVERVIEW
 
-Pre-packaged squad definitions shipped with the plugin. These provide default agent teams that users get out-of-the-box. Currently contains the `dev` squad for development workflows. Users can override any built-in squad by creating one with the same name in their project.
+Pre-packaged squad definitions shipped with the plugin. These provide default agent teams that users get out-of-the-box. Currently contains the `code` squad for development workflows.
 
 ## STRUCTURE
 ```
 builtin-squads/
-└── dev/
+└── code/
     └── SQUAD.yaml    # Default development squad
 ```
 
-## THE DEV SQUAD
+## THE CODE SQUAD
 
-The `dev` squad is the default development team. It provides:
-- **dev-junior** agent — category-spawned executor for atomic tasks
-- Development categories for task routing (visual-engineering, ultrabrain, etc.)
+The `code` squad is the built-in development team (`src/features/builtin-squads/code/SQUAD.yaml`). It provides:
+- **developer** agent — implementation specialist for code, tests, and bug fixes
+- Development categories for task routing (`quick`, `visual`, `ultrabrain`, `artistry`)
 
 This squad is loaded automatically by `src/features/squad/loader.ts` on every startup.
 
@@ -28,7 +28,7 @@ This squad is loaded automatically by `src/features/squad/loader.ts` on every st
 4. docs/kord/squads/ — user overrides
 ```
 
-**Dedup rule**: First-seen name wins. Since built-in loads first, a user squad with the same name (e.g., `dev`) will NOT override the built-in. To override, users should use `squad.default_squad` config or create a differently-named squad.
+**Dedup rule**: First-seen name wins. Since built-in loads first, a user squad with the same name (e.g., `code`) will NOT override the built-in. To switch behavior, use `squad.default_squad` config or a differently-named squad.
 
 ## HOW TO ADD A NEW BUILT-IN SQUAD
 

@@ -37,12 +37,14 @@ plugin-handlers/
    → Resolves models via fallback chains
    → Injects discovered skills into agent prompts
    ↓
-6. Load external agents:
-   → Claude Code user agents (~/.claude/agents/)
-   → Claude Code project agents (.claude/agents/)
-   → Plugin agents (from step 2, with permission migration)
-   ↓
-7. Configure Kord agent behavior:
+ 6. Load external agents:
+    → Claude Code user agents (~/.claude/agents/*.md)
+    → Claude Code project agents (.claude/agents/*.md)
+    → Plugin agents (from step 2, with permission migration)
+    → OpenCode user agents (~/.config/opencode/agents/*.md)
+    → OpenCode project agents (.opencode/agents/*.md)
+    ↓
+ 7. Configure Kord agent behavior:
    → Set as default_agent if enabled
    → Create dev-junior with overrides
    → Optionally expose OpenCode-Builder (if default_builder_enabled)
@@ -77,7 +79,17 @@ plugin-handlers/
     → Apply disabled_mcps filter
     ↓
 13. Merge agent configs:
-    → Priority: builtin < plugin < user < project < OpenCode config
+    → Priority (later overrides earlier):
+      1. squadAgentConfigs (from SQUAD.yaml)
+      2. agentConfig (kord, dev-junior, builder, planner)
+      3. builtinAgents (other built-in agents)
+      4. openCodeUserAgents (~/.config/opencode/agents/*.md)
+      5. userAgents (Claude Code: ~/.claude/agents/*.md)
+      6. openCodeProjectAgents (.opencode/agents/*.md)
+      7. projectAgents (Claude Code: .claude/agents/*.md)
+      8. pluginAgents (from plugins)
+      9. filteredConfigAgents (highest - from kord-aios.json)
+    → T0 agents (kord, dev, builder, planner) are NOT overridable via .opencode/agents/
     → Apply AgentOverrideConfig per agent
     → reorderAgentsByPriority(): kord → dev → plan → build first
     ↓
@@ -113,10 +125,22 @@ Components are loaded from multiple sources and merged. Later sources override e
 | Source | Agents | Commands | Skills | MCPs |
 |--------|--------|----------|--------|------|
 | **Builtin** (plugin code) | ✓ | ✓ | ✓ | ✓ |
-| **Claude Code plugins** (.mcp.json) | ✓ | ✓ | ✓ | ✓ |
-| **User global** (~/.claude/, ~/.config/opencode/) | ✓ | ✓ | ✓ | — |
-| **Project** (.claude/, .opencode/) | ✓ | ✓ | ✓ | — |
+| **Squads** (SQUAD.yaml) | ✓ | — | — | — |
+| **OpenCode user** (~/.config/opencode/) | ✓ | ✓ | ✓ | — |
+| **Claude Code user** (~/.claude/) | ✓ | ✓ | ✓ | — |
+| **OpenCode project** (.opencode/) | ✓ | ✓ | ✓ | — |
+| **Claude Code project** (.claude/) | ✓ | ✓ | ✓ | — |
+| **Plugins** | ✓ | ✓ | ✓ | ✓ |
 | **kord-aios.json overrides** | ✓ (agents section) | — | ✓ (skills section) | — |
+
+**Note**: T0 agents (kord, dev, builder, planner) cannot be overridden via `.opencode/agents/*.md` — they are managed by Kord AIOS core.
+
+## OPENCODE AGENT LOADING + PRECEDENCE
+
+- OpenCode agents are loaded from both `~/.config/opencode/agents/` and `.opencode/agents/` using `loadOpenCodeAgents()`.
+- Project loading path is `loadOpenCodeProjectAgents(ctx.directory)`; this is the source used for per-repo overrides.
+- Merge order keeps OpenCode project agents above builtin/user sources but below explicit runtime config (`config.agent`).
+- T0 filtering is applied before merge, so `kord`, `dev`, `builder`, and `planner` from OpenCode files are always dropped.
 
 ## AGENT NAME MIGRATION
 

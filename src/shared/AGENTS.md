@@ -18,7 +18,8 @@ shared/
 ├── model-sanitizer.ts     # Model name sanitization
 ├── model-suggestion-retry.ts # Model suggestion on failure
 ├── model-resolution-pipeline.ts # Dynamic routing + fallback resolution
-├── agent-fallback.ts      # Resolves agent fallback from kord-aios.json (105 lines)
+├── agent-fallback.ts      # Resolves fallback from user config, squad manifests, hardcoded chains
+├── squad-fallback-store.ts # In-memory fallback store for squad-* agents
 ├── fallback-candidates.ts  # Builds filtered fallback candidates (131 lines)
 ├── provider-health.ts     # Provider health tracking with TTL bans
 ├── prompt-retry.ts       # Prompt retry with deferred error detection
@@ -108,6 +109,8 @@ const chain = resolveAgentFallbackChain("data-engineer", {
 })
 // Returns user config if present, otherwise falls back to hardcoded chain
 ```
+
+For `squad-*` agents, `resolveAgentFallbackChain()` also checks `squad-fallback-store.ts` (populated from `SQUAD.yaml` agent `fallback` entries in `createAllSquadAgentConfigs()`) before falling back to `AGENT_MODEL_REQUIREMENTS`.
 
 ### Fallback Candidate Filtering
 ```typescript

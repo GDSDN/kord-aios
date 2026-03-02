@@ -7,6 +7,10 @@
 >
 > ✅ Official repository: https://github.com/GDSDN/kord-aios
 
+> [!NOTE]
+>
+> **Versioning**: Kord AIOS may reset public semver to `1.x` even if earlier npm versions exist from upstream history. Always install via the npm `latest` tag unless you intentionally pin an older version.
+
 ## Contents
 
 - [What is Kord AIOS?](#what-is-kord-aios)
@@ -100,17 +104,31 @@ Kord AIOS ships a full development team. All agents are customizable — overrid
 
 ### Squads
 
-Define domain-specific agent teams via `SQUAD.yaml` manifests. Each squad declares its agents, categories for task routing, and skill dependencies. The built-in `dev` squad provides the default development team.
+Define domain-specific agent teams via `SQUAD.yaml` manifests. Each squad declares its agents, categories for task routing, and skill dependencies. The built-in default is `code` (`src/features/builtin-squads/code/SQUAD.yaml`).
+
+**Chief + Worker Model:** Squads support L2 (chief) and L1 (worker) agent hierarchy. Chiefs have `is_chief: true` with auto-generated Squad Awareness and coordination protocol. Workers are standard subagents.
+
+**Naming Convention:** Squad agents are registered with prefixed names (`squad-{squadName}-{yamlKey}`) to prevent collisions across squads.
+
+**Agent Fields:** `fallback` (per-agent fallback chain) and `write_paths` (extra write authority paths) are supported in `SQUAD.yaml`. `write_paths` is validated (relative only, no `..`, no root `**`, no `docs/kord/` prefix).
+
+**Chief Permissions:** Chiefs auto-enable `permission.task = "allow"` unless `tools` explicitly overrides `task`.
 
 ```yaml
 # .opencode/squads/my-squad/SQUAD.yaml
 name: my-squad
 description: My custom agent team
+
 agents:
+  chief:
+    description: "Squad leader"
+    is_chief: true
+    mode: all
   specialist:
     description: "Domain expert"
     model: anthropic/claude-sonnet-4-5
     prompt: "You are a domain specialist..."
+
 categories:
   my-domain:
     description: "Domain-specific tasks"
@@ -258,6 +276,14 @@ JSONC supported — comments and trailing commas work.
 - Category-based task delegation routing
 - Built-in MCPs (websearch, context7, grep_app)
 - LSP and experimental features
+
+### OpenCode Agent Overrides
+
+You can override methodology agents from disk with `.opencode/agents/*.md` and `~/.config/opencode/agents/*.md`.
+
+- Agent keys are derived from filename (`course-creator.md` -> `course-creator`).
+- Frontmatter `write_paths` is enforced by `agent-authority` to gate file writes.
+- T0 agents (`kord`, `dev`, `builder`, `planner`) are protected and cannot be overridden from OpenCode agent files.
 
 See the full [Configuration Documentation](docs/configurations.md) for details.
 

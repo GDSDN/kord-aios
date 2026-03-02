@@ -17,6 +17,8 @@ import { buildCategorySkillsDelegationGuide } from "../dynamic-agent-prompt-buil
 import type { CategoryConfig } from "../../config/schema"
 import { DEFAULT_CATEGORIES } from "../../tools/delegate-task/constants"
 import { createAgentToolRestrictions } from "../../shared/permission-compat"
+import { buildSquadPromptSection } from "../../features/squad/factory"
+import type { LoadedSquad } from "../../features/squad/loader"
 
 import { BUILD_SYSTEM_PROMPT, getDefaultBuildPrompt } from "./default"
 import { BUILD_GPT_SYSTEM_PROMPT, getGptBuildPrompt } from "./gpt"
@@ -58,6 +60,7 @@ export interface OrchestratorContext {
   availableAgents?: AvailableAgent[]
   availableSkills?: AvailableSkill[]
   userCategories?: Record<string, CategoryConfig>
+  squads?: LoadedSquad[]
 }
 
 /**
@@ -109,13 +112,21 @@ export function createBuilderAgent(ctx: OrchestratorContext): AgentConfig {
     "call_kord_agent",
   ])
 
+  const basePrompt = buildDynamicOrchestratorPrompt(ctx)
+
+  // Inject squad awareness if squads are present
+  const squadSection = buildSquadPromptSection(ctx.squads ?? [])
+  const promptWithSquads = squadSection
+    ? basePrompt + `\n\n<Squad_Awareness>\n${squadSection}\n</Squad_Awareness>`
+    : basePrompt
+
   const baseConfig = {
     description:
       "Orchestrates work via task() to complete ALL tasks in a plan until fully done. Delegates to specialized agents, verifies results. (Builder - Kord AIOS)",
     mode: MODE,
     ...(ctx.model ? { model: ctx.model } : {}),
     temperature: 0.1,
-    prompt: buildDynamicOrchestratorPrompt(ctx),
+    prompt: promptWithSquads,
     color: "#10B981",
     ...restrictions,
   }

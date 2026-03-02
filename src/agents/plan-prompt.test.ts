@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test"
-import { PLAN_SYSTEM_PROMPT } from "./plan"
+import { PLAN_SYSTEM_PROMPT } from "./planner"
 
 describe("PLAN_SYSTEM_PROMPT Plan Reviewer invocation policy", () => {
   test("should direct providing ONLY the file path string when invoking Plan Reviewer", () => {

@@ -4,6 +4,7 @@ import { isAbsolute, join, relative, resolve } from "node:path"
 import { readBoulderState } from "../../features/boulder-state"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { findFirstMessageWithAgent, findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
+import { getAgentCapabilities } from "../../shared/agent-capabilities"
 import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
 import { BLOCKED_GIT_COMMANDS, DEFAULT_AGENT_ALLOWLIST, HOOK_NAME } from "./constants"
@@ -11,6 +12,34 @@ import type { AgentAuthorityConfig } from "./types"
 
 const WRITE_TOOLS = new Set(["write", "edit", "write_file", "edit_file"])
 const BASH_TOOLS = new Set(["bash", "interactive_bash"])
+
+/**
+ * Regex pattern for valid kebab-case squad names.
+ * Must match: /^[a-z0-9]+(-[a-z0-9]+)*$/
+ */
+const KEBAB_CASE_REGEX = /^[a-z0-9]+(-[a-z0-9]+)*$/
+
+/**
+ * Path explicitly denied for all squad agents.
+ * This prevents squads from mutating the main orchestration state.
+ */
+const SQUAD_DENIED_PATHS = ["docs/kord/boulder.json"]
+
+/**
+ * Extracts squad name from agent name format: squad-{squadName}-{agentKey}
+ * Returns null if agent name doesn't match squad naming convention.
+ */
+function extractSquadName(agentName: string): string | null {
+  // Match: squad-{squadName}-{anything}
+  const match = agentName.match(/^squad-(.+?)-.+$/)
+  if (!match) return null
+
+  const squadName = match[1]
+  // Validate squad name is kebab-case
+  if (!KEBAB_CASE_REGEX.test(squadName)) return null
+
+  return squadName
+}
 
 function normalizePath(filePath: string): string {
   return filePath.replace(/\\/g, "/")
@@ -149,7 +178,8 @@ function isBlockedGitCommand(command: string): boolean {
 }
 
 export function createAgentAuthorityHook(ctx: PluginInput, config?: AgentAuthorityConfig) {
-  const allowlistByAgent = resolveAllowlist(config)
+  // Config allowlist is preserved for backward compatibility but handled via getAgentCapabilities
+  // The config parameter is kept for potential future use (e.g., passing to getAgentCapabilities sources)
 
   return {
     "tool.execute.before": async (
@@ -194,7 +224,95 @@ export function createAgentAuthorityHook(ctx: PluginInput, config?: AgentAuthori
         throw new Error(`Agent ${getAgentDisplayName(agentName)} does not have write permission for path ${filePath}.`)
       }
 
-      const allowlist = allowlistByAgent[agentName] ?? []
+      // Use getAgentCapabilities to resolve write_paths with proper precedence:
+      // 1. Agent frontmatter/squad/config (if provided)
+      // 2. DEFAULT_AGENT_ALLOWLIST fallback for legacy agents
+      // 3. Empty (deny all) for unknown agents
+      const capabilities = getAgentCapabilities(agentName)
+      let allowlist: string[]
+
+      if (capabilities.write_paths && capabilities.write_paths.length > 0) {
+        allowlist = [...capabilities.write_paths]
+        log(`[${HOOK_NAME}] Using capabilities write_paths`, {
+          sessionID: input.sessionID,
+          agent: agentName,
+          source: "capabilities",
+          paths: allowlist,
+        })
+      } else if (agentName in DEFAULT_AGENT_ALLOWLIST) {
+        // Fallback to hardcoded allowlist for legacy agents without capabilities
+        allowlist = [...DEFAULT_AGENT_ALLOWLIST[agentName]]
+        log(`[${HOOK_NAME}] Using DEFAULT_AGENT_ALLOWLIST fallback`, {
+          sessionID: input.sessionID,
+          agent: agentName,
+          source: "hardcoded",
+          paths: allowlist,
+        })
+      } else {
+        // Unknown agent with no capabilities + no allowlist entry = deny all
+        allowlist = []
+        log(`[${HOOK_NAME}] No write_paths or allowlist - blocking`, {
+          sessionID: input.sessionID,
+          agent: agentName,
+          source: "none",
+        })
+      }
+
+      // Merge config.allowlist additions (additive - extends, doesn't replace)
+      if (config?.allowlist) {
+        for (const [configAgent, configPaths] of Object.entries(config.allowlist)) {
+          if (normalizeAgentKey(configAgent) === agentName) {
+            const normalizedPaths = configPaths.map((p) => normalizePath(p))
+            const existingSet = new Set(allowlist.map((p) => normalizePath(p)))
+            for (const path of normalizedPaths) {
+              if (!existingSet.has(path)) {
+                allowlist.push(path)
+              }
+            }
+            log(`[${HOOK_NAME}] Merged config allowlist for ${agentName}`, {
+              sessionID: input.sessionID,
+              addedPaths: normalizedPaths,
+            })
+            break
+          }
+        }
+      }
+
+      // Apply squad convention paths for squad agents (agentName starts with "squad-")
+      // This provides safe default workspace for squads to write coordination artifacts
+      // and final deliverables without needing explicit frontmatter or config.
+      const squadName = extractSquadName(agentName)
+      if (squadName) {
+        const squadConventionPaths = [
+          `docs/kord/squads/${squadName}/**`,
+          `docs/${squadName}/**`,
+        ]
+        // Add convention paths to allowlist
+        for (const path of squadConventionPaths) {
+          if (!allowlist.includes(path)) {
+            allowlist.push(path)
+          }
+        }
+        log(`[${HOOK_NAME}] Added squad convention paths for ${agentName}`, {
+          sessionID: input.sessionID,
+          squadName,
+          conventionPaths: squadConventionPaths,
+        })
+
+        // Check explicit deny for boulder.json - squad agents cannot mutate orchestration state
+        if (isAllowedPath(relativePath, SQUAD_DENIED_PATHS)) {
+          log(`[${HOOK_NAME}] Blocked squad agent from writing to protected path`, {
+            sessionID: input.sessionID,
+            agent: agentName,
+            filePath: relativePath,
+          })
+          throw new Error(
+            `Agent ${getAgentDisplayName(agentName)} (squad agent) is explicitly denied from writing to ${relativePath}. ` +
+            `This path is reserved for Kord orchestration state.`
+          )
+        }
+      }
+
       if (!isAllowedPath(relativePath, allowlist)) {
         log(`[${HOOK_NAME}] Blocked write`, {
           sessionID: input.sessionID,

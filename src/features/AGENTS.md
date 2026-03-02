@@ -22,6 +22,7 @@ features/
 ├── claude-code-plugin-loader/  # installed_plugins.json (486 lines)
 ├── claude-code-session-state/  # Session persistence
 ├── opencode-skill-loader/      # Skills from 6 directories (loader.ts 311 lines)
+├── opencode-agent-loader/      # .opencode/agents/*.md and ~/.config/opencode/agents/*.md loader
 ├── context-injector/           # AGENTS.md/README.md injection
 ├── boulder-state/              # Todo state persistence
 ├── hook-message-injector/      # Message injection
@@ -53,6 +54,12 @@ features/
 - **Lazy**: Clients created on first call
 - **Transports**: stdio, http (SSE/Streamable)
 - **Lifecycle**: 5m idle cleanup
+
+## TASK 10 NOTES: OPENCODE AGENT CAPABILITIES
+
+- OpenCode agent loader keys custom agents by filename (`my-agent.md` -> `my-agent`).
+- Loader validates frontmatter and stores capability fields (`write_paths`, tool allow/deny, delegation flag) in an in-memory map.
+- This capability map is consumed later by `getAgentCapabilities()` when direct frontmatter sources are not passed.
 
 ## ANTI-PATTERNS
 

@@ -1,7 +1,11 @@
-import { createBuiltinAgents } from "../agents";
+import {
+  createBuiltinAgents,
+  createPlanAnalyzerAgent,
+  createPlanReviewerAgent,
+} from "../agents";
 import { createDevJuniorAgentWithOverrides } from "../agents/dev-junior";
 import { loadAllSquads } from "../features/squad/loader";
-import { createAllSquadAgentConfigs } from "../features/squad/factory";
+import { createAllSquadAgentConfigs, buildSquadPromptSection } from "../features/squad/factory";
 import {
   loadUserCommands,
   loadProjectCommands,
@@ -23,19 +27,29 @@ import {
   loadUserAgents,
   loadProjectAgents,
 } from "../features/claude-code-agent-loader";
+import { loadOpenCodeAgents } from "../features/opencode-agent-loader/loader";
 import { loadMcpConfigs } from "../features/claude-code-mcp-loader";
 import { loadAllPluginComponents } from "../features/claude-code-plugin-loader";
 import { createBuiltinMcps } from "../mcp";
 import type { OhMyOpenCodeConfig } from "../config";
 import { log, fetchAvailableModels, readConnectedProvidersCache, resolveModelPipeline } from "../shared";
-import { getOpenCodeConfigPaths } from "../shared/opencode-config-dir";
+import { join } from "node:path";
+import { getOpenCodeConfigPaths, getOpenCodeConfigDir } from "../shared/opencode-config-dir";
 import { migrateAgentConfig } from "../shared/permission-compat";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
-import { PLAN_SYSTEM_PROMPT, PLAN_PERMISSION } from "../agents/plan";
+import { PLAN_SYSTEM_PROMPT, PLAN_PERMISSION } from "../agents/planner";
 import { DEFAULT_CATEGORIES } from "../tools/delegate-task/constants";
 import type { ModelCacheState } from "../plugin-state";
 import type { CategoryConfig } from "../config/schema";
+
+function pickFirstFallbackModel(requirement: { fallbackChain: { providers: string[]; model: string }[] } | undefined): string | undefined {
+  const first = requirement?.fallbackChain?.[0]
+  const provider = first?.providers?.[0]
+  const model = first?.model
+  if (!provider || !model) return undefined
+  return `${provider}/${model}`
+}
 
 export interface ConfigHandlerDeps {
   ctx: { directory: string; client?: any };
@@ -51,6 +65,47 @@ export function resolveCategoryConfig(
 }
 
 const CORE_AGENT_ORDER = ["kord", "dev", "planner", "builder"] as const;
+
+/**
+ * T0 agents that cannot be overridden by OpenCode agent files.
+ * These are core orchestration agents managed by Kord AIOS.
+ */
+const T0_AGENTS = new Set(["kord", "dev", "builder", "planner"]);
+
+/**
+ * Filter out T0 agents from OpenCode agent configs.
+ * T0 agents (kord, dev, builder, planner) are managed by Kord AIOS
+ * and cannot be overridden via .opencode/agents/*.md files.
+ */
+function filterT0Agents(agents: Record<string, unknown>): Record<string, unknown> {
+  const filtered: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(agents)) {
+    if (!T0_AGENTS.has(key)) {
+      filtered[key] = value;
+    }
+  }
+  return filtered;
+}
+
+/**
+ * Load OpenCode agents from user global directory (~/.config/opencode/agents/)
+ * with T0 agents filtered out.
+ */
+function loadOpenCodeUserAgents(): Record<string, unknown> {
+  const userAgentsDir = join(getOpenCodeConfigDir({ binary: "opencode", checkExisting: false }), "agents");
+  const agents = loadOpenCodeAgents(userAgentsDir);
+  return filterT0Agents(agents);
+}
+
+/**
+ * Load OpenCode agents from project directory (.opencode/agents/)
+ * with T0 agents filtered out.
+ */
+function loadOpenCodeProjectAgents(projectDir: string): Record<string, unknown> {
+  const projectAgentsDir = join(projectDir, ".opencode", "agents");
+  const agents = loadOpenCodeAgents(projectAgentsDir);
+  return filterT0Agents(agents);
+}
 
 function reorderAgentsByPriority(agents: Record<string, unknown>): Record<string, unknown> {
   const ordered: Record<string, unknown> = {};
@@ -131,9 +186,9 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     }
 
     // Migrate disabled_agents from old names to new names
-    const migratedDisabledAgents = (pluginConfig.disabled_agents ?? []).map(agent => {
+    const migratedDisabledAgents: string[] = (pluginConfig.disabled_agents ?? []).map(agent => {
       return AGENT_NAME_MAP[agent.toLowerCase()] ?? AGENT_NAME_MAP[agent] ?? agent
-    }) as typeof pluginConfig.disabled_agents
+    })
 
     const includeClaudeSkillsForAwareness = pluginConfig.claude_code?.skills ?? true;
     const [
@@ -160,6 +215,10 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     // Pass it as uiSelectedModel so it takes highest priority in model resolution
     const currentModel = config.model as string | undefined;
     const disabledSkills = new Set<string>(pluginConfig.disabled_skills ?? []);
+
+    // Load squads early so they can be passed to createBuiltinAgents
+    const squadLoadResult = loadAllSquads(ctx.directory);
+
     const builtinAgents = await createBuiltinAgents(
       migratedDisabledAgents,
       pluginConfig.agents,
@@ -171,7 +230,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       ctx.client,
       browserProvider,
       currentModel, // uiSelectedModel - takes highest priority
-      disabledSkills
+      disabledSkills,
+      squadLoadResult.squads
     );
 
     // Claude Code agents: Do NOT apply permission migration
@@ -192,6 +252,17 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         v ? migrateAgentConfig(v as Record<string, unknown>) : v,
       ])
     );
+
+    // OpenCode agents: Load from user global and project directories
+    // Do NOT apply migrateAgentConfig() - OpenCode agents use their own format
+    // T0 agents (kord, dev, builder, planner) are filtered out in the loader functions
+    const openCodeUserAgents = loadOpenCodeUserAgents();
+    const openCodeProjectAgents = loadOpenCodeProjectAgents(ctx.directory);
+
+    log(`[config-handler] Loaded OpenCode agents: ${Object.keys(openCodeUserAgents).length} user, ${Object.keys(openCodeProjectAgents).length} project`, {
+      userAgents: Object.keys(openCodeUserAgents),
+      projectAgents: Object.keys(openCodeProjectAgents),
+    });
 
     const isKordEnabled = pluginConfig.kord_agent?.disabled !== true;
     const builderEnabled =
@@ -300,12 +371,19 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         const temperatureToUse = planOverride?.temperature ?? categoryConfig?.temperature;
         const topPToUse = planOverride?.top_p ?? categoryConfig?.top_p;
         const maxTokensToUse = planOverride?.maxTokens ?? categoryConfig?.maxTokens;
+
+        // Inject squad awareness into planner prompt
+        const squadSection = buildSquadPromptSection(squadLoadResult.squads)
+        const plannerPrompt = squadSection
+          ? PLAN_SYSTEM_PROMPT + `\n\n<Squad_Awareness>\n${squadSection}\n</Squad_Awareness>`
+          : PLAN_SYSTEM_PROMPT
+
         const planBase = {
           name: "planner",
           ...(resolvedModel ? { model: resolvedModel } : {}),
           ...(variantToUse ? { variant: variantToUse } : {}),
           mode: "all" as const,
-          prompt: PLAN_SYSTEM_PROMPT,
+          prompt: plannerPrompt,
           permission: PLAN_PERMISSION,
           description: `${configAgent?.plan?.description ?? "Planner agent"} (Planner - Kord AIOS)`,
           color: (configAgent?.plan?.color as string) ?? "#FF5722", // Deep Orange - Fire/Flame theme
@@ -335,6 +413,32 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         } else {
           agentConfig["planner"] = planBase;
         }
+
+        // Ensure Plan workflow subagents exist even when model cache is missing.
+        // Without this, Planner cannot delegate to plan-analyzer/plan-reviewer and
+        // task() fails with "Unknown agent".
+        const isDisabled = (name: string) =>
+          migratedDisabledAgents.some((a) => a.toLowerCase() === name.toLowerCase())
+
+        if (!isDisabled("plan-analyzer") && !("plan-analyzer" in agentConfig)) {
+          const planAnalyzerRequirement = AGENT_MODEL_REQUIREMENTS["plan-analyzer"]
+          const fallback = resolvedModel
+            ?? pickFirstFallbackModel(planAnalyzerRequirement)
+            ?? pickFirstFallbackModel(planRequirement)
+          if (fallback) {
+            agentConfig["plan-analyzer"] = createPlanAnalyzerAgent(fallback)
+          }
+        }
+
+        if (!isDisabled("plan-reviewer") && !("plan-reviewer" in agentConfig)) {
+          const planReviewerRequirement = AGENT_MODEL_REQUIREMENTS["plan-reviewer"]
+          const fallback = resolvedModel
+            ?? pickFirstFallbackModel(planReviewerRequirement)
+            ?? pickFirstFallbackModel(planRequirement)
+          if (fallback) {
+            agentConfig["plan-reviewer"] = createPlanReviewerAgent(fallback)
+          }
+        }
       }
 
     const filteredConfigAgents = configAgent
@@ -363,11 +467,10 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
 
       const planDemoteConfig = shouldDemotePlan
            ? { mode: "subagent" as const
-          }
-        : undefined;
+         }
+       : undefined;
 
-      // Load squads and convert to agent configs (always, regardless of plannerEnabled)
-      const squadLoadResult = loadAllSquads(ctx.directory);
+      // Reuse squads loaded earlier, convert to agent configs
       const squadAgentConfigs = createAllSquadAgentConfigs(squadLoadResult.squads);
 
       log(`[config-handler] Loaded ${squadLoadResult.squads.length} squads with ${squadAgentConfigs.size} agents from ${ctx.directory}`, {
@@ -375,13 +478,28 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         agents: [...squadAgentConfigs.keys()],
       });
 
+      // NOTE: Squads can define agent names that overlap with core agents (e.g. dev-junior).
+      // Core/builtin agent configs must win; squads should only contribute additional agents.
+      //
+      // Agent merge order (later sources override earlier):
+      // 1. squadAgentConfigs (lowest - from SQUAD.yaml)
+      // 2. agentConfig (kord, dev-junior, builder, planner)
+      // 3. builtinAgents (other built-in agents)
+      // 4. openCodeUserAgents (~/.config/opencode/agents/*.md)
+      // 5. userAgents (Claude Code: ~/.claude/agents/*.md)
+      // 6. openCodeProjectAgents (.opencode/agents/*.md)
+      // 7. projectAgents (Claude Code: .claude/agents/*.md)
+      // 8. pluginAgents (from plugins)
+      // 9. filteredConfigAgents (highest - from kord-aios.json)
       config.agent = {
+        ...Object.fromEntries(squadAgentConfigs), // Add squad agents (lowest precedence)
         ...agentConfig,
         ...Object.fromEntries(
           Object.entries(builtinAgents).filter(([k]) => k !== "kord")
         ),
-        ...Object.fromEntries(squadAgentConfigs), // Add squad agents
+        ...openCodeUserAgents,
         ...userAgents,
+        ...openCodeProjectAgents,
         ...projectAgents,
         ...pluginAgents,
         ...filteredConfigAgents,
@@ -390,14 +508,25 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
       };
     } else {
-      // Kord disabled - still load squads for non-Kord mode
-      const squadLoadResult = loadAllSquads(ctx.directory);
+      // Kord disabled - reuse squads loaded earlier for non-Kord mode
       const squadAgentConfigs = createAllSquadAgentConfigs(squadLoadResult.squads);
 
+      // Squads should not override builtin/user/project agent configs.
+      // OpenCode agents are included in merge order:
+      // 1. squadAgentConfigs (lowest)
+      // 2. builtinAgents
+      // 3. openCodeUserAgents
+      // 4. userAgents (Claude Code)
+      // 5. openCodeProjectAgents
+      // 6. projectAgents (Claude Code)
+      // 7. pluginAgents
+      // 8. configAgent (highest - from opencode.json)
       config.agent = {
+        ...Object.fromEntries(squadAgentConfigs), // Add squad agents (lowest precedence)
         ...builtinAgents,
-        ...Object.fromEntries(squadAgentConfigs), // Add squad agents
+        ...openCodeUserAgents,
         ...userAgents,
+        ...openCodeProjectAgents,
         ...projectAgents,
         ...pluginAgents,
         ...configAgent,
@@ -461,6 +590,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       webfetch: "allow",
       external_directory: "allow",
       task: "deny",
+      call_kord_agent: "allow",
     };
 
     const mcpResult = (pluginConfig.claude_code?.mcp ?? true)
