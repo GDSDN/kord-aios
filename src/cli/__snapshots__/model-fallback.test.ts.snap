@@ -502,7 +502,8 @@ exports[`generateModelConfig single native provider uses Gemini models when only
       "model": "google/gemini-3-pro",
     },
     "devops": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-flash",
+      "variant": "high",
     },
     "explore": {
       "model": "opencode/gpt-5-nano",
@@ -540,7 +541,7 @@ exports[`generateModelConfig single native provider uses Gemini models when only
       "model": "google/gemini-3-pro",
     },
     "ux-design-expert": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-flash",
       "variant": "high",
     },
     "vision": {
@@ -594,7 +595,8 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
       "model": "google/gemini-3-pro",
     },
     "devops": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-flash",
+      "variant": "high",
     },
     "explore": {
       "model": "opencode/gpt-5-nano",
@@ -632,7 +634,7 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
       "model": "google/gemini-3-pro",
     },
     "ux-design-expert": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3-flash",
       "variant": "high",
     },
     "vision": {
@@ -735,8 +737,8 @@ exports[`generateModelConfig all native providers uses preferred models from fal
       "model": "anthropic/claude-sonnet-4-5",
     },
     "ux-design-expert": {
-      "model": "google/gemini-3-pro",
-      "variant": "high",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "vision": {
       "model": "google/gemini-3-flash",
@@ -842,8 +844,8 @@ exports[`generateModelConfig all native providers uses preferred models with isM
       "model": "anthropic/claude-sonnet-4-5",
     },
     "ux-design-expert": {
-      "model": "google/gemini-3-pro",
-      "variant": "high",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "vision": {
       "model": "google/gemini-3-flash",
@@ -950,8 +952,8 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
       "model": "opencode/claude-sonnet-4-5",
     },
     "ux-design-expert": {
-      "model": "opencode/gemini-3-pro",
-      "variant": "high",
+      "model": "opencode/claude-opus-4-6",
+      "variant": "max",
     },
     "vision": {
       "model": "opencode/gemini-3-flash",
@@ -1057,8 +1059,8 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "model": "opencode/claude-sonnet-4-5",
     },
     "ux-design-expert": {
-      "model": "opencode/gemini-3-pro",
-      "variant": "high",
+      "model": "opencode/claude-opus-4-6",
+      "variant": "max",
     },
     "vision": {
       "model": "opencode/gemini-3-flash",
@@ -1165,8 +1167,8 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
       "model": "github-copilot/claude-sonnet-4.5",
     },
     "ux-design-expert": {
-      "model": "github-copilot/gemini-3-pro-preview",
-      "variant": "high",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
     "vision": {
       "model": "github-copilot/gemini-3-flash-preview",
@@ -1272,8 +1274,8 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "model": "github-copilot/claude-sonnet-4.5",
     },
     "ux-design-expert": {
-      "model": "github-copilot/gemini-3-pro-preview",
-      "variant": "high",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
     "vision": {
       "model": "github-copilot/gemini-3-flash-preview",
@@ -1544,8 +1546,8 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "model": "anthropic/claude-sonnet-4-5",
     },
     "ux-design-expert": {
-      "model": "opencode/gemini-3-pro",
-      "variant": "high",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "vision": {
       "model": "opencode/gemini-3-flash",
@@ -1651,8 +1653,8 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
       "model": "github-copilot/claude-sonnet-4.5",
     },
     "ux-design-expert": {
-      "model": "github-copilot/gemini-3-pro-preview",
-      "variant": "high",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
     "vision": {
       "model": "github-copilot/gemini-3-flash-preview",
@@ -1846,8 +1848,8 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
       "model": "anthropic/claude-sonnet-4-5",
     },
     "ux-design-expert": {
-      "model": "google/gemini-3-pro",
-      "variant": "high",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "vision": {
       "model": "google/gemini-3-flash",
@@ -1949,8 +1951,8 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "model": "github-copilot/claude-sonnet-4.5",
     },
     "ux-design-expert": {
-      "model": "github-copilot/gemini-3-pro-preview",
-      "variant": "high",
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
     "vision": {
       "model": "github-copilot/gemini-3-flash-preview",
@@ -2056,8 +2058,8 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
       "model": "anthropic/claude-sonnet-4-5",
     },
     "ux-design-expert": {
-      "model": "google/gemini-3-pro",
-      "variant": "high",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "vision": {
       "model": "google/gemini-3-flash",
@@ -2163,8 +2165,8 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
       "model": "anthropic/claude-sonnet-4-5",
     },
     "ux-design-expert": {
-      "model": "google/gemini-3-pro",
-      "variant": "high",
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "vision": {
       "model": "google/gemini-3-flash",
