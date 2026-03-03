@@ -35,6 +35,7 @@ export const CHECK_IDS = {
   MCP_OAUTH_TOKENS: "mcp-oauth-tokens",
   VERSION_STATUS: "version-status",
   PROJECT_LAYOUT: "project-layout",
+  PROJECT_STRUCTURE: "project-structure",
 } as const
 
 export const CHECK_NAMES: Record<string, string> = {
@@ -55,6 +56,7 @@ export const CHECK_NAMES: Record<string, string> = {
   [CHECK_IDS.MCP_OAUTH_TOKENS]: "MCP OAuth Tokens",
   [CHECK_IDS.VERSION_STATUS]: "Version Status",
   [CHECK_IDS.PROJECT_LAYOUT]: "Project Layout",
+  [CHECK_IDS.PROJECT_STRUCTURE]: "Project Structure",
 } as const
 
 
