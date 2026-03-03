@@ -3,6 +3,7 @@ name: brownfield-create-epic
 description: "Create Brownfield Epic Task methodology and workflow"
 agent: sm
 subtask: false
+template: epic.md
 ---
 
 # Create Brownfield Epic Task

@@ -3,6 +3,7 @@ name: qa-review-build
 description: "QA Review Build: 10-Phase Quality Assurance Review methodology and workflow"
 agent: qa
 subtask: false
+template: qa-report.md
 ---
 
 # QA Review Build: 10-Phase Quality Assurance Review

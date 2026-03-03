@@ -3,222 +3,138 @@ name: qa-gate
 description: "qa-gate methodology and workflow"
 agent: qa
 subtask: false
+template: qa-gate.md
 ---
 
-# qa-gate
-
-### 1. YOLO Mode - Fast, Autonomous (0-1 prompts)
-
-- Autonomous decision making with logging
-- Minimal user interaction
-- *Best for:** Simple, deterministic tasks
-
-### 2. Interactive Mode - Balanced, Educational (5-10 prompts) **[DEFAULT]**
-
-- Explicit decision checkpoints
-- Educational explanations
-- *Best for:** Learning, complex decisions
-
-### 3. Pre-Flight Planning - Comprehensive Upfront Planning
-
-- Task analysis phase (identify all ambiguities)
-- Zero ambiguity execution
-- *Best for:** Ambiguous requirements, critical work
-
-*Parameter:** `mode` (optional, default: `interactive`)
-
----
-
-## Acceptance Criteria
-
-*Purpose:** Definitive pass/fail criteria for task completion
-
-*Checklist:**
-
-```yaml
-acceptance-criteria:
-  - [ ] Validation rules applied; pass/fail accurate; actionable feedback
-    type: acceptance-criterion
-    blocker: true
-    validation: |
-      Assert validation rules applied; pass/fail accurate; actionable feedback
-    error_message: "Acceptance criterion not met: Validation rules applied; pass/fail accurate; actionable feedback"
-```
-
----
-
-## Error Handling
-
-*Strategy:** abort
-
-*Common Errors:**
-
-1. *Error:** Validation Criteria Missing
-   - *Cause:** Required validation rules not defined
-   - *Resolution:** Ensure validation criteria loaded from config
-   - *Recovery:** Use default validation rules, log warning
-
-2. *Error:** Invalid Schema
-   - *Cause:** Target does not match expected schema
-   - *Resolution:** Update schema or fix target structure
-   - *Recovery:** Detailed validation error report
-
-3. *Error:** Dependency Missing
-   - *Cause:** Required dependency for validation not found
-   - *Resolution:** Install missing dependencies
-   - *Recovery:** Abort with clear dependency list
-
----
+# QA Gate
 
 ## Purpose
+Generate a standalone quality gate file that provides a clear pass/fail decision with actionable feedback. This gate serves as an advisory checkpoint for teams to understand quality status before code is merged or pushed to production environments.
 
-Generate a standalone quality gate file that provides a clear pass/fail decision with actionable feedback. This gate serves as an advisory checkpoint for teams to understand quality status.
+## Execution Modes
+Choose your execution mode:
+- **1. YOLO Mode**: Fast, Autonomous (0-1 prompts). Minimal user interaction.
+- **2. Interactive Mode [DEFAULT]**: Balanced, Educational (5-10 prompts). Explicit decision checkpoints.
+- **3. Pre-Flight Planning**: Comprehensive Upfront Planning. Zero ambiguity execution.
 
 ## Prerequisites
+- The story has been reviewed (manually or via a `review-story` task).
+- Review findings, test results, and compliance checks are available.
+- Full understanding of story requirements and implementation details.
 
-- Story has been reviewed (manually or via review-story task)
-- Review findings are available
-- Understanding of story requirements and implementation
+## Gate Decision Criteria
 
-## Gate File Location
+### PASS
+- All acceptance criteria are met.
+- No high-severity issues identified in the codebase.
+- Test coverage meets project standards.
+- Documentation and guidelines have been adhered to.
+- Action: Update story status from `REVIEW` to `DONE`.
 
-*ALWAYS** check the `kord-aios-core/core-config.yaml` for the `qa.qaLocation/gates`
+### CONDITIONAL
+- Non-blocking issues present (e.g., performance optimizations, minor UX quirks).
+- These issues should be tracked and scheduled for future resolution.
+- The project can proceed with awareness.
+- Action: Update story status from `REVIEW` to `DONE`, but log the conditions.
 
-Slug rules:
+### FAIL
+- Acceptance criteria are NOT met.
+- High-severity issues are present (e.g., security vulnerabilities, broken core functionality).
+- Action: Return story status to `IN_PROGRESS` or keep in `REVIEW` pending immediate fixes.
 
-- Convert to lowercase
-- Replace spaces with hyphens
-- Strip punctuation
-- Example: "User Auth - Login!" becomes "user-auth-login"
+## Story Status Lifecycle
+- `DRAFT` -> `READY` -> `IN_PROGRESS` -> `REVIEW` -> `DONE`
+- QA gate evaluates stories in `REVIEW`.
+- `PASS`/`CONDITIONAL` moves the story to `DONE`.
+- `FAIL` moves the story back to `IN_PROGRESS`.
 
-## Minimal Required Schema
+## Severity Scale
+
+**FIXED VALUES - NO VARIATIONS:**
+- `low`: Minor issues, cosmetic problems, non-functional nits.
+- `medium`: Should fix soon, but not a blocker for release.
+- `high`: Critical issues, must block release immediately.
+
+## Issue ID Prefixes
+When generating issue IDs, use the following standardized prefixes:
+- `SEC-`: Security issues (e.g., lack of rate limiting)
+- `PERF-`: Performance issues (e.g., slow database queries)
+- `REL-`: Reliability issues (e.g., lack of error handling)
+- `TEST-`: Testing gaps (e.g., missing unit tests)
+- `MNT-`: Maintainability concerns (e.g., convoluted logic)
+- `ARCH-`: Architecture issues (e.g., violating established patterns)
+- `DOC-`: Documentation gaps (e.g., missing docstrings)
+- `REQ-`: Requirements issues (e.g., unmet acceptance criteria)
+
+## Output Requirements
+
+### 1. File Location & Naming
+- Create the gate file at: `docs/qa/gates/{epic}.{story}-{slug}.md` using the `.kord/templates/qa-gate.md` template (if available, otherwise fallback to standard YAML schema).
+- Slug rules:
+  - Convert the story title to lowercase.
+  - Replace spaces with hyphens.
+  - Strip all punctuation.
+  - Example: "User Auth - Login!" becomes `user-auth-login`.
+
+### 2. Story Update
+- **ALWAYS** append the QA result to the story's QA Results section.
+- Keep the `status_reason` concise (1-2 sentences maximum).
+- Use severity values exactly: `low`, `medium`, or `high`.
+
+### 3. File Schema Requirements
+The generated QA gate YAML file MUST follow this schema strictly:
 
 ```yaml
 schema: 1
 story: '{epic}.{story}'
-gate: PASS|CONCERNS|FAIL|WAIVED
+gate: PASS|FAIL|CONDITIONAL
 status_reason: '1-2 sentence explanation of gate decision'
-reviewer: 'Quinn'
+reviewer: 'Your Agent Name'
 updated: '{ISO-8601 timestamp}'
-top_issues: [] # Empty array if no issues
-waiver: { active: false } # Only set active: true if WAIVED
+top_issues: [] # Empty array if no issues, or populated with issue objects
+conditions: [] # Only populated if CONDITIONAL
 ```
 
-## Schema with Issues
-
+### 4. Schema with Issues Example
 ```yaml
 schema: 1
 story: '1.3'
-gate: CONCERNS
+gate: CONDITIONAL
 status_reason: 'Missing rate limiting on auth endpoints poses security risk.'
-reviewer: 'Quinn'
+reviewer: 'QA Agent'
 updated: '2025-01-12T10:15:00Z'
 top_issues:
   - id: 'SEC-001'
-    severity: high # ONLY: low|medium|high
+    severity: high
     finding: 'No rate limiting on login endpoint'
     suggested_action: 'Add rate limiting middleware before production'
   - id: 'TEST-001'
     severity: medium
     finding: 'No integration tests for auth flow'
     suggested_action: 'Add integration test coverage'
-waiver: { active: false }
+conditions:
+  - 'Implement rate limiting in subsequent story'
 ```
 
-## Schema when Waived
-
+### 5. Schema when Failed Example
 ```yaml
 schema: 1
 story: '1.3'
-gate: WAIVED
-status_reason: 'Known issues accepted for MVP release.'
-reviewer: 'Quinn'
+gate: FAIL
+status_reason: 'Critical bug prevents login.'
+reviewer: 'QA Agent'
 updated: '2025-01-12T10:15:00Z'
 top_issues:
-  - id: 'PERF-001'
-    severity: low
-    finding: 'Dashboard loads slowly with 1000+ items'
-    suggested_action: 'Implement pagination in next sprint'
-waiver:
-  active: true
-  reason: 'MVP release - performance optimization deferred'
-  approved_by: 'Product Owner'
+  - id: 'SEC-002'
+    severity: high
+    finding: 'Login throws 500 error.'
+    suggested_action: 'Fix server error.'
+conditions: []
 ```
 
-### PASS
-
-- All acceptance criteria met
-- No high-severity issues
-- Test coverage meets project standards
-
-### CONCERNS
-
-- Non-blocking issues present
-- Should be tracked and scheduled
-- Can proceed with awareness
-
-### FAIL
-
-- Acceptance criteria not met
-- High-severity issues present
-- Recommend return to InProgress
-
-### WAIVED
-
-- Issues explicitly accepted
-- Requires approval and reason
-- Proceed despite known issues
-
-## Severity Scale
-
-*FIXED VALUES - NO VARIATIONS:**
-
-- `low`: Minor issues, cosmetic problems
-- `medium`: Should fix soon, not blocking
-- `high`: Critical issues, should block release
-
-## Issue ID Prefixes
-
-- `SEC-`: Security issues
-- `PERF-`: Performance issues
-- `REL-`: Reliability issues
-- `TEST-`: Testing gaps
-- `MNT-`: Maintainability concerns
-- `ARCH-`: Architecture issues
-- `DOC-`: Documentation gaps
-- `REQ-`: Requirements issues
-
-## Output Requirements
-
-1. *ALWAYS** create gate file at: `qa.qaLocation/gates` from `kord-aios-core/core-config.yaml`
-2. *ALWAYS** append this exact format to story's QA Results section:
-
-   ```text
-   Gate: {STATUS} → qa.qaLocation/gates/{epic}.{story}-{slug}.yml
-   ```
-
-3. Keep status_reason to 1-2 sentences maximum
-4. Use severity values exactly: `low`, `medium`, or `high`
-
-## Example Story Update
-
-After creating gate file, append to story's QA Results section:
-
-```markdown
-
-### Reviewed By: Quinn (Test Architect)
-
-[... existing review content ...]
-
-### Gate Status
-
-Gate: CONCERNS → qa.qaLocation/gates/{epic}.{story}-{slug}.yml
-```
-
-## Key Principles
-
-- Keep it minimal and predictable
-- Fixed severity scale (low/medium/high)
-- Always write to standard path
-- Always update story with gate reference
-- Clear, actionable findings
+## Anti-Patterns
+- Skipping the `top_issues` section when `FAIL` or `CONDITIONAL` is selected.
+- Creating custom severity levels (e.g., `critical`, `warning`) instead of `low`, `medium`, `high`.
+- Placing the gate file outside the `docs/qa/gates/` directory.
+- Not updating the original story file with the gate reference.
+- Using a non-English language in the output.

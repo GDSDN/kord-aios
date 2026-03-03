@@ -3,6 +3,7 @@ name: qa-risk-profile
 description: "risk-profile methodology and workflow"
 agent: qa
 subtask: false
+template: qa-report.md
 ---
 
 # risk-profile

@@ -3,6 +3,7 @@ name: create-brownfield-story
 description: "Create Brownfield Story Task methodology and workflow"
 agent: sm
 subtask: false
+template: story.md
 ---
 
 # Create Brownfield Story Task

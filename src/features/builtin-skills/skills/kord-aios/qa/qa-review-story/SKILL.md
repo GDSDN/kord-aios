@@ -3,6 +3,7 @@ name: qa-review-story
 description: "Automated code quality scanning with self-healing before human review"
 agent: qa
 subtask: false
+template: qa-report.md
 ---
 
 # review-story

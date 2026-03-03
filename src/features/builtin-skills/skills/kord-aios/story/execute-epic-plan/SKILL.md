@@ -3,6 +3,7 @@ name: execute-epic-plan
 description: "Execute Epic Plan Task methodology and workflow"
 agent: sm
 subtask: false
+template: epic.md
 ---
 
 # Execute Epic Plan Task

@@ -3,6 +3,7 @@ name: sm-create-next-story
 description: "Create Next Story Task methodology and workflow"
 agent: sm
 subtask: false
+template: story.md
 ---
 
 # Create Next Story Task

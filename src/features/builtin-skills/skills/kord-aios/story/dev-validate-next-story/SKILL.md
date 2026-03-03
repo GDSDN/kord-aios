@@ -3,6 +3,7 @@ name: dev-validate-next-story
 description: "Validate Next Story Task methodology and workflow"
 agent: dev
 subtask: false
+template: checklist-story-dod.md
 ---
 
 # Validate Next Story Task

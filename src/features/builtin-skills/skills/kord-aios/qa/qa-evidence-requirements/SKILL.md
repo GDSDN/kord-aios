@@ -3,6 +3,7 @@ name: qa-evidence-requirements
 description: "Evidence Requirements Task methodology and workflow"
 agent: qa
 subtask: false
+template: qa-report.md
 ---
 
 # Evidence Requirements Task

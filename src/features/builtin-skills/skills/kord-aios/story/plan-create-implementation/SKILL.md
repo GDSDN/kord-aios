@@ -3,6 +3,7 @@ name: plan-create-implementation
 description: "Execution Pipeline: Create Implementation Plan methodology and workflow"
 agent: sm
 subtask: false
+template: task.md
 ---
 
 # Execution Pipeline: Create Implementation Plan

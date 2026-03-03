@@ -89,6 +89,7 @@ import {
   createPlanReadTool,
   createSquadLoadTool,
   createDecisionLogTool,
+  createChecklistRunnerTool,
   interactive_bash,
   startTmuxCheck,
   lspManager,
@@ -547,6 +548,7 @@ const KordAIOSPlugin: Plugin = async (ctx) => {
   const planReadTool = createPlanReadTool(ctx);
   const squadLoadTool = createSquadLoadTool(ctx);
   const decisionLogTool = createDecisionLogTool(ctx);
+  const checklistRunnerTool = createChecklistRunnerTool(ctx);
 
   const autoSlashCommand = isHookEnabled("auto-slash-command")
     ? createAutoSlashCommandHook({ skills: mergedSkills })
@@ -578,6 +580,7 @@ const KordAIOSPlugin: Plugin = async (ctx) => {
     plan_read: planReadTool,
     squad_load: squadLoadTool,
     decision_log: decisionLogTool,
+    checklist_runner: checklistRunnerTool,
     task: delegateTask,
     skill: skillTool,
     skill_mcp: skillMcpTool,

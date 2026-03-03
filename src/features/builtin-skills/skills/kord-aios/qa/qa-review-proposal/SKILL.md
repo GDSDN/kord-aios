@@ -3,6 +3,7 @@ name: qa-review-proposal
 description: "Review Proposal - Kord AIOS Developer Task methodology and workflow"
 agent: qa
 subtask: false
+template: qa-report.md
 ---
 
 # Review Proposal - Kord AIOS Developer Task

@@ -63,6 +63,7 @@ agent: dev                    # Optional: force specific agent
 model: openai/gpt-5.2         # Optional: force specific model
 subtask: false                # Optional: run as subtask (default false)
 argument-hint: "describe what to build"  # Optional: hint for $ARGUMENTS
+template: story.md            # Optional: reference .kord/templates/{template}
 allowed-tools: read edit bash  # Optional: tool allowlist (space-separated or array)
 ---
 
@@ -90,6 +91,7 @@ What the agent should NOT do...
 | `model` | string | No | Force specific model override |
 | `subtask` | boolean | No | Run as subtask (default: false) |
 | `argument-hint` | string | No | Hint text for $ARGUMENTS placeholder |
+| `template` | string | No | Reference a template from `.kord/templates/{template}` — injects template reference line inside `<skill-instruction>` |
 | `allowed-tools` | string \| string[] | No | Restrict tools available during skill execution |
 
 ### Template Wrapping

@@ -30,7 +30,11 @@ agents/
 │   ├── index.ts
 │   ├── default.ts
 │   └── gpt.ts
-├── kord.ts                 # Main orchestrator prompt (530 lines)
+├── kord/                      # Main orchestrator (delegation & rules)
+│   ├── index.ts
+│   ├── task-management.ts      # Todo discipline (210 lines)
+│   ├── delegation.ts           # Dynamic section composition
+│   └── methodology-rules.ts    # Advisory methodology rules
 ├── dev.ts               # Autonomous deep worker (618 lines, GPT 5.3 Codex)
 ├── architect.ts                   # Strategic advisor (GPT-5.2)
 ├── librarian.ts                # Multi-repo research (328 lines)
