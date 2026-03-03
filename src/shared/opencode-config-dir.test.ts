@@ -184,8 +184,8 @@ describe("opencode-config-dir", () => {
         expect(result).toBe(join(homedir(), ".config", "opencode"))
       })
 
-      test("returns %APPDATA%/opencode on Windows by default (no config exists)", () => {
-        // given opencode CLI binary detected, platform is Windows, no config exists
+      test("returns ~/.config/opencode on Windows (same XDG path as all platforms)", () => {
+        // given opencode CLI binary detected, platform is Windows
         Object.defineProperty(process, "platform", { value: "win32" })
         delete process.env.APPDATA
         delete process.env.OPENCODE_CONFIG_DIR
@@ -193,32 +193,21 @@ describe("opencode-config-dir", () => {
         // when getOpenCodeConfigDir is called with binary="opencode"
         const result = getOpenCodeConfigDir({ binary: "opencode", version: "1.0.200", checkExisting: false })
 
-        // then returns %APPDATA%/opencode (XDG-style default on Windows)
-        expect(result).toBe(join(homedir(), "AppData", "Roaming", "opencode"))
+        // then returns ~/.config/opencode (OpenCode uses XDG path on all platforms)
+        expect(result).toBe(join(homedir(), ".config", "opencode"))
       })
 
-      describe("Windows path resolution priority", () => {
-        // These tests verify the correct priority order on Windows:
-        // 1. First check ~/.config/opencode (cross-platform path that OpenCode uses)
-        // 2. Then fall back to %APPDATA%/opencode
-        //
-        // The logic is verified by checking the returned path when different
-        // combinations of config files exist.
+      test("returns ~/.config/opencode on Windows regardless of checkExisting flag", () => {
+        // given opencode CLI binary detected, platform is Windows
+        Object.defineProperty(process, "platform", { value: "win32" })
+        delete process.env.APPDATA
+        delete process.env.OPENCODE_CONFIG_DIR
 
-        test("returns ~/.config/opencode on Windows when checkExisting is false (default behavior)", () => {
-          // given opencode CLI binary detected, platform is Windows
-          // checkExisting defaults to true, but we can verify priority by checking what path is returned
-          Object.defineProperty(process, "platform", { value: "win32" })
-          delete process.env.APPDATA
-          delete process.env.OPENCODE_CONFIG_DIR
+        // when getOpenCodeConfigDir is called with checkExisting=true
+        const result = getOpenCodeConfigDir({ binary: "opencode", version: "1.0.200", checkExisting: true })
 
-          // when getOpenCodeConfigDir is called with binary="opencode" and checkExisting=true
-          // The function should return ~/.config/opencode if it exists, otherwise appdata
-          const result = getOpenCodeConfigDir({ binary: "opencode", version: "1.0.200", checkExisting: true })
-
-          // The cross-platform path should take priority on Windows
-          expect(result).toBe(join(homedir(), ".config", "opencode"))
-        })
+        // then still returns ~/.config/opencode (no filesystem check needed)
+        expect(result).toBe(join(homedir(), ".config", "opencode"))
       })
     })
 
