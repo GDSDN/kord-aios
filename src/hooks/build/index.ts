@@ -77,6 +77,42 @@ RULES:
 - Do not stop until all tasks are complete
 - If blocked, document the blocker and move to the next task`
 
+const METHODOLOGY_FLOW = `
+## Story Development Cycle
+
+### Phase Table
+
+| Phase | Agent | Role | Output |
+|-------|-------|------|--------|
+| **Draft** | SM | Creates story with acceptance criteria | Draft story in docs/kord/stories/ |
+| **Ready** | PO | Validates story completeness and correctness | Approved story → Ready for dev |
+| **In Progress** | Dev | Implements the story | Code changes |
+| **Review** | QA | Verifies implementation against acceptance criteria | QA Report |
+
+### Story Status Lifecycle
+
+\`DRAFT → READY → IN_PROGRESS → REVIEW → DONE\`
+
+- **DRAFT**: Initial story created, awaiting PO validation
+- **READY**: PO approved, ready for development
+- **DEV**: Development in progress
+- **REVIEW**: QA verification in progress
+- **DONE**: Story completed and verified
+
+### Retry Loops
+
+| Rejection | Route | Action |
+|-----------|-------|--------|
+| **PO rejects** | → SM | Story returns to SM for rework |
+| **QA rejects** | → Dev | Returns to Dev for fixes |
+
+### Tools for Story Management
+
+- **story_read**: Read story content and status
+- **story_update**: Update story status and progress
+- **checklist_runner**: Validate story artifacts against checklists
+`
+
 const VERIFICATION_REMINDER = `**MANDATORY: WHAT YOU MUST DO RIGHT NOW**
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -205,6 +241,8 @@ function buildOrchestratorReminder(planName: string, progress: { total: number; 
 **BOULDER STATE:** Plan: ${planName} | ${progress.completed}/${progress.total} done | ${remaining} remaining
 
 ---
+
+${METHODOLOGY_FLOW}
 
 ${buildVerificationReminder(sessionId)}
 
@@ -451,6 +489,25 @@ function buildTaskDelegationContext(task: PlanTask): string {
   if (task.executor) {
     parts.push(`\n**EXECUTOR**: Delegate this task to \`@${task.executor}\` agent.`)
     parts.push(`Use: task(subagent_type="${task.executor}", ...)\n`)
+
+    // Add phase context for methodology agents
+    const executorLower = task.executor.toLowerCase()
+    if (executorLower === "sm") {
+      parts.push(`**PHASE CONTEXT**: You are delegating to the Scrum Master.`)
+      parts.push(`- SM creates stories in DRAFT status`)
+      parts.push(`- Use story_update to mark story status`)
+      parts.push(`- Reference: ${METHODOLOGY_FLOW.split("\n")[1]?.trim() ?? "Story Development Cycle"}`)
+    } else if (executorLower === "po") {
+      parts.push(`**PHASE CONTEXT**: You are delegating to the Product Owner.`)
+      parts.push(`- PO validates stories and moves from DRAFT → READY`)
+      parts.push(`- Use story_read to review story content`)
+      parts.push(`- Use checklist_runner to validate story artifacts`)
+    } else if (executorLower === "qa") {
+      parts.push(`**PHASE CONTEXT**: You are delegating to QA.`)
+      parts.push(`- QA verifies implementation and moves from IN_PROGRESS → REVIEW`)
+      parts.push(`- Use story_read to check acceptance criteria`)
+      parts.push(`- Use checklist_runner to validate QA gate`)
+    }
   }
 
   if (task.category) {

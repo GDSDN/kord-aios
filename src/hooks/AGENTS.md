@@ -14,7 +14,7 @@
 ## STRUCTURE
 ```
 hooks/
-├── build/                      # Main orchestration (770 lines)
+├── build/                      # Main orchestration (770 lines), includes METHODOLOGY_FLOW in src/hooks/build/index.ts
 ├── anthropic-context-window-limit-recovery/ # Auto-summarize
 ├── todo-continuation-enforcer.ts # Force TODO completion (517 lines)
 ├── ralph-loop/                 # Self-referential dev loop (428 lines)
