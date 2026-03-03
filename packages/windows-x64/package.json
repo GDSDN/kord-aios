@@ -1,6 +1,6 @@
 {
   "name": "kord-aios-windows-x64",
-  "version": "3.3.2",
+  "version": "3.3.3",
   "description": "Platform-specific binary for kord-aios (windows-x64)",
   "license": "MIT",
   "repository": {
