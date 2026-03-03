@@ -24,6 +24,7 @@ function parseKordAiosSkill(content: string, skillBaseDir: string, skillNameFall
     subtask?: boolean
     "argument-hint"?: string
     "allowed-tools"?: string | string[]
+    template?: string
   }>(content)
 
   const name = data.name || skillNameFallback
@@ -36,18 +37,44 @@ function parseKordAiosSkill(content: string, skillBaseDir: string, skillNameFall
       : data["allowed-tools"].split(/\s+/).filter(Boolean)
   }
 
-  const template = `<skill-instruction>\nBase directory for this skill: ${skillBaseDir}/\nFile references (@path) in this skill are relative to this directory.\n\n${body.trim()}\n</skill-instruction>\n\n<user-request>\n$ARGUMENTS\n</user-request>`
+  // Build template reference line if template frontmatter is present
+  const templateRefLine = data.template
+    ? `Template: Use the template at .kord/templates/${data.template} when creating this artifact.\n`
+    : ""
+
+  const template = `<skill-instruction>
+Base directory for this skill: ${skillBaseDir}/
+File references (@path) in this skill are relative to this directory.
+${templateRefLine}${body.trim()}
+</skill-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`
 
   return {
     name,
     description: `(kord-aios - Skill) ${description}`,
     template,
+    templateRef: data.template,
     agent: data.agent,
     model: data.model,
     subtask: data.subtask ?? false,
     argumentHint: data["argument-hint"],
     allowedTools,
   }
+}
+
+/**
+ * Test-only helper to parse a skill from content.
+ * Exported for testing purposes only.
+ */
+export function __test__parseKordAiosSkill(
+  content: string,
+  skillBaseDir: string,
+  skillNameFallback: string
+): BuiltinSkill | null {
+  return parseKordAiosSkill(content, skillBaseDir, skillNameFallback)
 }
 
 export async function loadKordAiosSkills(): Promise<BuiltinSkill[]> {
