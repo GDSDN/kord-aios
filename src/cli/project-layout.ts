@@ -10,6 +10,25 @@ export const KORD_INPUT_SUBDIRS = [
   "squads",
 ] as const
 
+/**
+ * Subdirectories that are actively created by createKordDirectory()
+ * These are the only .kord/ subdirs that get created automatically.
+ */
+export const KORD_ACTIVE_SUBDIRS = [
+  "templates",
+  "squads",
+] as const
+
+/**
+ * Reserved subdirectories that are NOT created automatically.
+ * These document future intent but are not currently used.
+ */
+export const KORD_RESERVED_SUBDIRS = [
+  "scripts",
+  "checklists",
+  "skills",
+] as const
+
 export const KORD_OUTPUT_SUBDIRS = [
   "plans",
   "drafts",

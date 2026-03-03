@@ -33,18 +33,15 @@ describe("init", () => {
     if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true })
   })
 
-  test("creates .kord/ directory structure", async () => {
+  test("creates .kord/ directory structure with templates and squads", async () => {
     //#given - empty project directory
 
     //#when
     await init({ directory: TEST_DIR })
 
-    //#then
+    //#then - Only templates and squads are actively created (KORD_ACTIVE_SUBDIRS)
     expect(existsSync(join(TEST_DIR, KORD_DIR))).toBe(true)
-    expect(existsSync(join(TEST_DIR, KORD_DIR, "scripts"))).toBe(true)
     expect(existsSync(join(TEST_DIR, KORD_DIR, "templates"))).toBe(true)
-    expect(existsSync(join(TEST_DIR, KORD_DIR, "checklists"))).toBe(true)
-    expect(existsSync(join(TEST_DIR, KORD_DIR, "skills"))).toBe(true)
     expect(existsSync(join(TEST_DIR, KORD_DIR, "squads"))).toBe(true)
   })
 
@@ -216,6 +213,51 @@ describe("init", () => {
     //#then
     expect(result.scaffold.skipped.length).toBeGreaterThan(0)
     expect(result.scaffold.created).toHaveLength(0)
+  })
+
+  test("exports code squad to .kord/squads/code/", async () => {
+    //#given - empty project directory
+
+    //#when
+    await init({ directory: TEST_DIR })
+
+    //#then - code squad should be exported
+    const squadPath = join(TEST_DIR, KORD_DIR, "squads", "code", "SQUAD.yaml")
+    expect(existsSync(squadPath)).toBe(true)
+    const squadContent = readFileSync(squadPath, "utf-8")
+    expect(squadContent).toContain("name: code")
+    expect(squadContent).toContain("developer")
+  })
+
+  test("init is idempotent - running twice succeeds", async () => {
+    //#given - empty project directory
+    await init({ directory: TEST_DIR })
+
+    //#when - run init again
+    const result = await init({ directory: TEST_DIR })
+
+    //#then - should succeed without errors
+    expect(result.success).toBe(true)
+    expect(result.exitCode).toBe(0)
+    // Second run should skip all scaffolded files
+    expect(result.scaffold.created).toHaveLength(0)
+    expect(result.scaffold.skipped.length).toBeGreaterThan(0)
+  })
+
+  test("init with force re-exports squad", async () => {
+    //#given - already scaffolded
+    await init({ directory: TEST_DIR })
+
+    // Modify the squad file
+    const squadPath = join(TEST_DIR, KORD_DIR, "squads", "code", "SQUAD.yaml")
+    writeFileSync(squadPath, "modified content", "utf-8")
+
+    //#when - init with force
+    const result = await init({ directory: TEST_DIR, force: true })
+
+    //#then - squad should be re-exported
+    const squadContent = readFileSync(squadPath, "utf-8")
+    expect(squadContent).toContain("name: code")
   })
 
   // LSP diagnostics test (guarded by TSLS availability)

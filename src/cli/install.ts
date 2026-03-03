@@ -2,21 +2,16 @@ import * as p from "@clack/prompts"
 import color from "picocolors"
 import type { InstallArgs, InstallConfig, ClaudeSubscription, BooleanArg, DetectedConfig, ProjectMaturityStatus } from "./types"
 import { detectProjectMaturity } from "./project-detector"
-import { detectOS, getManualInstallInstructions } from "./opencode-installer"
 import { runPostInstallDoctor } from "./post-install-doctor"
 import {
   addPluginToKordAiosConfig,
   writeKordAiosConfig,
-  writeProjectKordAiosConfig,
   isKordAiosInstalled,
   getKordAiosVersion,
   addAuthPlugins,
   addProviderConfig,
   detectCurrentConfig,
 } from "./config-manager"
-import { shouldShowChatGPTOnlyWarning } from "./model-fallback"
-import { createKordDirectory } from "./kord-directory"
-import { scaffoldProject } from "./scaffolder"
 import packageJson from "../../package.json" with { type: "json" }
 
 const VERSION = packageJson.version
@@ -459,7 +454,7 @@ async function runNonTuiInstallWithArgs(args: InstallArgs, detected: DetectedCon
   printHeader(isUpdate)
   printInfo(getMaturityMessage(effectiveStatus))
 
-  const totalSteps = 7
+  const totalSteps = 4
   let step = 1
 
   printStep(step++, totalSteps, "Checking OpenCode installation...")
@@ -515,32 +510,6 @@ async function runNonTuiInstallWithArgs(args: InstallArgs, detected: DetectedCon
   }
   printSuccess(`Config written ${SYMBOLS.arrow} ${color.dim(kordAiosResult.configPath)}`)
 
-  const projectConfigResult = writeProjectKordAiosConfig(process.cwd())
-  if (!projectConfigResult.success) {
-    printWarning(`Project config write warning: ${projectConfigResult.error} ${SYMBOLS.arrow} ${color.dim(projectConfigResult.configPath)}`)
-  } else {
-    printSuccess(`Project config written ${SYMBOLS.arrow} ${color.dim(projectConfigResult.configPath)}`)
-  }
-
-  printStep(step++, totalSteps, "Creating .kord/ directory structure...")
-  const kordDirResult = createKordDirectory(process.cwd())
-  if (!kordDirResult.success) {
-    printWarning(`Could not create .kord/ directory: ${kordDirResult.error}`)
-  } else if (kordDirResult.created) {
-    printSuccess(`.kord/ directory created ${SYMBOLS.arrow} ${color.dim(kordDirResult.kordPath)}`)
-  } else {
-    printSuccess(`.kord/ directory verified ${SYMBOLS.arrow} ${color.dim(kordDirResult.kordPath)}`)
-  }
-
-  const scaffoldResult = scaffoldProject({ directory: process.cwd() })
-  if (scaffoldResult.errors.length > 0) {
-    printWarning(`Project scaffold warnings: ${scaffoldResult.errors.join("; ")}`)
-  } else if (scaffoldResult.created.length > 0) {
-    printSuccess(`Project scaffolded (${scaffoldResult.created.length} created, ${scaffoldResult.skipped.length} skipped)`)
-  } else {
-    printSuccess(`Project scaffold verified (${scaffoldResult.skipped.length} skipped)`)
-  }
-
   if (!args.skipDoctor) {
     printStep(step++, totalSteps, "Running post-install verification...")
     const doctorResult = runPostInstallDoctor(process.cwd())
@@ -577,6 +546,17 @@ async function runNonTuiInstallWithArgs(args: InstallArgs, detected: DetectedCon
   console.log(`${SYMBOLS.star} ${color.bold(color.green(isUpdate ? "Configuration updated!" : "Installation complete!"))}`)
   console.log(`  Run ${color.cyan("opencode")} to start!`)
   console.log()
+
+  // Show guidance about project setup for fresh installations
+  if (!isUpdate) {
+    printBox(
+      `To set up a project with Kord AIOS:\n` +
+      `  ${color.cyan("cd your-project-directory")}\n` +
+      `  ${color.cyan("bunx kord-aios init")}\n\n` +
+      color.dim("This will create .kord/, .opencode/, and baseline files."),
+      "Project Setup"
+    )
+  }
 
   printBox(
     `${color.bold("Pro Tip:")} Include ${color.cyan("ultrawork")} (or ${color.cyan("ulw")}) in your prompt.\n` +
@@ -679,34 +659,6 @@ export async function install(args: InstallArgs): Promise<number> {
   }
   s.stop(`Config written to ${color.cyan(kordAiosResult.configPath)}`)
 
-  s.start("Writing project-level Kord AIOS configuration")
-  const projectConfigResult = writeProjectKordAiosConfig(process.cwd())
-  if (!projectConfigResult.success) {
-    s.stop(`Project config warning: ${projectConfigResult.error} ${color.yellow("[!]")} ${color.cyan(projectConfigResult.configPath)}`)
-  } else {
-    s.stop(`Project config written to ${color.cyan(projectConfigResult.configPath)}`)
-  }
-
-  s.start("Creating .kord/ directory structure")
-  const kordDirResult = createKordDirectory(process.cwd())
-  if (!kordDirResult.success) {
-    s.stop(`.kord/ directory warning: ${kordDirResult.error} ${color.yellow("[!]")}`)
-  } else if (kordDirResult.created) {
-    s.stop(`.kord/ directory created at ${color.cyan(kordDirResult.kordPath)}`)
-  } else {
-    s.stop(`.kord/ directory verified at ${color.cyan(kordDirResult.kordPath)}`)
-  }
-
-  s.start("Scaffolding project baseline (templates + docs)")
-  const scaffoldResult = scaffoldProject({ directory: process.cwd() })
-  if (scaffoldResult.errors.length > 0) {
-    s.stop(`Project scaffold warnings: ${scaffoldResult.errors.join("; ")} ${color.yellow("[!]")}`)
-  } else if (scaffoldResult.created.length > 0) {
-    s.stop(`Project scaffolded (${scaffoldResult.created.length} created, ${scaffoldResult.skipped.length} skipped)`)
-  } else {
-    s.stop(`Project scaffold verified (${scaffoldResult.skipped.length} skipped)`)
-  }
-
   if (!args.skipDoctor) {
     s.start("Running post-install verification")
     const doctorResult = runPostInstallDoctor(process.cwd())
@@ -741,6 +693,17 @@ export async function install(args: InstallArgs): Promise<number> {
 
   p.log.success(color.bold(isUpdate ? "Configuration updated!" : "Installation complete!"))
   p.log.message(`Run ${color.cyan("opencode")} to start!`)
+
+  // Show guidance about project setup for fresh installations
+  if (!isUpdate) {
+    p.note(
+      `To set up a project with Kord AIOS:\n` +
+      `  ${color.cyan("cd your-project-directory")}\n` +
+      `  ${color.cyan("bunx kord-aios init")}\n\n` +
+      color.dim("This will create .kord/, .opencode/, and baseline files."),
+      "Project Setup"
+    )
+  }
 
   p.note(
     `Include ${color.cyan("ultrawork")} (or ${color.cyan("ulw")}) in your prompt.\n` +

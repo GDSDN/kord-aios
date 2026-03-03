@@ -2,7 +2,7 @@ import { describe, expect, test, mock, beforeEach, afterEach } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 
-import { ANTIGRAVITY_PROVIDER_CONFIG, getPluginNameWithVersion, fetchNpmDistTags, generateKordAiosConfig, writeProjectKordAiosConfig } from "./config-manager"
+import { ANTIGRAVITY_PROVIDER_CONFIG, getPluginNameWithVersion, fetchNpmDistTags, generateKordAiosConfig, writeProjectKordAiosConfig, detectProvidersFromKordAiosConfig, detectCurrentConfig, addAuthPlugins, addProviderConfig } from "./config-manager"
 import type { InstallConfig } from "./types"
 
 describe("getPluginNameWithVersion", () => {
@@ -688,5 +688,401 @@ describe("writeProjectKordAiosConfig", () => {
   test("returns error when unable to create directory", () => {
     // This test is hard to implement without mocking fs
     // Skipping for now as the implementation handles the error case
+  })
+})
+
+describe("detectProvidersFromKordAiosConfig", () => {
+  const originalEnv = process.env.OPENCODE_CONFIG_DIR
+  let configDir: string
+  let resetConfigContext: () => void
+  let initConfigContext: (binary: string, version: string | null) => void
+
+  beforeEach(() => {
+    // Create temporary config directory
+    configDir = resolve(__dirname, `test-temp-config-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    mkdirSync(configDir, { recursive: true })
+    process.env.OPENCODE_CONFIG_DIR = configDir
+
+    // Need to import the reset/init functions
+    const cm = require("./config-manager")
+    resetConfigContext = cm.resetConfigContext
+    initConfigContext = cm.initConfigContext
+    resetConfigContext()
+    initConfigContext("opencode", null)
+  })
+
+  afterEach(() => {
+    if (originalEnv !== undefined) {
+      process.env.OPENCODE_CONFIG_DIR = originalEnv
+    } else {
+      delete process.env.OPENCODE_CONFIG_DIR
+    }
+    if (existsSync(configDir)) {
+      rmSync(configDir, { recursive: true, force: true })
+    }
+  })
+
+  test("returns ALL false when no config file exists", () => {
+    // #given no config file exists in the temp directory
+    // (configDir has no kord-aios.json)
+
+    // #when detecting providers
+    const result = detectProvidersFromKordAiosConfig()
+
+    // #then should return ALL false (not true as before - this is the bug fix)
+    expect(result.hasOpenAI).toBe(false)
+    expect(result.hasOpencodeZen).toBe(false)
+    expect(result.hasZaiCodingPlan).toBe(false)
+    expect(result.hasKimiForCoding).toBe(false)
+  })
+
+  test("returns ALL false when config is invalid/unparseable", () => {
+    // #given config file exists but contains invalid JSON
+    const invalidConfigPath = resolve(configDir, "kord-aios.json")
+    writeFileSync(invalidConfigPath, "{ invalid json content }")
+
+    // #when detecting providers
+    const result = detectProvidersFromKordAiosConfig()
+
+    // #then should return ALL false (not true as before - this is the bug fix)
+    expect(result.hasOpenAI).toBe(false)
+    expect(result.hasOpencodeZen).toBe(false)
+    expect(result.hasZaiCodingPlan).toBe(false)
+    expect(result.hasKimiForCoding).toBe(false)
+  })
+})
+
+describe("detectCurrentConfig", () => {
+  const originalEnv = process.env.OPENCODE_CONFIG_DIR
+  let configDir: string
+  let resetConfigContext: () => void
+  let initConfigContext: (binary: string, version: string | null) => void
+
+  beforeEach(() => {
+    // Create temporary config directory
+    configDir = resolve(__dirname, `test-temp-config-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    mkdirSync(configDir, { recursive: true })
+    process.env.OPENCODE_CONFIG_DIR = configDir
+
+    const cm = require("./config-manager")
+    resetConfigContext = cm.resetConfigContext
+    initConfigContext = cm.initConfigContext
+    resetConfigContext()
+    initConfigContext("opencode", null)
+  })
+
+  afterEach(() => {
+    if (originalEnv !== undefined) {
+      process.env.OPENCODE_CONFIG_DIR = originalEnv
+    } else {
+      delete process.env.OPENCODE_CONFIG_DIR
+    }
+    if (existsSync(configDir)) {
+      rmSync(configDir, { recursive: true, force: true })
+    }
+  })
+
+  test("defaults to ALL false for provider flags when not installed", () => {
+    // #given no config file exists (fresh system)
+
+    // #when detecting current config
+    const result = detectCurrentConfig()
+
+    // #then provider detection should be false (not true as before - this is the bug fix)
+    expect(result.hasClaude).toBe(false)
+    expect(result.isMax20).toBe(false)
+    expect(result.hasOpenAI).toBe(false)
+    expect(result.hasOpencodeZen).toBe(false)
+    expect(result.hasZaiCodingPlan).toBe(false)
+    expect(result.hasKimiForCoding).toBe(false)
+    // isInstalled should be false
+    expect(result.isInstalled).toBe(false)
+  })
+})
+
+describe("addAuthPlugins", () => {
+  const originalEnv = process.env.OPENCODE_CONFIG_DIR
+  const originalFetch = globalThis.fetch
+  let configDir: string
+  let resetConfigContext: () => void
+  let initConfigContext: (binary: string, version: string | null) => void
+
+  beforeEach(() => {
+    // Create temporary config directory
+    configDir = resolve(__dirname, `test-temp-auth-plugins-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    mkdirSync(configDir, { recursive: true })
+    process.env.OPENCODE_CONFIG_DIR = configDir
+
+    const cm = require("./config-manager")
+    resetConfigContext = cm.resetConfigContext
+    initConfigContext = cm.initConfigContext
+    resetConfigContext()
+    initConfigContext("opencode", null)
+
+    // Mock fetch for npm version lookups
+    globalThis.fetch = mock(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ latest: "1.3.0" }),
+      } as Response)
+    ) as unknown as typeof fetch
+  })
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+
+    if (originalEnv !== undefined) {
+      process.env.OPENCODE_CONFIG_DIR = originalEnv
+    } else {
+      delete process.env.OPENCODE_CONFIG_DIR
+    }
+    if (existsSync(configDir)) {
+      rmSync(configDir, { recursive: true, force: true })
+    }
+  })
+
+  test("adds opencode-antigravity-auth plugin when hasGemini is true", async () => {
+    // #given config with hasGemini=true
+    const config: InstallConfig = {
+      hasClaude: true,
+      isMax20: false,
+      hasOpenAI: false,
+      hasGemini: true, // Gemini selected
+      hasCopilot: false,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
+    }
+
+    // #when adding auth plugins
+    const result = await addAuthPlugins(config)
+
+    // #then should succeed
+    expect(result.success).toBe(true)
+
+    // #and config file should contain antigravity plugin
+    const content = readFileSync(result.configPath, "utf-8")
+    expect(content).toContain("opencode-antigravity-auth")
+  })
+
+  test("does NOT add antigravity plugin when hasGemini is false", async () => {
+    // #given config with hasGemini=false
+    const config: InstallConfig = {
+      hasClaude: true,
+      isMax20: false,
+      hasOpenAI: false,
+      hasGemini: false, // Gemini NOT selected
+      hasCopilot: false,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
+    }
+
+    // #when adding auth plugins
+    const result = await addAuthPlugins(config)
+
+    // #then should succeed
+    expect(result.success).toBe(true)
+
+    // #and config file should NOT contain antigravity plugin (empty plugins array or no antigravity)
+    const content = readFileSync(result.configPath, "utf-8")
+    const parsed = JSON.parse(content)
+    // Plugin array may exist but should be empty or not contain antigravity
+    const hasAntigravity = parsed.plugin?.some((p: string) => p.includes("antigravity")) ?? false
+    expect(hasAntigravity).toBe(false)
+  })
+
+  test("does NOT duplicate existing antigravity entry", async () => {
+    // #given existing config with antigravity plugin
+    const configPath = resolve(configDir, "opencode.json")
+    const existingConfig = {
+      plugin: ["kord-aios", "opencode-antigravity-auth@1.2.0"],
+    }
+    writeFileSync(configPath, JSON.stringify(existingConfig, null, 2))
+
+    // #and config with hasGemini=true
+    const config: InstallConfig = {
+      hasClaude: true,
+      isMax20: false,
+      hasOpenAI: false,
+      hasGemini: true,
+      hasCopilot: false,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
+    }
+
+    // #when adding auth plugins again
+    const result = await addAuthPlugins(config)
+
+    // #then should succeed
+    expect(result.success).toBe(true)
+
+    // #and should NOT have duplicate antigravity entries
+    const content = readFileSync(result.configPath, "utf-8")
+    const parsed = JSON.parse(content)
+    const antigravityPlugins = parsed.plugin.filter((p: string) => p.includes("antigravity"))
+    expect(antigravityPlugins.length).toBe(1)
+  })
+
+  test("migrates legacy kord-aios-antigravity-auth to canonical opencode-antigravity-auth", async () => {
+    // #given existing config with legacy plugin name
+    const configPath = resolve(configDir, "opencode.json")
+    const existingConfig = {
+      plugin: ["kord-aios", "kord-aios-antigravity-auth@1.0.0"], // Legacy name
+    }
+    writeFileSync(configPath, JSON.stringify(existingConfig, null, 2))
+
+    // #and config with hasGemini=true
+    const config: InstallConfig = {
+      hasClaude: true,
+      isMax20: false,
+      hasOpenAI: false,
+      hasGemini: true,
+      hasCopilot: false,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
+    }
+
+    // #when adding auth plugins
+    const result = await addAuthPlugins(config)
+
+    // #then should succeed
+    expect(result.success).toBe(true)
+
+    // #and should have canonical name, not legacy
+    const content = readFileSync(result.configPath, "utf-8")
+    const parsed = JSON.parse(content)
+    expect(parsed.plugin).toContain("opencode-antigravity-auth@1.3.0")
+    expect(parsed.plugin).not.toContain("kord-aios-antigravity-auth")
+  })
+})
+
+describe("addProviderConfig", () => {
+  const originalEnv = process.env.OPENCODE_CONFIG_DIR
+  let configDir: string
+  let resetConfigContext: () => void
+  let initConfigContext: (binary: string, version: string | null) => void
+
+  beforeEach(() => {
+    // Create temporary config directory
+    configDir = resolve(__dirname, `test-temp-provider-config-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    mkdirSync(configDir, { recursive: true })
+    process.env.OPENCODE_CONFIG_DIR = configDir
+
+    const cm = require("./config-manager")
+    resetConfigContext = cm.resetConfigContext
+    initConfigContext = cm.initConfigContext
+    resetConfigContext()
+    initConfigContext("opencode", null)
+  })
+
+  afterEach(() => {
+    if (originalEnv !== undefined) {
+      process.env.OPENCODE_CONFIG_DIR = originalEnv
+    } else {
+      delete process.env.OPENCODE_CONFIG_DIR
+    }
+    if (existsSync(configDir)) {
+      rmSync(configDir, { recursive: true, force: true })
+    }
+  })
+
+  test("adds google provider config when hasGemini is true", () => {
+    // #given config with hasGemini=true
+    const config: InstallConfig = {
+      hasClaude: true,
+      isMax20: false,
+      hasOpenAI: false,
+      hasGemini: true, // Gemini selected
+      hasCopilot: false,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
+    }
+
+    // #when adding provider config
+    const result = addProviderConfig(config)
+
+    // #then should succeed
+    expect(result.success).toBe(true)
+
+    // #and config file should contain google provider
+    const content = readFileSync(result.configPath, "utf-8")
+    const parsed = JSON.parse(content)
+    expect(parsed.provider).toBeDefined()
+    expect(parsed.provider.google).toBeDefined()
+    expect(parsed.provider.google.name).toBe("Google")
+    expect(parsed.provider.google.models).toBeDefined()
+    expect(parsed.provider.google.models["antigravity-gemini-3-pro"]).toBeDefined()
+  })
+
+  test("does NOT add google provider when hasGemini is false", () => {
+    // #given config with hasGemini=false
+    const config: InstallConfig = {
+      hasClaude: true,
+      isMax20: false,
+      hasOpenAI: false,
+      hasGemini: false, // Gemini NOT selected
+      hasCopilot: false,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
+    }
+
+    // #when adding provider config
+    const result = addProviderConfig(config)
+
+    // #then should succeed
+    expect(result.success).toBe(true)
+
+    // #and config file should NOT contain provider block
+    const content = readFileSync(result.configPath, "utf-8")
+    const parsed = JSON.parse(content)
+    expect(parsed.provider).toBeUndefined()
+  })
+
+  test("preserves existing google provider config (add-only merge)", () => {
+    // #given existing config with google provider
+    const configPath = resolve(configDir, "opencode.json")
+    const existingConfig = {
+      provider: {
+        google: {
+          name: "Existing Google Config", // Should be preserved
+          models: {
+            "custom-model": { name: "Custom Model" }, // Should be preserved
+          },
+        },
+      },
+    }
+    writeFileSync(configPath, JSON.stringify(existingConfig, null, 2))
+
+    // #and config with hasGemini=true
+    const config: InstallConfig = {
+      hasClaude: true,
+      isMax20: false,
+      hasOpenAI: false,
+      hasGemini: true,
+      hasCopilot: false,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
+    }
+
+    // #when adding provider config
+    const result = addProviderConfig(config)
+
+    // #then should succeed
+    expect(result.success).toBe(true)
+
+    // #and should preserve existing config entirely (add-only merge = existing wins)
+    const content = readFileSync(result.configPath, "utf-8")
+    const parsed = JSON.parse(content)
+    // Existing name should be preserved
+    expect(parsed.provider.google.name).toBe("Existing Google Config")
+    // Existing custom model should be preserved
+    expect(parsed.provider.google.models["custom-model"]).toBeDefined()
+    // Antigravity models are NOT added because existing google config takes precedence (add-only merge)
   })
 })

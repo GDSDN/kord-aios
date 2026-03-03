@@ -144,6 +144,8 @@ export const BuiltinCommandNameSchema = z.enum([
   "status",
   "squad",
   "squad-create",
+  "git-commit",
+  "git-create-pr",
 ])
 
 export const AgentOverrideConfigSchema = z.object({

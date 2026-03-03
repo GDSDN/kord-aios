@@ -9,6 +9,8 @@ import { CHECKPOINT_TEMPLATE } from "./templates/checkpoint"
 import { STATUS_TEMPLATE } from "./templates/status"
 import { SQUAD_TEMPLATE } from "./templates/squad"
 import { SQUAD_CREATE_TEMPLATE } from "./templates/squad-create"
+import { GIT_COMMIT_TEMPLATE } from "./templates/git-commit"
+import { GIT_CREATE_PR_TEMPLATE } from "./templates/git-create-pr"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -114,6 +116,28 @@ ${SQUAD_CREATE_TEMPLATE}
 $ARGUMENTS
 </user-request>`,
     argumentHint: "<domain-name>",
+  },
+  "git-commit": {
+    description: "(builtin) Create atomic git commits (DevOps)",
+    template: `<command-instruction>
+${GIT_COMMIT_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+    argumentHint: "[--staged|--all] [--message=\"...\"]",
+  },
+  "git-create-pr": {
+    description: "(builtin) Create GitHub PR (DevOps)",
+    template: `<command-instruction>
+${GIT_CREATE_PR_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+    argumentHint: "[<base-branch>] [--title=\"...\"]",
   },
 }
 

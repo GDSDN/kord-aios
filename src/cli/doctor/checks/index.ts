@@ -11,6 +11,7 @@ import { getMcpCheckDefinitions } from "./mcp"
 import { getMcpOAuthCheckDefinition } from "./mcp-oauth"
 import { getVersionCheckDefinition } from "./version"
 import { getProjectLayoutCheckDefinition } from "./project-layout"
+import { getProjectStructureCheckDefinition } from "./project-structure"
 
 export * from "./opencode"
 export * from "./plugin"
@@ -24,6 +25,7 @@ export * from "./mcp"
 export * from "./mcp-oauth"
 export * from "./version"
 export * from "./project-layout"
+export * from "./project-structure"
 
 export function getAllCheckDefinitions(): CheckDefinition[] {
   return [
@@ -32,6 +34,7 @@ export function getAllCheckDefinitions(): CheckDefinition[] {
     getConfigCheckDefinition(),
     getModelResolutionCheckDefinition(),
     getProjectLayoutCheckDefinition(),
+    getProjectStructureCheckDefinition(),
     ...getAuthCheckDefinitions(),
     ...getDependencyCheckDefinitions(),
     getGhCliCheckDefinition(),

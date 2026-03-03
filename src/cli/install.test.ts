@@ -164,111 +164,6 @@ describe("install CLI - binary check behavior", () => {
     expect(allCalls).toContain("[OK]")
     expect(allCalls).toContain("OpenCode 1.0.200")
   })
-
-  test("non-TUI mode: scaffolds project baseline files", async () => {
-    // given OpenCode binary is NOT installed
-    isOpenCodeInstalledSpy = spyOn(configManager, "isKordAiosInstalled").mockResolvedValue(false)
-    getOpenCodeVersionSpy = spyOn(configManager, "getKordAiosVersion").mockResolvedValue(null)
-
-    // given mock npm fetch
-    globalThis.fetch = mock(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({ latest: "3.0.0" }),
-      } as Response)
-    ) as unknown as typeof fetch
-
-    const args: InstallArgs = {
-      tui: false,
-      claude: "yes",
-      openai: "no",
-      gemini: "no",
-      copilot: "no",
-      opencodeZen: "no",
-      zaiCodingPlan: "no",
-    }
-
-    // when
-    const exitCode = await install(args)
-
-    // then
-    expect(exitCode).toBe(0)
-    expect(existsSync(join(projectDir, ".kord", "templates", "story.md"))).toBe(true)
-    expect(existsSync(join(projectDir, "docs", "kord", "plans"))).toBe(true)
-    expect(existsSync(join(projectDir, "kord-rules.md"))).toBe(true)
-  })
-
-  test("non-TUI mode: writes project config under .opencode", async () => {
-    // given OpenCode binary is NOT installed
-    isOpenCodeInstalledSpy = spyOn(configManager, "isKordAiosInstalled").mockResolvedValue(false)
-    getOpenCodeVersionSpy = spyOn(configManager, "getKordAiosVersion").mockResolvedValue(null)
-
-    globalThis.fetch = mock(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({ latest: "3.0.0" }),
-      } as Response)
-    ) as unknown as typeof fetch
-
-    const args: InstallArgs = {
-      tui: false,
-      claude: "yes",
-      openai: "no",
-      gemini: "no",
-      copilot: "no",
-      opencodeZen: "no",
-      zaiCodingPlan: "no",
-    }
-
-    // when
-    const exitCode = await install(args)
-
-    // then
-    expect(exitCode).toBe(0)
-    expect(existsSync(join(projectDir, ".opencode"))).toBe(true)
-    expect(existsSync(join(projectDir, ".opencode", "kord-aios.json"))).toBe(true)
-  })
-
-  test("non-TUI mode: preserves existing project config values with add-only merge", async () => {
-    // given OpenCode binary is NOT installed
-    isOpenCodeInstalledSpy = spyOn(configManager, "isKordAiosInstalled").mockResolvedValue(false)
-    getOpenCodeVersionSpy = spyOn(configManager, "getKordAiosVersion").mockResolvedValue(null)
-
-    globalThis.fetch = mock(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({ latest: "3.0.0" }),
-      } as Response)
-    ) as unknown as typeof fetch
-
-    mkdirSync(join(projectDir, ".opencode"), { recursive: true })
-    writeFileSync(
-      join(projectDir, ".opencode", "kord-aios.json"),
-      JSON.stringify({
-        defaultAgent: "custom-agent",
-        provider: { anthropic: { options: { maxTokens: 1234 } } },
-      }, null, 2)
-    )
-
-    const args: InstallArgs = {
-      tui: false,
-      claude: "yes",
-      openai: "no",
-      gemini: "no",
-      copilot: "no",
-      opencodeZen: "no",
-      zaiCodingPlan: "no",
-    }
-
-    // when
-    const exitCode = await install(args)
-
-    // then
-    expect(exitCode).toBe(0)
-    const projectConfig = JSON.parse(readFileSync(join(projectDir, ".opencode", "kord-aios.json"), "utf-8"))
-    expect(projectConfig.defaultAgent).toBe("custom-agent")
-    expect(projectConfig.provider.anthropic.options.maxTokens).toBe(1234)
-  })
 })
 
 describe("install CLI - provider detection and reuse", () => {
@@ -445,5 +340,260 @@ describe("install CLI - provider detection and reuse", () => {
     const allCalls = mockConsoleLog.mock.calls.flat().join("\n")
     expect(allCalls).toContain("Validation failed")
     expect(allCalls).toContain("--claude is required")
+  })
+})
+
+describe("install CLI - global-only behavior (Task 3)", () => {
+  let configDir: string
+  let projectDir: string
+  let originalCwd: string
+  let originalEnv: string | undefined
+  let isOpenCodeInstalledSpy: ReturnType<typeof spyOn>
+  let getOpenCodeVersionSpy: ReturnType<typeof spyOn>
+  let createKordDirectorySpy: ReturnType<typeof spyOn>
+  let scaffoldProjectSpy: ReturnType<typeof spyOn>
+  let addPluginSpy: ReturnType<typeof spyOn>
+  let writeKordAiosConfigSpy: ReturnType<typeof spyOn>
+  let writeProjectKordAiosConfigSpy: ReturnType<typeof spyOn>
+
+  beforeEach(() => {
+    // given temporary OpenCode config directory
+    configDir = join(tmpdir(), `kord-test-config-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    mkdirSync(configDir, { recursive: true })
+
+    // given isolated project directory
+    projectDir = join(tmpdir(), `kord-test-project-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    mkdirSync(projectDir, { recursive: true })
+
+    originalCwd = process.cwd()
+    process.chdir(projectDir)
+
+    originalEnv = process.env.OPENCODE_CONFIG_DIR
+    process.env.OPENCODE_CONFIG_DIR = configDir
+
+    // Reset config context
+    configManager.resetConfigContext()
+    configManager.initConfigContext("opencode", null)
+
+    // Capture console output
+    console.log = mockConsoleLog
+    mockConsoleLog.mockClear()
+
+    // given OpenCode binary is NOT installed (so we can test config-only behavior)
+    isOpenCodeInstalledSpy = spyOn(configManager, "isKordAiosInstalled").mockResolvedValue(false)
+    getOpenCodeVersionSpy = spyOn(configManager, "getKordAiosVersion").mockResolvedValue(null)
+
+    globalThis.fetch = mock(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ latest: "3.0.0" }),
+      } as Response)
+    ) as unknown as typeof fetch
+  })
+
+  afterEach(() => {
+    process.chdir(originalCwd)
+    if (originalEnv !== undefined) {
+      process.env.OPENCODE_CONFIG_DIR = originalEnv
+    } else {
+      delete process.env.OPENCODE_CONFIG_DIR
+    }
+
+    if (existsSync(projectDir)) {
+      rmSync(projectDir, { recursive: true, force: true })
+    }
+
+    if (existsSync(configDir)) {
+      rmSync(configDir, { recursive: true, force: true })
+    }
+
+    isOpenCodeInstalledSpy?.mockRestore()
+    getOpenCodeVersionSpy?.mockRestore()
+    createKordDirectorySpy?.mockRestore()
+    scaffoldProjectSpy?.mockRestore()
+    addPluginSpy?.mockRestore()
+    writeKordAiosConfigSpy?.mockRestore()
+    writeProjectKordAiosConfigSpy?.mockRestore()
+  })
+
+  test("install should NOT call createKordDirectory()", async () => {
+    // given
+    createKordDirectorySpy = spyOn(require("./kord-directory"), "createKordDirectory").mockReturnValue({
+      success: true,
+      created: false,
+      kordPath: "/fake/path",
+    })
+
+    const args: InstallArgs = {
+      tui: false,
+      claude: "yes",
+      openai: "no",
+      gemini: "no",
+      copilot: "no",
+      opencodeZen: "no",
+      zaiCodingPlan: "no",
+    }
+
+    // when
+    await install(args)
+
+    // then - should NOT be called in global-only install
+    expect(createKordDirectorySpy).not.toHaveBeenCalled()
+  })
+
+  test("install should NOT call scaffoldProject()", async () => {
+    // given
+    scaffoldProjectSpy = spyOn(require("./scaffolder"), "scaffoldProject").mockReturnValue({
+      created: [],
+      skipped: [],
+      errors: [],
+    })
+
+    const args: InstallArgs = {
+      tui: false,
+      claude: "yes",
+      openai: "no",
+      gemini: "no",
+      copilot: "no",
+      opencodeZen: "no",
+      zaiCodingPlan: "no",
+    }
+
+    // when
+    await install(args)
+
+    // then - should NOT be called in global-only install
+    expect(scaffoldProjectSpy).not.toHaveBeenCalled()
+  })
+
+  test("install should NOT call writeProjectKordAiosConfig()", async () => {
+    // given
+    writeProjectKordAiosConfigSpy = spyOn(configManager, "writeProjectKordAiosConfig").mockReturnValue({
+      success: true,
+      configPath: "/fake/path",
+    })
+
+    const args: InstallArgs = {
+      tui: false,
+      claude: "yes",
+      openai: "no",
+      gemini: "no",
+      copilot: "no",
+      opencodeZen: "no",
+      zaiCodingPlan: "no",
+    }
+
+    // when
+    await install(args)
+
+    // then - should NOT be called in global-only install
+    expect(writeProjectKordAiosConfigSpy).not.toHaveBeenCalled()
+  })
+
+  test("install SHOULD call addPluginToKordAiosConfig()", async () => {
+    // given
+    addPluginSpy = spyOn(configManager, "addPluginToKordAiosConfig").mockResolvedValue({
+      success: true,
+      configPath: join(configDir, "opencode.json"),
+    })
+
+    const args: InstallArgs = {
+      tui: false,
+      claude: "yes",
+      openai: "no",
+      gemini: "no",
+      copilot: "no",
+      opencodeZen: "no",
+      zaiCodingPlan: "no",
+    }
+
+    // when
+    await install(args)
+
+    // then - should be called to register plugin in global config
+    expect(addPluginSpy).toHaveBeenCalled()
+  })
+
+  test("install SHOULD write global kord-aios.json", async () => {
+    // given
+    const args: InstallArgs = {
+      tui: false,
+      claude: "yes",
+      openai: "no",
+      gemini: "no",
+      copilot: "no",
+      opencodeZen: "no",
+      zaiCodingPlan: "no",
+    }
+
+    // when
+    await install(args)
+
+    // then - global config should be written
+    const globalConfigPath = join(configDir, "kord-aios.json")
+    expect(existsSync(globalConfigPath)).toBe(true)
+
+    const config = JSON.parse(readFileSync(globalConfigPath, "utf-8"))
+    expect(config.agents).toBeDefined()
+  })
+
+  test("install should show guidance message to run init", async () => {
+    // given
+    const args: InstallArgs = {
+      tui: false,
+      claude: "yes",
+      openai: "no",
+      gemini: "no",
+      copilot: "no",
+      opencodeZen: "no",
+      zaiCodingPlan: "no",
+    }
+
+    // when
+    await install(args)
+
+    // then - should show guidance to run init
+    const allCalls = mockConsoleLog.mock.calls.flat().join("\n")
+    expect(allCalls).toContain("bunx kord-aios init")
+  })
+
+  test("fresh install (no config) should prompt all providers (not skip)", async () => {
+    // given no existing config detected
+    spyOn(configManager, "detectCurrentConfig").mockReturnValue({
+      isInstalled: false,
+      hasClaude: false,
+      isMax20: false,
+      hasOpenAI: false,
+      hasGemini: false,
+      hasCopilot: false,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
+    })
+
+    const args: InstallArgs = {
+      tui: false,
+      claude: "yes",
+      openai: "yes",
+      gemini: "yes",
+      copilot: "yes",
+      opencodeZen: "yes",
+      zaiCodingPlan: "no",
+      kimiForCoding: "no",
+    }
+
+    // when
+    const exitCode = await install(args)
+
+    // then - should succeed and use the provided values
+    expect(exitCode).toBe(0)
+
+    // then - should write config with provided values
+    const globalConfigPath = join(configDir, "kord-aios.json")
+    const config = JSON.parse(readFileSync(globalConfigPath, "utf-8"))
+
+    // Fresh install with explicit flags should have agents configured
+    expect(config.agents).toBeDefined()
+    expect(config.agents.kord).toBeDefined()
   })
 })

@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync } from "node:fs"
 import { join } from "node:path"
-import { KORD_DIR, KORD_INPUT_SUBDIRS } from "./project-layout"
+import { KORD_DIR, KORD_ACTIVE_SUBDIRS } from "./project-layout"
 
 export interface KordDirectoryResult {
   success: boolean
@@ -20,7 +20,7 @@ export function createKordDirectory(projectDir: string): KordDirectoryResult {
       mkdirSync(kordPath, { recursive: true })
     }
 
-    for (const subdir of KORD_INPUT_SUBDIRS) {
+    for (const subdir of KORD_ACTIVE_SUBDIRS) {
       const subdirPath = join(kordPath, subdir)
       if (!existsSync(subdirPath)) {
         mkdirSync(subdirPath, { recursive: true })
