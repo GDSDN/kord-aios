@@ -18,6 +18,45 @@ export interface ModelSuggestionInfo {
   suggestion: string
 }
 
+export type PromptRetryReason = "quota" | "timeout"
+
+export type PromptRetryEvent =
+  | {
+      type: "retryable-error-detected"
+      reason: PromptRetryReason
+      fromModel: string
+      error: string
+    }
+  | {
+      type: "fallback-attempt"
+      reason: PromptRetryReason
+      fromModel: string
+      toModel: string
+      attempt: number
+      total: number
+    }
+  | {
+      type: "fallback-success"
+      reason: PromptRetryReason
+      toModel: string
+      attempt: number
+      total: number
+    }
+  | {
+      type: "fallback-failed"
+      reason: PromptRetryReason
+      toModel: string
+      attempt: number
+      total: number
+      error: string
+    }
+  | {
+      type: "fallback-exhausted"
+      reason: PromptRetryReason
+      fromModel: string
+      attempted: string[]
+    }
+
 function extractMessage(error: unknown): string {
   if (typeof error === "string") return error
   if (error instanceof Error) return error.message
@@ -214,9 +253,28 @@ function hasMeaningfulAssistantOrToolOutput(messages: unknown[]): boolean {
       if (text.length > 0) return true
 
       const type = typeof part.type === "string" ? part.type.trim() : ""
-      return role === "tool" && type.length > 0
+      if (type.length > 0) return true
+
+      return Object.keys(part).some((key) => key !== "type" && key !== "text")
     })
   })
+}
+
+async function hasRecentOutputProgress(
+  client: Client,
+  sessionID: string,
+  timeoutMs: number,
+): Promise<boolean> {
+  const currentMessages = await readSessionMessages(client, sessionID)
+  const recentWindowMs = timeoutMs + 5_000
+  const now = Date.now()
+  const recentMessages = currentMessages.filter((message) => {
+    const created = extractCreatedTime(message)
+    if (created <= 0) return false
+    return now - created <= recentWindowMs
+  })
+
+  return hasMeaningfulAssistantOrToolOutput(recentMessages)
 }
 
 async function detectDeferredPromptError(
@@ -324,6 +382,26 @@ interface PromptArgs {
 
 interface PromptRetryOptions {
   promptTimeoutMs?: number
+  onRetryEvent?: (event: PromptRetryEvent) => void | Promise<void>
+}
+
+async function emitRetryEvent(
+  options: PromptRetryOptions | undefined,
+  event: PromptRetryEvent,
+): Promise<void> {
+  const handler = options?.onRetryEvent
+  if (!handler) {
+    return
+  }
+
+  try {
+    await handler(event)
+  } catch (error) {
+    log("[prompt-retry] onRetryEvent callback failed", {
+      eventType: event.type,
+      error: extractMessage(error),
+    })
+  }
 }
 
 function createPromptTimeoutError(sessionID: string | undefined, timeoutMs: number): Error {
@@ -382,22 +460,12 @@ export async function promptWithRetry(
     }
 
     if (isTimeoutError(error) && sessionID) {
-      const currentMessages = await readSessionMessages(client, sessionID)
-      const recentWindowMs = promptTimeoutMs + 5_000
-      const now = Date.now()
-      const recentMessages = currentMessages.filter((message) => {
-        const created = extractCreatedTime(message)
-        if (created <= 0) return false
-        return now - created <= recentWindowMs
-      })
-
-      const hasOutputProgress = hasMeaningfulAssistantOrToolOutput(recentMessages)
+      const hasOutputProgress = await hasRecentOutputProgress(client, sessionID, promptTimeoutMs)
 
       if (hasOutputProgress) {
         log("[prompt-retry] Timeout detected with ongoing output; preserving active generation", {
           sessionID,
           model: currentModel,
-          recentMessageCount: recentMessages.length,
         })
         return
       }
@@ -427,10 +495,18 @@ export async function promptWithRetry(
     // 2. Handle Retryable Errors (quota/rate-limit/timeout)
     if (isRetryableModelError(error) && fallbackChain && fallbackChain.length > 0) {
       const retryReason = isTimeoutError(error) ? "timeout" : "quota"
+      const reason = retryReason as PromptRetryReason
       log("[prompt-retry] Retryable model error detected", {
         model: currentModel,
         error: extractMessage(error),
         reason: retryReason,
+      })
+
+      await emitRetryEvent(options, {
+        type: "retryable-error-detected",
+        reason,
+        fromModel: currentModel,
+        error: extractMessage(error),
       })
 
       const sessionID = args.path?.id
@@ -480,11 +556,20 @@ export async function promptWithRetry(
 
       const attemptedFallbacks: string[] = []
 
-      for (const candidate of candidates) {
+      for (const [index, candidate] of candidates.entries()) {
         const fallbackModelStr = `${candidate.providerID}/${candidate.modelID}`
         attemptedFallbacks.push(fallbackModelStr)
 
         log("[prompt-retry] Attempting fallback", { fallbackModel: fallbackModelStr })
+
+        await emitRetryEvent(options, {
+          type: "fallback-attempt",
+          reason,
+          fromModel: currentModel,
+          toModel: fallbackModelStr,
+          attempt: index + 1,
+          total: candidates.length,
+        })
 
         try {
           const variantToUse = candidate.variant ?? args.body.variant
@@ -500,8 +585,33 @@ export async function promptWithRetry(
             },
           }, promptTimeoutMs)
           log("[prompt-retry] Fallback successful", { model: fallbackModelStr })
+          await emitRetryEvent(options, {
+            type: "fallback-success",
+            reason,
+            toModel: fallbackModelStr,
+            attempt: index + 1,
+            total: candidates.length,
+          })
           return
         } catch (fallbackError) {
+          if (isTimeoutError(fallbackError) && sessionID) {
+            const hasOutputProgress = await hasRecentOutputProgress(client, sessionID, promptTimeoutMs)
+            if (hasOutputProgress) {
+              log("[prompt-retry] Fallback timeout detected with ongoing output; preserving active generation", {
+                sessionID,
+                model: fallbackModelStr,
+              })
+              await emitRetryEvent(options, {
+                type: "fallback-success",
+                reason,
+                toModel: fallbackModelStr,
+                attempt: index + 1,
+                total: candidates.length,
+              })
+              return
+            }
+          }
+
           if (isQuotaError(fallbackError)) {
             markProviderUnhealthy(candidate.providerID, "quota")
           }
@@ -510,9 +620,24 @@ export async function promptWithRetry(
             model: fallbackModelStr,
             error: extractMessage(fallbackError),
           })
+          await emitRetryEvent(options, {
+            type: "fallback-failed",
+            reason,
+            toModel: fallbackModelStr,
+            attempt: index + 1,
+            total: candidates.length,
+            error: extractMessage(fallbackError),
+          })
           await abortSession("fallback")
         }
       }
+
+      await emitRetryEvent(options, {
+        type: "fallback-exhausted",
+        reason,
+        fromModel: currentModel,
+        attempted: attemptedFallbacks,
+      })
 
       const attemptedText = attemptedFallbacks.length > 0
         ? attemptedFallbacks.join(", ")
