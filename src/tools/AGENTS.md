@@ -34,7 +34,8 @@ tools/
 ├── skill-mcp/        # Skill MCP operations
 ├── slashcommand/     # Slash command dispatch
 ├── interactive-bash/ # Tmux session operations
-└── look-at/          # Multimodal PDF/image inspection
+├── look-at/          # Multimodal PDF/image inspection
+└── checklist-runner/ # Artifact validation (tool key: checklist_runner)
 ```
 
 ## TOOL CATEGORIES

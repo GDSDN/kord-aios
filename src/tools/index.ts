@@ -53,6 +53,7 @@ export { createPlanReadTool } from "./plan-read"
 export { createSquadLoadTool } from "./squad-load"
 export { createSquadValidateTool } from "./squad-validate"
 export { createDecisionLogTool } from "./decision-log"
+export { createChecklistRunnerTool } from "./checklist-runner"
 export {
   createTaskCreateTool,
   createTaskGetTool,
