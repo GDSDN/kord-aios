@@ -13,6 +13,7 @@ import { discoverSkills } from "../../features/opencode-skill-loader"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
 import { log, getAgentToolRestrictions, resolveModelPipeline, promptWithRetry, createSessionWithRetry, markInternalSessionAbort } from "../../shared"
+import type { PromptRetryEvent } from "../../shared"
 import { fetchAvailableModels, isModelAvailable } from "../../shared/model-availability"
 import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { buildFallbackCandidates } from "../../shared/fallback-candidates"
@@ -64,6 +65,37 @@ function extractAssistantText(messages: SessionMessage[]): string {
 
 function isNoTextSentinel(text: string): boolean {
   return text.trim().toLowerCase() === "(no text output)"
+}
+
+function truncateFallbackError(error: string): string {
+  const compact = error.replace(/\s+/g, " ").trim()
+  if (compact.length <= 120) {
+    return compact
+  }
+  return `${compact.slice(0, 117)}...`
+}
+
+function formatPromptRetryNotice(event: PromptRetryEvent): string {
+  switch (event.type) {
+    case "retryable-error-detected":
+      return `Model fallback triggered (${event.reason}) on ${event.fromModel}.`
+    case "fallback-attempt":
+      return `Fallback attempt ${event.attempt}/${event.total}: trying ${event.toModel}.`
+    case "fallback-success":
+      return `Fallback succeeded with ${event.toModel}.`
+    case "fallback-failed":
+      return `Fallback failed on ${event.toModel}: ${truncateFallbackError(event.error)}.`
+    case "fallback-exhausted":
+      return `Fallback exhausted after attempts: ${event.attempted.join(", ") || "none"}.`
+  }
+}
+
+function appendFallbackStatus(base: string, notices: string[]): string {
+  if (notices.length === 0) {
+    return base
+  }
+  const lines = notices.map((notice, index) => `${index + 1}. ${notice}`)
+  return `${base}\n\nFallback status:\n${lines.join("\n")}`
 }
 
 async function fetchSessionMessages(client: OpencodeClient, sessionID: string): Promise<SessionMessage[]> {
@@ -297,6 +329,7 @@ export async function executeSyncContinuation(
   let resumeAgent: string | undefined
   let resumeModel: { providerID: string; modelID: string } | undefined
   let fallbackChain: FallbackEntry[] | undefined
+  const fallbackNotices: string[] = []
 
   if (toastManager) {
     toastManager.addTask({
@@ -319,12 +352,48 @@ export async function executeSyncContinuation(
       command: args.command,
     },
   }
+
+  const publishFallbackNotice = async (notice: string): Promise<void> => {
+    if (!notice) return
+    if (fallbackNotices[fallbackNotices.length - 1] === notice) {
+      return
+    }
+    fallbackNotices.push(notice)
+
+    const fallbackMeta = {
+      title: syncContMeta.title,
+      metadata: {
+        ...syncContMeta.metadata,
+        internal_status: notice,
+        fallback_history: [...fallbackNotices],
+      },
+    }
+    await ctx.metadata?.(fallbackMeta)
+    if (ctx.callID) {
+      storeToolMetadata(ctx.sessionID, ctx.callID, fallbackMeta)
+    }
+  }
+
   await ctx.metadata?.(syncContMeta)
   if (ctx.callID) {
     storeToolMetadata(ctx.sessionID, ctx.callID, syncContMeta)
   }
 
   try {
+    if (typeof client.session.status === "function") {
+      const statusResult = await client.session.status()
+      const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
+      const currentStatus = allStatuses[args.session_id!]?.type
+
+      if (currentStatus && currentStatus !== "idle") {
+        if (toastManager) {
+          toastManager.removeTask(taskId)
+        }
+
+        return `Session is currently ${currentStatus}; skipped continuation prompt injection to avoid interrupting active execution.\n\nSession ID: ${args.session_id}`
+      }
+    }
+
     try {
       const messagesResp = await client.session.messages({ path: { id: args.session_id! } })
       const messages = (messagesResp.data ?? []) as SessionMessage[]
@@ -363,13 +432,17 @@ export async function executeSyncContinuation(
         },
         parts: [{ type: "text", text: args.prompt }],
       },
-    }, fallbackChain)
+    }, fallbackChain, {
+      onRetryEvent: async (event) => {
+        await publishFallbackNotice(formatPromptRetryNotice(event))
+      },
+    })
   } catch (promptError) {
     if (toastManager) {
       toastManager.removeTask(taskId)
     }
     const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
-    return `Failed to send continuation prompt: ${errorMessage}\n\nSession ID: ${args.session_id}`
+    return appendFallbackStatus(`Failed to send continuation prompt: ${errorMessage}\n\nSession ID: ${args.session_id}`, fallbackNotices)
   }
 
   const timing = getTimingConfig()
@@ -392,7 +465,7 @@ export async function executeSyncContinuation(
         toastManager.removeTask(taskId)
       }
       try {
-        return await handoffSyncSessionToBackground({
+        const handoffMessage = await handoffSyncSessionToBackground({
           manager,
           sessionID: args.session_id!,
           parentSessionID: ctx.sessionID,
@@ -404,9 +477,10 @@ export async function executeSyncContinuation(
           model: resumeModel,
           fallbackChain,
         })
+        return appendFallbackStatus(handoffMessage, fallbackNotices)
       } catch (handoffError) {
         const message = handoffError instanceof Error ? handoffError.message : String(handoffError)
-        return `Sync execution exceeded SLA, but background handoff failed: ${message}\n\nSession ID: ${args.session_id}`
+        return appendFallbackStatus(`Sync execution exceeded SLA, but background handoff failed: ${message}\n\nSession ID: ${args.session_id}`, fallbackNotices)
       }
     }
 
@@ -433,7 +507,7 @@ export async function executeSyncContinuation(
     if (toastManager) {
       toastManager.removeTask(taskId)
     }
-    return `Error fetching result: ${messagesResult.error}\n\nSession ID: ${args.session_id}`
+    return appendFallbackStatus(`Error fetching result: ${messagesResult.error}\n\nSession ID: ${args.session_id}`, fallbackNotices)
   }
 
   const messages = ((messagesResult as { data?: unknown }).data ?? messagesResult) as SessionMessage[]
@@ -443,15 +517,15 @@ export async function executeSyncContinuation(
 
   const textContent = extractAssistantText(messages)
   if (!textContent) {
-    return `No assistant response found.\n\nSession ID: ${args.session_id}`
+    return appendFallbackStatus(`No assistant response found.\n\nSession ID: ${args.session_id}`, fallbackNotices)
   }
   if (isNoTextSentinel(textContent)) {
-    return `Subagent produced no text output. This usually indicates provider-side failure after fallback routing.\n\nSession ID: ${args.session_id}`
+    return appendFallbackStatus(`Subagent produced no text output. This usually indicates provider-side failure after fallback routing.\n\nSession ID: ${args.session_id}`, fallbackNotices)
   }
 
   const duration = formatDuration(startTime)
 
-  return `Task continued and completed in ${duration}.
+  return appendFallbackStatus(`Task continued and completed in ${duration}.
 
 ---
 
@@ -459,7 +533,7 @@ ${textContent || "(No text output)"}
 
 <task_metadata>
 session_id: ${args.session_id}
-</task_metadata>`
+</task_metadata>`, fallbackNotices)
 }
 
 export async function executeUnstableAgentTask(
@@ -780,6 +854,29 @@ export async function executeSyncTask(
         command: args.command,
       },
     }
+    const fallbackNotices: string[] = []
+    const publishFallbackNotice = async (notice: string): Promise<void> => {
+      if (!notice) return
+      if (fallbackNotices[fallbackNotices.length - 1] === notice) {
+        return
+      }
+      fallbackNotices.push(notice)
+
+      const fallbackMeta = {
+        title: syncTaskMeta.title,
+        metadata: {
+          ...syncTaskMeta.metadata,
+          internal_status: notice,
+          fallback_history: [...fallbackNotices],
+        },
+      }
+
+      await ctx.metadata?.(fallbackMeta)
+      if (ctx.callID) {
+        storeToolMetadata(ctx.sessionID, ctx.callID, fallbackMeta)
+      }
+    }
+
     await ctx.metadata?.(syncTaskMeta)
     if (ctx.callID) {
       storeToolMetadata(ctx.sessionID, ctx.callID, syncTaskMeta)
@@ -801,28 +898,32 @@ export async function executeSyncTask(
           ...(categoryModel ? { model: { providerID: categoryModel.providerID, modelID: categoryModel.modelID } } : {}),
           ...(categoryModel?.variant ? { variant: categoryModel.variant } : {}),
         },
-      }, fallbackChain)
+      }, fallbackChain, {
+        onRetryEvent: async (event) => {
+          await publishFallbackNotice(formatPromptRetryNotice(event))
+        },
+      })
     } catch (promptError) {
       if (toastManager && taskId !== undefined) {
         toastManager.removeTask(taskId)
       }
       const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
       if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
-        return formatDetailedError(new Error(`Agent "${agentToUse}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`), {
+        return appendFallbackStatus(formatDetailedError(new Error(`Agent "${agentToUse}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`), {
           operation: "Send prompt to agent",
           args,
           sessionID,
           agent: agentToUse,
           category: args.category,
-        })
+        }), fallbackNotices)
       }
-      return formatDetailedError(promptError, {
+      return appendFallbackStatus(formatDetailedError(promptError, {
         operation: "Send prompt",
         args,
         sessionID,
         agent: agentToUse,
         category: args.category,
-      })
+      }), fallbackNotices)
     }
 
     const syncTiming = getTimingConfig()
@@ -842,7 +943,7 @@ export async function executeSyncTask(
       if (ctx.abort?.aborted) {
         log("[task] Aborted by user", { sessionID })
         if (toastManager && taskId) toastManager.removeTask(taskId)
-        return `Task aborted.\n\nSession ID: ${sessionID}`
+        return appendFallbackStatus(`Task aborted.\n\nSession ID: ${sessionID}`, fallbackNotices)
       }
 
       await new Promise(resolve => setTimeout(resolve, syncTiming.POLL_INTERVAL_MS))
@@ -858,7 +959,7 @@ export async function executeSyncTask(
           toastManager.removeTask(taskId)
         }
         try {
-          return await handoffSyncSessionToBackground({
+          const handoffMessage = await handoffSyncSessionToBackground({
             manager,
             sessionID,
             parentSessionID: parentContext.sessionID,
@@ -871,9 +972,10 @@ export async function executeSyncTask(
             fallbackChain,
             skillContent: systemContent,
           })
+          return appendFallbackStatus(handoffMessage, fallbackNotices)
         } catch (handoffError) {
           const message = handoffError instanceof Error ? handoffError.message : String(handoffError)
-          return `Sync execution exceeded SLA, but background handoff failed: ${message}\n\nSession ID: ${sessionID}`
+          return appendFallbackStatus(`Sync execution exceeded SLA, but background handoff failed: ${message}\n\nSession ID: ${sessionID}`, fallbackNotices)
         }
       }
 
@@ -947,6 +1049,7 @@ export async function executeSyncTask(
                 agent: agentToUse,
                 to: key,
               })
+              await publishFallbackNotice(`Session retry loop detected. Switching model to ${key}.`)
 
               markInternalSessionAbort(sessionID, "delegate-task:retry-stuck")
               await client.session.abort({ path: { id: sessionID } }).catch(() => {})
@@ -974,6 +1077,7 @@ export async function executeSyncTask(
                 )
                 switched = true
                 retrySince = Date.now()
+                await publishFallbackNotice(`Model switch succeeded with ${key}.`)
                 break
               } catch (error) {
                 log("[task] Retry-stuck fallback prompt error", {
@@ -981,13 +1085,14 @@ export async function executeSyncTask(
                   model: key,
                   error: String(error),
                 })
+                await publishFallbackNotice(`Model switch failed on ${key}: ${truncateFallbackError(String(error))}.`)
                 continue
               }
             }
 
             if (!switched) {
               if (toastManager && taskId) toastManager.removeTask(taskId)
-              return `Session stuck in retry with no output after ${Math.floor(syncTiming.FIRST_OUTPUT_TIMEOUT_MS / 1000)}s; exhausted fallback models.\n\nSession ID: ${sessionID}`
+              return appendFallbackStatus(`Session stuck in retry with no output after ${Math.floor(syncTiming.FIRST_OUTPUT_TIMEOUT_MS / 1000)}s; exhausted fallback models.\n\nSession ID: ${sessionID}`, fallbackNotices)
             }
           }
         }
@@ -1032,7 +1137,7 @@ export async function executeSyncTask(
     try {
       messages = await fetchSessionMessages(client, sessionID)
     } catch (error) {
-      return `${error instanceof Error ? error.message : String(error)}\n\nSession ID: ${sessionID}`
+      return appendFallbackStatus(`${error instanceof Error ? error.message : String(error)}\n\nSession ID: ${sessionID}`, fallbackNotices)
     }
 
     collectTriedModelsFromMessages(messages, triedModels)
@@ -1066,6 +1171,7 @@ export async function executeSyncTask(
           agent: agentToUse,
           model: modelKey,
         })
+        await publishFallbackNotice(`No output detected. Retrying with ${modelKey}.`)
 
         await client.session.abort({ path: { id: sessionID } }).catch(() => {})
 
@@ -1096,8 +1202,11 @@ export async function executeSyncTask(
             model: modelKey,
             error: String(error),
           })
+          await publishFallbackNotice(`No-output recovery failed on ${modelKey}: ${truncateFallbackError(String(error))}.`)
           continue
         }
+
+        await publishFallbackNotice(`No-output recovery succeeded with ${modelKey}.`)
 
         messages = await waitForStableMessages(client, sessionID, syncTiming)
         collectTriedModelsFromMessages(messages, triedModels)
@@ -1111,14 +1220,14 @@ export async function executeSyncTask(
         const attempted = attemptedRecoveryModels.length > 0
           ? ` Attempted recovery models: ${attemptedRecoveryModels.join(", ")}.`
           : ""
-        return `No assistant response found.${attempted}\n\nSession ID: ${sessionID}`
+        return appendFallbackStatus(`No assistant response found.${attempted}\n\nSession ID: ${sessionID}`, fallbackNotices)
       }
 
       if (isNoTextSentinel(textContent)) {
         const attempted = attemptedRecoveryModels.length > 0
           ? ` Attempted recovery models: ${attemptedRecoveryModels.join(", ")}.`
           : ""
-        return `Subagent produced no text output after fallback recovery.${attempted}\n\nSession ID: ${sessionID}`
+        return appendFallbackStatus(`Subagent produced no text output after fallback recovery.${attempted}\n\nSession ID: ${sessionID}`, fallbackNotices)
       }
     }
 
@@ -1130,7 +1239,7 @@ export async function executeSyncTask(
 
     subagentSessions.delete(sessionID)
 
-    return `Task completed in ${duration}.
+    return appendFallbackStatus(`Task completed in ${duration}.
 
 Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}
 
@@ -1140,7 +1249,7 @@ ${textContent || "(No text output)"}
 
 <task_metadata>
 session_id: ${sessionID}
-</task_metadata>`
+</task_metadata>`, fallbackNotices)
   } catch (error) {
     if (toastManager && taskId !== undefined) {
       toastManager.removeTask(taskId)

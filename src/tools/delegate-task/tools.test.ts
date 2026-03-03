@@ -248,6 +248,22 @@ describe("kord-task", () => {
       expect(result).toBe(false)
     })
 
+    test("returns false for 'plan-analyzer'", () => {
+      // given / #when
+      const result = isPlanAgent("plan-analyzer")
+
+      // then
+      expect(result).toBe(false)
+    })
+
+    test("returns false for 'plan-reviewer'", () => {
+      // given / #when
+      const result = isPlanAgent("plan-reviewer")
+
+      // then
+      expect(result).toBe(false)
+    })
+
     test("returns false for undefined", () => {
       // given / #when
       const result = isPlanAgent(undefined)
@@ -1219,6 +1235,69 @@ describe("kord-task", () => {
     // then - should return background message
     expect(result).toContain("Background task continued")
     expect(result).toContain("task-456")
+  })
+
+  test("session_id with background=false should skip prompt injection when session is busy", async () => {
+    // given
+    const { createDelegateTask } = require("./tools")
+    let promptCallCount = 0
+
+    const mockTask = {
+      id: "task-789",
+      sessionID: "ses_busy_continue",
+      description: "Busy continued task",
+      agent: "explore",
+      status: "running",
+    }
+
+    const mockManager = {
+      resume: async () => mockTask,
+    }
+
+    const mockClient = {
+      session: {
+        prompt: async () => {
+          promptCallCount += 1
+          return { data: {} }
+        },
+        messages: async () => ({ data: [] }),
+        status: async () => ({ data: { "ses_busy_continue": { type: "running" } } }),
+      },
+      config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+      app: {
+        agents: async () => ({ data: [] }),
+      },
+    }
+
+    const tool = createDelegateTask({
+      manager: mockManager,
+      client: mockClient,
+    })
+
+    const toolContext = {
+      sessionID: "parent-session",
+      messageID: "parent-message",
+      agent: "kord",
+      abort: new AbortController().signal,
+    }
+
+    // when
+    const result = await tool.execute(
+      {
+        description: "Continue busy test",
+        prompt: "Add more context while running",
+        session_id: "ses_busy_continue",
+        run_in_background: false,
+        load_skills: ["git-master"],
+      },
+      toolContext
+    )
+
+    // then
+    expect(promptCallCount).toBe(0)
+    expect(result).toContain("Session is currently running")
+    expect(result).toContain("skipped continuation prompt injection")
+    expect(result).toContain("ses_busy_continue")
   })
 })
 
@@ -3038,6 +3117,86 @@ describe("kord-task", () => {
       expect(result).toContain("Task completed")
     }, { timeout: 20000 })
 
+    test("sync delegation reports fallback progress via metadata and final output", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+      let promptCalls = 0
+      const metadataCalls: any[] = []
+
+      const mockManager = { launch: async () => ({}) }
+
+      const mockClient = {
+        app: {
+          agents: async () => ({
+            data: [
+              { name: "architect", mode: "subagent", model: { providerID: "openai", modelID: "gpt-5.2" } },
+            ],
+          }),
+        },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_architect_retry_status" } }),
+          prompt: async () => {
+            promptCalls += 1
+            if (promptCalls === 1) {
+              throw new Error("429 rate limit exceeded")
+            }
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Retry success" }] }],
+          }),
+          status: async () => ({ data: { "ses_architect_retry_status": { type: "idle" } } }),
+          abort: async () => ({ data: {} }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        userAgentOverrides: {
+          architect: {
+            fallback: [
+              { model: "anthropic/claude-opus-4-6" },
+            ],
+          },
+        },
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "kord",
+        abort: new AbortController().signal,
+        metadata: async (input: any) => {
+          metadataCalls.push(input)
+        },
+      }
+
+      // when
+      const result = await tool.execute(
+        {
+          description: "Retry with status",
+          prompt: "Review architecture with fallback",
+          subagent_type: "architect",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      // then
+      expect(result).toContain("Fallback status:")
+      expect(result).toContain("Fallback succeeded with anthropic/claude-opus-4-6")
+
+      const statusUpdates = metadataCalls.filter((call) => call?.metadata?.internal_status)
+      expect(statusUpdates.length).toBeGreaterThan(0)
+      expect(statusUpdates[statusUpdates.length - 1]?.metadata?.fallback_history).toContain(
+        "Fallback succeeded with anthropic/claude-opus-4-6."
+      )
+    }, { timeout: 20000 })
+
     test("uses user-configured agent fallback chain before hardcoded defaults", async () => {
       // given
       const { createDelegateTask } = require("./tools")
@@ -3437,7 +3596,7 @@ describe("kord-task", () => {
       expect(trackedInputs[0].prompt).toBe("Do complex architecture review")
     }, { timeout: 20000 })
 
-    test("sync continuation hands off to background when SLA is exceeded", async () => {
+    test("sync continuation skips prompt injection when existing session is busy", async () => {
       // given
       const { createDelegateTask } = require("./tools")
       __setTimingConfig({
@@ -3505,12 +3664,10 @@ describe("kord-task", () => {
       )
 
       // then
-      expect(result).toContain("Sync execution exceeded SLA")
+      expect(result).toContain("Session is currently running")
+      expect(result).toContain("skipped continuation prompt injection")
       expect(result).toContain("Session ID: ses_existing_sync")
-      expect(result).toContain("background_output(task_id=")
-      expect(trackedInputs.length).toBe(1)
-      expect(trackedInputs[0].sessionID).toBe("ses_existing_sync")
-      expect(trackedInputs[0].prompt).toBe("continue existing work")
+      expect(trackedInputs.length).toBe(0)
     }, { timeout: 20000 })
   })
 
