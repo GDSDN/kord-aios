@@ -1,6 +1,6 @@
 {
   "name": "kord-aios-darwin-x64",
-  "version": "3.3.3",
+  "version": "3.3.5",
   "description": "Platform-specific binary for kord-aios (darwin-x64)",
   "license": "MIT",
   "repository": {
