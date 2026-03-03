@@ -46,44 +46,13 @@ function getTauriConfigDir(identifier: string): string {
   }
 }
 
-function getCliConfigDir(checkExisting: boolean): string {
+function getCliConfigDir(_checkExisting: boolean): string {
   const envConfigDir = process.env.OPENCODE_CONFIG_DIR?.trim()
   if (envConfigDir) {
     return resolve(envConfigDir)
   }
 
-  if (process.platform === "win32") {
-    // OpenCode uses XDG-style resolution via xdg-basedir.
-    // On Windows, that maps config to %APPDATA% by default.
-    // PRIORITY: Check ~/.config/opencode FIRST (cross-platform path that OpenCode uses)
-    // then fall back to %APPDATA%/opencode for historical compatibility.
-
-    const crossPlatformDir = join(homedir(), ".config", "opencode")
-    const crossPlatformConfig = join(crossPlatformDir, "opencode.json")
-    const crossPlatformConfigC = join(crossPlatformDir, "opencode.jsonc")
-
-    const appData = process.env.APPDATA || join(homedir(), "AppData", "Roaming")
-    const appdataDir = join(appData, "opencode")
-    const appdataConfig = join(appdataDir, "opencode.json")
-    const appdataConfigC = join(appdataDir, "opencode.jsonc")
-
-    if (checkExisting) {
-      // First check cross-platform path (~/.config/opencode) - this is where
-      // OpenCode stores config on all platforms including Windows
-      if (existsSync(crossPlatformConfig) || existsSync(crossPlatformConfigC)) {
-        return crossPlatformDir
-      }
-
-      // Then check appdata path (%APPDATA%/opencode) - historical location
-      if (existsSync(appdataConfig) || existsSync(appdataConfigC)) {
-        return appdataDir
-      }
-    }
-
-    // Default to appdata path if neither exists
-    return appdataDir
-  }
-
+  // OpenCode CLI uses XDG-style ~/.config/opencode on ALL platforms including Windows.
   const xdgConfig = process.env.XDG_CONFIG_HOME || join(homedir(), ".config")
   return join(xdgConfig, "opencode")
 }
