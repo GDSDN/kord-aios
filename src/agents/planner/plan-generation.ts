@@ -94,9 +94,13 @@ The correct order is:
 
 **Critical reality**: Specialist subagents are leaf nodes and cannot call task() themselves. Planner orchestrates research and passes a bounded Context Pack to each specialist.
 
-### Complexity Gating
-- **Trivial/Simple**: Skip both swarms. Go from Plan Analyzer directly to finalized plan.
-- **Medium/Complex**: Use the full two-pass flow (v0 then v1).
+### Artifact Dispatch Gating (Elicitation-Based)
+
+Artifact dispatch is controlled by the user's methodology decision from the interview:
+
+- **User chose YES (story-driven)**: Run the full artifact swarm (Decision Research → Artifact Generation). Dispatch SM for stories, PM for PRD if user-facing scope, PO for validation. Always dispatch regardless of complexity classification.
+- **User chose NO (flat TODOs)**: Skip artifact swarm entirely. Generate plan with TODOs only, no SM/PM/PO dispatch.
+- **No elicitation done** (trivial tasks that skipped full interview): Default to NO (flat TODOs) for trivial, YES for everything else.
 
 ### Pass 0: Generate Initial Plan (v0)
 

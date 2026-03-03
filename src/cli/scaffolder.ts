@@ -8,6 +8,17 @@ import {
   KORD_RULES_CONTENT,
   STORY_TEMPLATE_CONTENT,
   ADR_TEMPLATE_CONTENT,
+  PRD_TEMPLATE_CONTENT,
+  EPIC_TEMPLATE_CONTENT,
+  TASK_TEMPLATE_CONTENT,
+  QA_GATE_TEMPLATE_CONTENT,
+  QA_REPORT_TEMPLATE_CONTENT,
+  CHECKLIST_STORY_DRAFT_CONTENT,
+  CHECKLIST_STORY_DOD_CONTENT,
+  CHECKLIST_PR_REVIEW_CONTENT,
+  CHECKLIST_ARCHITECT_CONTENT,
+  CHECKLIST_PRE_PUSH_CONTENT,
+  CHECKLIST_SELF_CRITIQUE_CONTENT,
 } from "./project-layout"
 
 export interface ScaffoldResult {
@@ -44,6 +55,19 @@ function getScaffoldEntries(baseDir: string): DirEntry[] {
   entries.push({ path: templatesDir, isDir: true })
   entries.push({ path: join(templatesDir, "story.md"), content: STORY_TEMPLATE_CONTENT })
   entries.push({ path: join(templatesDir, "adr.md"), content: ADR_TEMPLATE_CONTENT })
+  entries.push({ path: join(templatesDir, "prd.md"), content: PRD_TEMPLATE_CONTENT })
+  entries.push({ path: join(templatesDir, "epic.md"), content: EPIC_TEMPLATE_CONTENT })
+  entries.push({ path: join(templatesDir, "task.md"), content: TASK_TEMPLATE_CONTENT })
+  entries.push({ path: join(templatesDir, "qa-gate.md"), content: QA_GATE_TEMPLATE_CONTENT })
+  entries.push({ path: join(templatesDir, "qa-report.md"), content: QA_REPORT_TEMPLATE_CONTENT })
+
+  // .kord/templates/checklists/ (flat, no subdirs)
+  entries.push({ path: join(templatesDir, "checklist-story-draft.md"), content: CHECKLIST_STORY_DRAFT_CONTENT })
+  entries.push({ path: join(templatesDir, "checklist-story-dod.md"), content: CHECKLIST_STORY_DOD_CONTENT })
+  entries.push({ path: join(templatesDir, "checklist-pr-review.md"), content: CHECKLIST_PR_REVIEW_CONTENT })
+  entries.push({ path: join(templatesDir, "checklist-architect.md"), content: CHECKLIST_ARCHITECT_CONTENT })
+  entries.push({ path: join(templatesDir, "checklist-pre-push.md"), content: CHECKLIST_PRE_PUSH_CONTENT })
+  entries.push({ path: join(templatesDir, "checklist-self-critique.md"), content: CHECKLIST_SELF_CRITIQUE_CONTENT })
 
   // kord-rules.md at project root
   entries.push({ path: join(baseDir, KORD_RULES_FILE), content: KORD_RULES_CONTENT })

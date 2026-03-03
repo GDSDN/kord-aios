@@ -2,6 +2,19 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { scaffoldProject, isProjectScaffolded } from "./scaffolder"
+import {
+  PRD_TEMPLATE_CONTENT,
+  EPIC_TEMPLATE_CONTENT,
+  TASK_TEMPLATE_CONTENT,
+  QA_GATE_TEMPLATE_CONTENT,
+  QA_REPORT_TEMPLATE_CONTENT,
+  CHECKLIST_STORY_DRAFT_CONTENT,
+  CHECKLIST_STORY_DOD_CONTENT,
+  CHECKLIST_PR_REVIEW_CONTENT,
+  CHECKLIST_ARCHITECT_CONTENT,
+  CHECKLIST_PRE_PUSH_CONTENT,
+  CHECKLIST_SELF_CRITIQUE_CONTENT,
+} from "./project-layout"
 
 const TEST_DIR = join(import.meta.dir, "__test_scaffold__")
 
@@ -46,6 +59,74 @@ describe("scaffoldProject", () => {
     expect(adr).toContain("Context")
     expect(adr).toContain("Decision")
     expect(adr).toContain("Consequences")
+  })
+
+  test("creates .kord/templates/ with new templates (prd, epic, task, qa-gate, qa-report)", () => {
+    //#given - empty project directory
+
+    //#when
+    scaffoldProject({ directory: TEST_DIR })
+
+    //#then
+    expect(existsSync(join(TEST_DIR, ".kord", "templates", "prd.md"))).toBe(true)
+    expect(existsSync(join(TEST_DIR, ".kord", "templates", "epic.md"))).toBe(true)
+    expect(existsSync(join(TEST_DIR, ".kord", "templates", "task.md"))).toBe(true)
+    expect(existsSync(join(TEST_DIR, ".kord", "templates", "qa-gate.md"))).toBe(true)
+    expect(existsSync(join(TEST_DIR, ".kord", "templates", "qa-report.md"))).toBe(true)
+
+    const prd = readFileSync(join(TEST_DIR, ".kord", "templates", "prd.md"), "utf-8")
+    expect(prd).toContain("Product Requirements Document")
+    expect(prd).toContain("Executive Summary")
+
+    const epic = readFileSync(join(TEST_DIR, ".kord", "templates", "epic.md"), "utf-8")
+    expect(epic).toContain("Epic:")
+    expect(epic).toContain("Vision")
+
+    const task = readFileSync(join(TEST_DIR, ".kord", "templates", "task.md"), "utf-8")
+    expect(task).toContain("Task:")
+    expect(task).toContain("Description")
+
+    const qaGate = readFileSync(join(TEST_DIR, ".kord", "templates", "qa-gate.md"), "utf-8")
+    expect(qaGate).toContain("QA Gate")
+    expect(qaGate).toContain("Gate Decision")
+
+    const qaReport = readFileSync(join(TEST_DIR, ".kord", "templates", "qa-report.md"), "utf-8")
+    expect(qaReport).toContain("QA Report")
+    expect(qaReport).toContain("Test Results Summary")
+  })
+
+  test("creates .kord/templates/ with checklist templates", () => {
+    //#given - empty project directory
+
+    //#when
+    scaffoldProject({ directory: TEST_DIR })
+
+    //#then
+    expect(existsSync(join(TEST_DIR, ".kord", "templates", "checklist-story-draft.md"))).toBe(true)
+    expect(existsSync(join(TEST_DIR, ".kord", "templates", "checklist-story-dod.md"))).toBe(true)
+    expect(existsSync(join(TEST_DIR, ".kord", "templates", "checklist-pr-review.md"))).toBe(true)
+    expect(existsSync(join(TEST_DIR, ".kord", "templates", "checklist-architect.md"))).toBe(true)
+    expect(existsSync(join(TEST_DIR, ".kord", "templates", "checklist-pre-push.md"))).toBe(true)
+    expect(existsSync(join(TEST_DIR, ".kord", "templates", "checklist-self-critique.md"))).toBe(true)
+
+    // Verify content matches constants
+    const storyDraft = readFileSync(join(TEST_DIR, ".kord", "templates", "checklist-story-draft.md"), "utf-8")
+    expect(storyDraft).toBe(CHECKLIST_STORY_DRAFT_CONTENT)
+
+    const storyDod = readFileSync(join(TEST_DIR, ".kord", "templates", "checklist-story-dod.md"), "utf-8")
+    expect(storyDod).toBe(CHECKLIST_STORY_DOD_CONTENT)
+
+    const prReview = readFileSync(join(TEST_DIR, ".kord", "templates", "checklist-pr-review.md"), "utf-8")
+    expect(prReview).toBe(CHECKLIST_PR_REVIEW_CONTENT)
+
+    const architect = readFileSync(join(TEST_DIR, ".kord", "templates", "checklist-architect.md"), "utf-8")
+    expect(architect).toBe(CHECKLIST_ARCHITECT_CONTENT)
+
+    const prePush = readFileSync(join(TEST_DIR, ".kord", "templates", "checklist-pre-push.md"), "utf-8")
+    expect(prePush).toBe(CHECKLIST_PRE_PUSH_CONTENT)
+
+    const selfCritique = readFileSync(join(TEST_DIR, ".kord", "templates", "checklist-self-critique.md"), "utf-8")
+    expect(selfCritique).toBe(CHECKLIST_SELF_CRITIQUE_CONTENT)
   })
 
   test("creates kord-rules.md at project root", () => {

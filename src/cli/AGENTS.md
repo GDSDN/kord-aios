@@ -72,6 +72,20 @@ cli/
 - **picocolors**: Terminal colors for status and headers
 - **Symbols**: ✓ (pass), ✗ (fail), ⚠ (warn), ℹ (info)
 
+## SCAFFOLDED TEMPLATES
+
+The CLI scaffolds 13 template files into `.kord/templates/`:
+
+| Template Files | Checklist Files |
+|----------------|-----------------|
+| story.md | checklist-story-draft.md |
+| adr.md | checklist-story-dod.md |
+| prd.md | checklist-pr-review.md |
+| epic.md | checklist-architect.md |
+| task.md | checklist-pre-push.md |
+| qa-gate.md | checklist-self-critique.md |
+| qa-report.md | |
+
 ## ANTI-PATTERNS
 
 - **Blocking in non-TTY**: Always check `process.stdout.isTTY`

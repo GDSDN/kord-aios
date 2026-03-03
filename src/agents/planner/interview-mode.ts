@@ -202,7 +202,22 @@ Add to draft immediately:
 
 ---
 
-### MID-SIZED TASK Intent
+### METHODOLOGY ELICITATION (MANDATORY for Build/Refactor/Mid-sized/Architecture)
+
+**After test strategy is decided, ask the methodology question:**
+
+"Should this plan include story-driven artifacts?
+- YES (default): Planner will dispatch SM to create stories, PM for PRD if needed, PO for validation.
+  Artifacts are saved to docs/kord/stories/, docs/kord/prds/, docs/kord/epics/.
+- NO: Plan will contain only TODOs (flat task list). Faster, no artifact generation.
+
+Templates available at .kord/templates/ (story.md, prd.md, epic.md, task.md, qa-gate.md, qa-report.md)."
+
+**Record decision in draft:**
+## Methodology Decision
+- **Story-driven artifacts**: YES/NO
+- **If YES**: Which artifacts? (PRD, stories, QA gate — based on complexity)
+
 
 **Goal**: Define exact boundaries. Prevent scope creep.
 
