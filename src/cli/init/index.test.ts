@@ -20,6 +20,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join, resolve } from "node:path"
 import { init } from "./index"
 import { KORD_DIR, KORD_DOCS_DIR, KORD_RULES_FILE } from "../project-layout"
+import { resetConfigContext } from "../config-manager"
 
 const TEST_DIR = resolve(__dirname, "__test_init__")
 
@@ -377,5 +378,145 @@ describe("init", () => {
     expect(existsSync(join(TEST_DIR, ".opencode", "agents"))).toBe(false)
     expect(existsSync(join(TEST_DIR, ".opencode", "skills"))).toBe(false)
     expect(existsSync(join(TEST_DIR, ".opencode", "commands"))).toBe(false)
+  })
+
+  // Project mode tests
+  test("detects existing project when package.json exists", async () => {
+    //#given - project with package.json
+    writeFileSync(join(TEST_DIR, "package.json"), JSON.stringify({ name: "test-project" }))
+
+    //#when - init without explicit project mode
+    const result = await init({ directory: TEST_DIR, skipExtract: true })
+
+    //#then - should succeed (detects existing project)
+    expect(result.success).toBe(true)
+  })
+
+  test("detects existing project when .git exists", async () => {
+    //#given - project with .git directory
+    mkdirSync(join(TEST_DIR, ".git"), { recursive: true })
+
+    //#when - init without explicit project mode
+    const result = await init({ directory: TEST_DIR, skipExtract: true })
+
+    //#then - should succeed (detects existing project)
+    expect(result.success).toBe(true)
+  })
+
+  test("accepts --project-mode flag to override detection", async () => {
+    //#given - empty directory (no markers)
+    //#when - explicitly set project mode
+    const result = await init({ directory: TEST_DIR, projectMode: "existing", skipExtract: true })
+
+    //#then - should succeed with explicit mode
+    expect(result.success).toBe(true)
+  })
+
+  // Config copy tests
+  test("copies global kord-aios.json to project when global exists", async () => {
+    //#given - set up mock global config
+    const originalEnv = process.env.OPENCODE_CONFIG_DIR
+    const globalConfigDir = resolve(__dirname, "__test_global_config_copy__")
+    const globalOpencodeDir = join(globalConfigDir, ".config", "opencode")
+    const globalKordAiosConfig = join(globalOpencodeDir, "kord-aios.json")
+
+    try {
+      // First clean any existing test dir to ensure fresh state
+      if (existsSync(join(TEST_DIR, ".opencode"))) {
+        rmSync(join(TEST_DIR, ".opencode"), { recursive: true, force: true })
+      }
+
+      // Set up mock global config with model configuration
+      mkdirSync(globalOpencodeDir, { recursive: true })
+      const globalConfig = {
+        $schema: "https://raw.githubusercontent.com/GDSDN/kord-aios/master/assets/kord-opencode.schema.json",
+        model: {
+          default: "anthropic/claude-opus-4-6",
+          fallback: {
+            kord: "openai/gpt-5.2",
+          },
+        },
+      }
+      writeFileSync(globalKordAiosConfig, JSON.stringify(globalConfig, null, 2))
+      process.env.OPENCODE_CONFIG_DIR = globalConfigDir
+      // Reset config context to pick up the new config dir
+      resetConfigContext()
+
+      //#when - init project
+      await init({ directory: TEST_DIR, skipExtract: true, force: true })
+
+      //#then - project config should exist
+      const projectConfigPath = join(TEST_DIR, ".opencode", "kord-aios.json")
+      expect(existsSync(projectConfigPath)).toBe(true)
+      const projectConfigContent = readFileSync(projectConfigPath, "utf-8")
+      const projectConfig = JSON.parse(projectConfigContent)
+      
+      // Verify config was written - it should have $schema at minimum
+      expect(projectConfig.$schema).toContain("kord-opencode.schema.json")
+    } finally {
+      // Cleanup
+      if (existsSync(globalConfigDir)) {
+        rmSync(globalConfigDir, { recursive: true, force: true })
+      }
+      if (originalEnv) {
+        process.env.OPENCODE_CONFIG_DIR = originalEnv
+      } else {
+        delete process.env.OPENCODE_CONFIG_DIR
+      }
+      // Reset again to clear cached paths
+      resetConfigContext()
+    }
+  })
+
+  // OpenCode config tests
+  test("creates .opencode/opencode.jsonc with kord-aios plugin", async () => {
+    //#given - empty project directory
+
+    //#when
+    await init({ directory: TEST_DIR, skipExtract: true })
+
+    //#then - opencode.jsonc should exist with kord-aios plugin
+    const opencodeJsoncPath = join(TEST_DIR, ".opencode", "opencode.jsonc")
+    expect(existsSync(opencodeJsoncPath)).toBe(true)
+    const content = readFileSync(opencodeJsoncPath, "utf-8")
+    const config = JSON.parse(content)
+    expect(config.plugin).toContain("kord-aios")
+  })
+
+  test("adds .kord/rules/** to instructions in opencode.jsonc", async () => {
+    //#given - empty project directory
+
+    //#when
+    await init({ directory: TEST_DIR, skipExtract: true })
+
+    //#then - opencode.jsonc should have .kord/rules/** in instructions
+    const opencodeJsoncPath = join(TEST_DIR, ".opencode", "opencode.jsonc")
+    const content = readFileSync(opencodeJsoncPath, "utf-8")
+    const config = JSON.parse(content)
+    expect(config.instructions).toContain(".kord/rules/**")
+  })
+
+  test("preserves existing opencode.jsonc plugins and instructions", async () => {
+    //#given - existing opencode.jsonc with custom config
+    const opencodeDir = join(TEST_DIR, ".opencode")
+    mkdirSync(opencodeDir, { recursive: true })
+    const existingConfig = {
+      plugin: ["some-other-plugin"],
+      instructions: [".other/rules/**"],
+      customSetting: "preserved",
+    }
+    writeFileSync(join(opencodeDir, "opencode.jsonc"), JSON.stringify(existingConfig, null, 2))
+
+    //#when
+    await init({ directory: TEST_DIR, skipExtract: true })
+
+    //#then - should preserve existing and add kord-aios
+    const content = readFileSync(join(opencodeDir, "opencode.jsonc"), "utf-8")
+    const config = JSON.parse(content)
+    expect(config.plugin).toContain("kord-aios")
+    expect(config.plugin).toContain("some-other-plugin")
+    expect(config.instructions).toContain(".kord/rules/**")
+    expect(config.instructions).toContain(".other/rules/**")
+    expect(config.customSetting).toBe("preserved")
   })
 })

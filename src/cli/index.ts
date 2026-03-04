@@ -80,22 +80,24 @@ program
   .option("-d, --directory <path>", "Working directory (default: current directory)")
   .option("--force", "Overwrite existing scaffolded files (templates, kord-rules.md)")
   .option("--skip-extract", "Skip extracting agents, skills, and commands to .opencode/")
+  .option("--project-mode <mode>", "Project mode: 'new' for greenfield, 'existing' for brownfield")
   .addHelpText("after", `
 Examples:
   $ bunx kord-aios init
   $ bunx kord-aios init --directory /path/to/project
   $ bunx kord-aios init --force
   $ bunx kord-aios init --skip-extract
+  $ bunx kord-aios init --project-mode existing
 
 What it creates:
   - .kord/ directory with subdirectories (scripts, templates, checklists, skills, squads)
   - docs/kord/ subdirectories (plans, drafts, notepads)
   - Template files (story.md, adr.md, kord-rules.md)
-  - Project config (.opencode/kord-aios.json)
+  - Project config (.opencode/kord-aios.json) - copies from global if exists
+  - OpenCode config (.opencode/opencode.jsonc) - adds kord-aios plugin and .kord/rules/**
   - Extracted agents, skills, commands to .opencode/ (unless --skip-extract)
 
 What it does NOT do:
-  - Does NOT add plugin to opencode.json
   - Does NOT configure provider authentication
   - Does NOT run doctor checks
   - Does NOT modify global config
@@ -105,6 +107,7 @@ What it does NOT do:
       directory: options.directory,
       force: options.force ?? false,
       skipExtract: options.skipExtract ?? false,
+      projectMode: options.projectMode,
     }
     const result = await init(initOptions)
     process.exit(result.exitCode)
