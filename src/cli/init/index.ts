@@ -3,7 +3,7 @@ import { scaffoldProject } from "../scaffolder"
 import { writeProjectKordAiosConfig } from "../config-manager"
 import { extract } from "../extract"
 import { bold, cyan } from "picocolors"
-import { existsSync, mkdirSync, cpSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, cpSync, readFileSync, writeFileSync, rmSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { KORD_DIR } from "../project-layout"
 import * as p from "@clack/prompts"
@@ -30,6 +30,12 @@ export interface InitResult {
     created: string[]
     skipped: string[]
     errors: string[]
+  }
+  migration: {
+    migrated: boolean
+    source?: string
+    target?: string
+    error?: string
   }
   squadExport: {
     success: boolean
@@ -96,6 +102,9 @@ export async function init(options: InitOptions): Promise<InitResult> {
     force,
   })
 
+  // Step 2.5: Migrate legacy kord-rules.md to .kord/rules/ if needed
+  const migrationResult = migrateLegacyRulesFile(cwd)
+
   // Step 3: Export code squad to .kord/squads/code/
   const squadExportResult = exportCodeSquad(cwd, force)
 
@@ -115,6 +124,7 @@ export async function init(options: InitOptions): Promise<InitResult> {
   printInitResults({
     kordCreated: kordResult.created,
     scaffold: scaffoldResult,
+    migration: migrationResult,
     squadExport: squadExportResult,
     config: configResult,
     opencodeConfig: opencodeConfigResult,
@@ -130,6 +140,7 @@ export async function init(options: InitOptions): Promise<InitResult> {
       created: kordResult.created,
     },
     scaffold: scaffoldResult,
+    migration: migrationResult,
     squadExport: squadExportResult,
     config: {
       success: configResult.success,
@@ -153,6 +164,50 @@ export async function init(options: InitOptions): Promise<InitResult> {
  * Detect project mode (new vs existing) based on filesystem.
  * If detection is ambiguous and TTY is available, prompts user.
  */
+
+/**
+ * Migrate legacy kord-rules.md from project root to .kord/rules/kord-rules.md.
+ * This ensures backward compatibility for projects that were initialized before
+ * the .kord/rules/ directory was introduced.
+ *
+ * Returns: { migrated: boolean, source?: string, target?: string }
+ */
+function migrateLegacyRulesFile(projectDir: string): { migrated: boolean; source?: string; target?: string; error?: string } {
+  const legacyPath = join(projectDir, "kord-rules.md")
+  const newPath = join(projectDir, KORD_DIR, "rules", "kord-rules.md")
+
+  // Check if legacy file exists and new location doesn't
+  const hasLegacy = existsSync(legacyPath)
+  const hasNew = existsSync(newPath)
+
+  // Only migrate if legacy exists AND new doesn't exist
+  if (hasLegacy && !hasNew) {
+    try {
+      // Ensure the target directory exists
+      const targetDir = join(projectDir, KORD_DIR, "rules")
+      if (!existsSync(targetDir)) {
+        mkdirSync(targetDir, { recursive: true })
+      }
+
+      // Read legacy file content
+      const content = readFileSync(legacyPath, "utf-8")
+
+      // Write to new location
+      writeFileSync(newPath, content, "utf-8")
+
+      // Optionally remove the legacy file (commented out for safety)
+      // rmSync(legacyPath)
+
+      return { migrated: true, source: legacyPath, target: newPath }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      return { migrated: false, error: `Migration failed: ${message}` }
+    }
+  }
+
+  return { migrated: false }
+}
+
 async function detectOrPromptProjectMode(cwd: string): Promise<"new" | "existing"> {
   // Detect based on existing project markers
   const hasPackageJson = existsSync(join(cwd, "package.json"))
@@ -319,6 +374,12 @@ interface PrintResultsParams {
     skipped: string[]
     errors: string[]
   }
+  migration: {
+    migrated: boolean
+    source?: string
+    target?: string
+    error?: string
+  }
   squadExport: {
     success: boolean
     exported: boolean
@@ -338,7 +399,7 @@ interface PrintResultsParams {
 }
 
 function printInitResults(params: PrintResultsParams): void {
-  const { kordCreated, scaffold, squadExport, config, opencodeConfig, extractSkipped } = params
+  const { kordCreated, scaffold, migration, squadExport, config, opencodeConfig, extractSkipped } = params
 
   // Print directory creation status
   if (kordCreated) {
@@ -355,6 +416,11 @@ function printInitResults(params: PrintResultsParams): void {
 
   if (totalSkipped > 0) {
     console.log(`${cyan("○")} ${bold(String(totalSkipped))} file(s) skipped (already exist)`)
+  }
+
+  // Print migration result
+  if (migration.migrated) {
+    console.log(`${cyan("✓")} ${bold("Migrated")} kord-rules.md to .kord/rules/`)
   }
 
   // Print squad export result

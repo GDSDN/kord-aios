@@ -1,6 +1,6 @@
 export const KORD_DIR = ".kord"
 export const KORD_DOCS_DIR = "docs/kord"
-export const KORD_RULES_FILE = "kord-rules.md"
+export const KORD_RULES_FILE = ".kord/rules/kord-rules.md"
 
 export const KORD_INPUT_SUBDIRS = [
   "scripts",
@@ -17,6 +17,7 @@ export const KORD_INPUT_SUBDIRS = [
 export const KORD_ACTIVE_SUBDIRS = [
   "templates",
   "squads",
+  "rules",
 ] as const
 
 /**

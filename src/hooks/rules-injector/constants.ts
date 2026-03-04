@@ -14,6 +14,8 @@ export const PROJECT_MARKERS = [
 ];
 
 export const PROJECT_RULE_SUBDIRS: [string, string][] = [
+  [".kord", "rules"],
+  [".sisyphus", "rules"],
   [".github", "instructions"],
   [".cursor", "rules"],
   [".claude", "rules"],

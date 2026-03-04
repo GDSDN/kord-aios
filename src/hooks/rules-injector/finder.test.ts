@@ -285,6 +285,97 @@ describe("findRuleFiles", () => {
     });
   });
 
+  describe(".kord/rules/ discovery (new location)", () => {
+    it("should discover .kord/rules/ files", () => {
+      // given .kord/rules/ directory (new location)
+      const rulesDir = join(TEST_DIR, ".kord", "rules");
+      mkdirSync(rulesDir, { recursive: true });
+      writeFileSync(join(rulesDir, "project.md"), "Project rules");
+
+      const currentFile = join(TEST_DIR, "index.ts");
+      writeFileSync(currentFile, "code");
+
+      // when finding rules
+      const candidates = findRuleFiles(TEST_DIR, homeDir, currentFile);
+
+      // then should find kord rules
+      const paths = candidates.map((c) => c.path);
+      expect(paths.some((p) => p.includes(join(".kord", "rules")))).toBe(true);
+    });
+
+    it("should discover .sisyphus/rules/ files (legacy alias)", () => {
+      // given .sisyphus/rules/ directory (legacy alias)
+      const rulesDir = join(TEST_DIR, ".sisyphus", "rules");
+      mkdirSync(rulesDir, { recursive: true });
+      writeFileSync(join(rulesDir, "legacy.md"), "Legacy rules");
+
+      const currentFile = join(TEST_DIR, "index.ts");
+      writeFileSync(currentFile, "code");
+
+      // when finding rules
+      const candidates = findRuleFiles(TEST_DIR, homeDir, currentFile);
+
+      // then should find sisyphus rules
+      const paths = candidates.map((c) => c.path);
+      expect(paths.some((p) => p.includes(join(".sisyphus", "rules")))).toBe(true);
+    });
+
+    it(".kord/rules/ should take precedence over .claude/rules/", () => {
+      // given both .kord/rules/ and .claude/rules/ with same-named files
+      const kordRules = join(TEST_DIR, ".kord", "rules");
+      const claudeRules = join(TEST_DIR, ".claude", "rules");
+      mkdirSync(kordRules, { recursive: true });
+      mkdirSync(claudeRules, { recursive: true });
+      writeFileSync(join(kordRules, "test.md"), "Kord rules");
+      writeFileSync(join(claudeRules, "test.md"), "Claude rules");
+
+      const currentFile = join(TEST_DIR, "index.ts");
+      writeFileSync(currentFile, "code");
+
+      // when finding rules
+      const candidates = findRuleFiles(TEST_DIR, homeDir, currentFile);
+
+      // then .kord/rules/ should be found first (lower distance)
+      const kordCandidate = candidates.find((c) =>
+        c.path.includes(join(".kord", "rules", "test.md"))
+      );
+      const claudeCandidate = candidates.find((c) =>
+        c.path.includes(join(".claude", "rules", "test.md"))
+      );
+
+      expect(kordCandidate).toBeDefined();
+      expect(claudeCandidate).toBeDefined();
+      // Both are at distance 0 from project root, but .kord is checked first
+      // So the first one in the array should be from .kord
+      const firstTestMd = candidates.find((c) => c.path.endsWith("test.md"));
+      expect(firstTestMd?.path).toContain(join(".kord", "rules"));
+    });
+
+    it(".kord/rules/ should take precedence over docs/kord/rules/", () => {
+      // given both .kord/rules/ and docs/kord/rules/
+      const kordRules = join(TEST_DIR, ".kord", "rules");
+      const docsRules = join(TEST_DIR, "docs/kord", "rules");
+      mkdirSync(kordRules, { recursive: true });
+      mkdirSync(docsRules, { recursive: true });
+      writeFileSync(join(kordRules, "guide.md"), "Kord guide");
+      writeFileSync(join(docsRules, "guide.md"), "Docs guide");
+
+      const currentFile = join(TEST_DIR, "index.ts");
+      writeFileSync(currentFile, "code");
+
+      // when finding rules
+      const candidates = findRuleFiles(TEST_DIR, homeDir, currentFile);
+
+      // then .kord/rules/ should be found first
+      const guideCandidates = candidates.filter((c) =>
+        c.path.endsWith("guide.md")
+      );
+      expect(guideCandidates.length).toBe(2);
+      // The first guide.md should be from .kord/rules
+      expect(guideCandidates[0].path).toContain(join(".kord", "rules"));
+    });
+  });
+
   describe("user-level rules", () => {
     it("should discover user-level .claude/rules/ files", () => {
       // given user-level rules
