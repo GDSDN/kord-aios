@@ -57,6 +57,19 @@ describe("init", () => {
     expect(existsSync(join(TEST_DIR, KORD_DOCS_DIR, "notepads"))).toBe(true)
   })
 
+  test("creates all expected docs/kord/ output directories (plans, stories, epics, prds)", async () => {
+    //#given - empty project directory
+
+    //#when
+    await init({ directory: TEST_DIR })
+
+    //#then - The init-delivery contract: all output directories must exist
+    expect(existsSync(join(TEST_DIR, KORD_DOCS_DIR, "plans"))).toBe(true)
+    expect(existsSync(join(TEST_DIR, KORD_DOCS_DIR, "stories"))).toBe(true)
+    expect(existsSync(join(TEST_DIR, KORD_DOCS_DIR, "epics"))).toBe(true)
+    expect(existsSync(join(TEST_DIR, KORD_DOCS_DIR, "prds"))).toBe(true)
+  })
+
   test("creates template files", async () => {
     //#given - empty project directory
 
@@ -72,6 +85,40 @@ describe("init", () => {
 
     const adr = readFileSync(join(TEST_DIR, KORD_DIR, "templates", "adr.md"), "utf-8")
     expect(adr).toContain("Context")
+  })
+
+  test("creates exactly 13 template files under .kord/templates/", async () => {
+    //#given - empty project directory
+
+    //#when
+    await init({ directory: TEST_DIR })
+
+    //#then - The init-delivery contract: 13 templates must exist
+    const templatesDir = join(TEST_DIR, KORD_DIR, "templates")
+    const expectedTemplates = [
+      "story.md",
+      "adr.md",
+      "prd.md",
+      "epic.md",
+      "task.md",
+      "qa-gate.md",
+      "qa-report.md",
+      "checklist-story-draft.md",
+      "checklist-story-dod.md",
+      "checklist-pr-review.md",
+      "checklist-architect.md",
+      "checklist-pre-push.md",
+      "checklist-self-critique.md",
+    ]
+
+    for (const template of expectedTemplates) {
+      expect(existsSync(join(templatesDir, template))).toBe(true)
+    }
+
+    // Verify exactly 13 files (not more, not less)
+    const { readdirSync } = await import("node:fs")
+    const files = readdirSync(templatesDir).filter((f) => f.endsWith(".md"))
+    expect(files).toHaveLength(13)
   })
 
   test("creates kord-rules.md at project root", async () => {
@@ -213,6 +260,37 @@ describe("init", () => {
     //#then
     expect(result.scaffold.skipped.length).toBeGreaterThan(0)
     expect(result.scaffold.created).toHaveLength(0)
+  })
+
+  test("init is non-destructive idempotent - running twice without force preserves user edits", async () => {
+    //#given - scaffold project first
+    await init({ directory: TEST_DIR })
+
+    // Modify a template file to detect non-destruction
+    const storyPath = join(TEST_DIR, KORD_DIR, "templates", "story.md")
+    const originalContent = readFileSync(storyPath, "utf-8")
+    const userEdit = "USER CUSTOM CONTENT"
+    writeFileSync(storyPath, userEdit, "utf-8")
+
+    // Also modify an output directory file
+    const plansDir = join(TEST_DIR, KORD_DOCS_DIR, "plans")
+    const userNotePath = join(plansDir, "user-note.md")
+    writeFileSync(userNotePath, "My custom note", "utf-8")
+
+    //#when - init again WITHOUT force
+    const result = await init({ directory: TEST_DIR, force: false })
+
+    //#then - user edits should be PRESERVED (non-destructive)
+    const preservedStoryContent = readFileSync(storyPath, "utf-8")
+    expect(preservedStoryContent).toBe(userEdit) // Should NOT be overwritten
+
+    const preservedUserNote = readFileSync(userNotePath, "utf-8")
+    expect(preservedUserNote).toBe("My custom note") // Should NOT be deleted
+
+    // Second run should succeed
+    expect(result.success).toBe(true)
+    expect(result.scaffold.created).toHaveLength(0) // Nothing new created
+    expect(result.scaffold.skipped.length).toBeGreaterThan(0) // Everything skipped
   })
 
   test("exports code squad to .kord/squads/code/", async () => {

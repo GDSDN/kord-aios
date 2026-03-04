@@ -31,6 +31,9 @@ export const KORD_RESERVED_SUBDIRS = [
 
 export const KORD_OUTPUT_SUBDIRS = [
   "plans",
+  "stories",
+  "epics",
+  "prds",
   "drafts",
   "notepads",
 ] as const
