@@ -79,17 +79,20 @@ program
   .description("Initialize Kord AIOS project structure (non-interactive)")
   .option("-d, --directory <path>", "Working directory (default: current directory)")
   .option("--force", "Overwrite existing scaffolded files (templates, kord-rules.md)")
+  .option("--skip-extract", "Skip extracting agents, skills, and commands to .opencode/")
   .addHelpText("after", `
 Examples:
   $ bunx kord-aios init
   $ bunx kord-aios init --directory /path/to/project
   $ bunx kord-aios init --force
+  $ bunx kord-aios init --skip-extract
 
 What it creates:
   - .kord/ directory with subdirectories (scripts, templates, checklists, skills, squads)
   - docs/kord/ subdirectories (plans, drafts, notepads)
   - Template files (story.md, adr.md, kord-rules.md)
   - Project config (.opencode/kord-aios.json)
+  - Extracted agents, skills, commands to .opencode/ (unless --skip-extract)
 
 What it does NOT do:
   - Does NOT add plugin to opencode.json
@@ -101,6 +104,7 @@ What it does NOT do:
     const initOptions: InitOptions = {
       directory: options.directory,
       force: options.force ?? false,
+      skipExtract: options.skipExtract ?? false,
     }
     const result = await init(initOptions)
     process.exit(result.exitCode)

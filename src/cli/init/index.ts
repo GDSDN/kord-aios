@@ -1,6 +1,7 @@
 import { createKordDirectory } from "../kord-directory"
 import { scaffoldProject } from "../scaffolder"
 import { writeProjectKordAiosConfig } from "../config-manager"
+import { extract } from "../extract"
 import { bold, cyan } from "picocolors"
 import { existsSync, mkdirSync, cpSync } from "node:fs"
 import { join } from "node:path"
@@ -13,6 +14,7 @@ const BUILTIN_SQUAD_FILE = "SQUAD.yaml"
 export interface InitOptions {
   directory?: string
   force?: boolean
+  skipExtract?: boolean
 }
 
 export interface InitResult {
@@ -36,6 +38,10 @@ export interface InitResult {
     configPath?: string
     error?: string
   }
+  extract: {
+    success: boolean
+    exitCode: number
+  }
   exitCode: number
 }
 
@@ -48,12 +54,14 @@ export interface InitResult {
  * - Template files (story.md, adr.md, kord-rules.md)
  * - Project config (.opencode/kord-aios.json)
  * - Exports code squad to .kord/squads/code/
+ * - Extracts agents, skills, commands to .opencode/ (unless skipExtract is true)
  *
  * Does NOT touch global config.
  */
 export async function init(options: InitOptions): Promise<InitResult> {
   const cwd = options.directory ?? process.cwd()
   const force = options.force ?? false
+  const skipExtract = options.skipExtract ?? false
 
   // Step 1: Create .kord/ directory
   const kordResult = createKordDirectory(cwd)
@@ -70,15 +78,22 @@ export async function init(options: InitOptions): Promise<InitResult> {
   // Step 4: Write project config
   const configResult = writeProjectKordAiosConfig(cwd)
 
+  // Step 5: Extract agents, skills, commands to .opencode/
+  let extractExitCode = 0
+  if (!skipExtract) {
+    extractExitCode = await extract({ directory: cwd, force })
+  }
+
   // Print results
   printInitResults({
     kordCreated: kordResult.created,
     scaffold: scaffoldResult,
     squadExport: squadExportResult,
     config: configResult,
+    extractSkipped: skipExtract,
   })
 
-  const success = kordResult.success && squadExportResult.success && configResult.success
+  const success = kordResult.success && squadExportResult.success && configResult.success && extractExitCode === 0
 
   return {
     success,
@@ -92,6 +107,10 @@ export async function init(options: InitOptions): Promise<InitResult> {
       success: configResult.success,
       configPath: configResult.configPath,
       error: configResult.error,
+    },
+    extract: {
+      success: extractExitCode === 0,
+      exitCode: extractExitCode,
     },
     exitCode: success ? 0 : 1,
   }
@@ -167,10 +186,11 @@ interface PrintResultsParams {
     configPath?: string
     error?: string
   }
+  extractSkipped: boolean
 }
 
 function printInitResults(params: PrintResultsParams): void {
-  const { kordCreated, scaffold, squadExport, config } = params
+  const { kordCreated, scaffold, squadExport, config, extractSkipped } = params
 
   // Print directory creation status
   if (kordCreated) {
@@ -199,6 +219,11 @@ function printInitResults(params: PrintResultsParams): void {
     console.log(`${cyan("✓")} ${bold(".opencode/kord-aios.json")} written`)
   } else if (config.error) {
     console.log(`${cyan("✗")} Failed to write config: ${config.error}`)
+  }
+
+  // Print extract result
+  if (extractSkipped) {
+    console.log(`${cyan("○")} ${bold("Extract")} skipped (--skip-extract flag)`)
   }
 
   // Print errors if any

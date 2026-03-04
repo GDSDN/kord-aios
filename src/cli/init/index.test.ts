@@ -354,4 +354,28 @@ describe("init", () => {
       expect(true).toBe(true)
     }
   })
+
+  test("init should extract agents, skills, and commands to .opencode/", async () => {
+    //#given - empty project directory
+
+    //#when
+    await init({ directory: TEST_DIR })
+
+    //#then - extract should have created .opencode/ agents, skills, commands
+    expect(existsSync(join(TEST_DIR, ".opencode", "agents"))).toBe(true)
+    expect(existsSync(join(TEST_DIR, ".opencode", "skills"))).toBe(true)
+    expect(existsSync(join(TEST_DIR, ".opencode", "commands"))).toBe(true)
+  })
+
+  test("init with skipExtract should NOT extract agents, skills, commands", async () => {
+    //#given - empty project directory
+
+    //#when
+    await init({ directory: TEST_DIR, skipExtract: true })
+
+    //#then - extract should NOT have been called
+    expect(existsSync(join(TEST_DIR, ".opencode", "agents"))).toBe(false)
+    expect(existsSync(join(TEST_DIR, ".opencode", "skills"))).toBe(false)
+    expect(existsSync(join(TEST_DIR, ".opencode", "commands"))).toBe(false)
+  })
 })
