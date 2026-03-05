@@ -18,6 +18,8 @@ export const KORD_ACTIVE_SUBDIRS = [
   "templates",
   "squads",
   "rules",
+  "standards",
+  "guides",
 ] as const
 
 /**
@@ -691,4 +693,277 @@ Reflect on your work before submission.
 - [ ] Potential refactors identified
 - [ ] Technical debt noted
 - [ ] Follow-up items documented
+`
+
+// ============================================================================
+// New methodology files for .kord/standards/ and .kord/guides/
+// ============================================================================
+
+export const KORD_ROOT_AGENTS_CONTENT = `# .kord — Kord AIOS Project Configuration
+
+This directory contains project-level methodology and configuration for Kord AIOS agents.
+
+## Directory Structure
+
+| Path | Purpose |
+|------|---------|
+| \`templates/\` | Story, ADR, PRD, task, and checklist templates |
+| \`standards/\` | Quality gates, decision heuristics, best practices |
+| \`guides/\` | Onboarding guides for new and existing projects |
+| \`squads/\` | Custom SQUAD.yaml manifests |
+| \`rules/\` | Project-specific agent rules |
+
+## Usage
+
+- Templates are used by \`/plan\` and \`/start-work\` commands
+- Standards provide guidance for agent decision-making
+- Guides help onboard agents to project context
+
+For details, see individual directory \`AGENTS.md\` files.
+`
+
+export const KORD_STANDARDS_AGENTS_CONTENT = `# .kord/standards — Quality Standards and Heuristics
+
+This directory contains quality gates and decision heuristics for Kord AIOS agents.
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| \`quality-gates.md\` | Checkpoints that must pass before advancing |
+| \`decision-heuristics.md\` | Guidelines for agent decision-making |
+
+## Quality Gates
+
+Quality gates are advisory checkpoints. Agents should verify relevant gates before marking work complete:
+
+- **Planning Gate**: Requirements are clear and testable
+- **Implementation Gate**: Code passes lint, typecheck, and tests
+- **Review Gate**: PR follows project conventions
+- **Agent Quality Gate**: Agent outputs meet quality standards
+
+## Decision Heuristics
+
+These heuristics guide agents when making technical decisions:
+
+- Prefer explicit over implicit
+- Prefer simple over complex (unless complexity is justified)
+- Prefer reversible over irreversible
+- Document trade-offs in ADRs
+`
+
+export const KORD_GUIDES_AGENTS_CONTENT = `# .kord/guides — Project Onboarding Guides
+
+This directory contains guides to help agents understand project context.
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| \`new-project.md\` | Guide for starting a new project with Kord AIOS |
+| \`existing-project.md\` | Guide for adding Kord AIOS to an existing project |
+
+## Usage
+
+These guides are loaded by the agent when initializing work. They provide context about:
+
+- Project setup and configuration
+- Development workflow
+- Team conventions
+- Quality expectations
+`
+
+export const KORD_STANDARDS_QUALITY_GATES_CONTENT = `# Quality Gates
+
+Advisory checkpoints that agents should verify before marking work complete.
+
+## Planning Gate
+
+- [ ] Requirements are clear and testable
+- [ ] Acceptance criteria have pass/fail conditions
+- [ ] Dependencies are identified
+- [ ] Scope is manageable (single deliverable)
+
+## Implementation Gate
+
+- [ ] Code compiles without errors
+- [ ] Tests pass (unit + integration)
+- [ ] Linting passes
+- [ ] No type errors
+- [ ] No debug code (console.log, etc.)
+
+## Review Gate
+
+- [ ] PR description is complete
+- [ ] Code follows project conventions
+- [ ] No AI comment bloat
+- [ ] No "as any", "@ts-ignore", "@ts-expect-error"
+
+## Agent Quality Gate
+
+- [ ] Output is actionable (not vague)
+- [ ] Decisions are explained
+- [ ] Trade-offs are documented
+- [ ] Edge cases are considered
+`
+
+export const KORD_STANDARDS_DECISION_HEURISTICS_CONTENT = `# Decision Heuristics
+
+Guidelines for agents making technical decisions.
+
+## General Principles
+
+1. **Explicit over implicit**: Make assumptions visible
+2. **Simple over complex**: Avoid unnecessary complexity
+3. **Reversible over irreversible**: Prefer reversible decisions
+4. **Document trade-offs**: Use ADRs for significant choices
+
+## Code Decisions
+
+- Follow existing patterns in the codebase
+- Name variables clearly (self-documenting)
+- Keep functions focused (single responsibility)
+- Error handling: fail fast with clear messages
+
+## Architecture Decisions
+
+- Consider scalability, performance, security
+- External dependencies should be documented
+- API contracts should be defined
+- Data flow should be understood
+
+## Trade-off Analysis
+
+When making decisions, consider:
+
+- **Pros**: Benefits of the approach
+- **Cons**: Costs and risks
+- **Alternatives**: Other options considered
+- **Mitigation**: How to address downsides
+`
+
+export const KORD_GUIDE_NEW_PROJECT_CONTENT = `# New Project Guide
+
+Guide for starting a new project with Kord AIOS.
+
+## Prerequisites
+
+- OpenCode >= 1.0.150 installed
+- Kord AIOS plugin installed
+
+## Quick Start
+
+1. Run the installer: \`bunx kord-aios init\`
+2. Follow interactive prompts
+3. Review generated \`.kord/\` structure
+
+## What Gets Created
+
+- \`.kord/templates/\` — Story, ADR, task, checklist templates
+- \`.kord/standards/\` — Quality gates and decision heuristics
+- \`.kord/guides/\` — This guide and existing-project guide
+- \`docs/kord/\` — Plans, stories, epics, drafts directories
+
+## First Steps
+
+1. Create your first story: \`/plan\`
+2. Execute via Build: \`/start-work\`
+3. Add team members as needed
+
+## Configuration
+
+Edit \`.opencode/kord-aios.json\` to customize:
+
+- Agent models and temperatures
+- Background task concurrency
+- Disabled hooks/skills
+
+See \`docs/guide/configurations.md\` for details.
+`
+
+export const KORD_GUIDE_EXISTING_PROJECT_CONTENT = `# Existing Project Guide
+
+Guide for adding Kord AIOS to an existing project.
+
+## Prerequisites
+
+- OpenCode >= 1.0.150 installed
+- Existing project with code
+
+## Quick Start
+
+1. Run: \`bunx kord-aios install\`
+2. Configure agents in \`.opencode/kord-aios.json\`
+3. Start using \`/plan\` and \`/start-work\`
+
+## Integration Tips
+
+### Migrate Existing Docs
+
+- Move existing specs to \`docs/kord/stories/\`
+- Move roadmaps to \`docs/kord/epics/\`
+- Move plans to \`docs/kord/plans/\`
+
+### Configure Agents
+
+Start with default configurations, then tune:
+
+- Temperature: 0.1-0.3 for code agents
+- Models: Use Opus/Sonnet for planning, Codex for code
+
+### Preserve Workflow
+
+- Keep existing CI/CD
+- Adapt Kord methodology to existing processes
+- Start small: use \`/plan\` for one feature
+
+## Common Issues
+
+- **Conflicting configs**: Check \`.opencode/\` takes precedence
+- **Missing permissions**: Verify \`write_paths\` in config
+- **Model issues**: Use doctor: \`bunx kord-aios doctor\`
+`
+
+export const CHECKLIST_AGENT_QUALITY_GATE_CONTENT = `---
+title: "Agent Quality Gate Checklist"
+type: checklist
+status: active
+created: "{DATE}"
+---
+
+# Agent Quality Gate Checklist
+
+Verify agent outputs meet quality standards before accepting work.
+
+## Completeness
+
+- [ ] All acceptance criteria addressed
+- [ ] No placeholder comments remaining
+- [ ] No "TODO" without description
+
+## Clarity
+
+- [ ] Output is actionable
+- [ ] Decisions are explained
+- [ ] Next steps are clear
+
+## Technical Quality
+
+- [ ] Code compiles without errors
+- [ ] Tests are included
+- [ ] No anti-patterns used
+
+## Edge Cases
+
+- [ ] Error cases handled
+- [ ] Boundary conditions considered
+
+## Documentation
+
+- [ ] Code comments are meaningful
+- [ ] Documentation updated if needed
+
+## Notes
+
+_Additional observations about agent performance_
 `
