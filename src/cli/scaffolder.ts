@@ -19,6 +19,14 @@ import {
   CHECKLIST_ARCHITECT_CONTENT,
   CHECKLIST_PRE_PUSH_CONTENT,
   CHECKLIST_SELF_CRITIQUE_CONTENT,
+  KORD_ROOT_AGENTS_CONTENT,
+  KORD_STANDARDS_AGENTS_CONTENT,
+  KORD_GUIDES_AGENTS_CONTENT,
+  KORD_STANDARDS_QUALITY_GATES_CONTENT,
+  KORD_STANDARDS_DECISION_HEURISTICS_CONTENT,
+  KORD_GUIDE_NEW_PROJECT_CONTENT,
+  KORD_GUIDE_EXISTING_PROJECT_CONTENT,
+  CHECKLIST_AGENT_QUALITY_GATE_CONTENT,
 } from "./project-layout"
 
 export interface ScaffoldResult {
@@ -30,6 +38,7 @@ export interface ScaffoldResult {
 export interface ScaffoldOptions {
   directory: string
   force?: boolean
+  projectMode?: "new" | "existing"
 }
 
 const GITKEEP = ""
@@ -40,7 +49,7 @@ interface DirEntry {
   isDir?: boolean
 }
 
-function getScaffoldEntries(baseDir: string): DirEntry[] {
+function getScaffoldEntries(baseDir: string, projectMode?: "new" | "existing"): DirEntry[] {
   const entries: DirEntry[] = []
 
   // docs/kord/ work directories
@@ -69,17 +78,79 @@ function getScaffoldEntries(baseDir: string): DirEntry[] {
   entries.push({ path: join(templatesDir, "checklist-pre-push.md"), content: CHECKLIST_PRE_PUSH_CONTENT })
   entries.push({ path: join(templatesDir, "checklist-self-critique.md"), content: CHECKLIST_SELF_CRITIQUE_CONTENT })
 
+  // .kord/templates/checklist-agent-quality-gate.md
+  entries.push({ path: join(templatesDir, "checklist-agent-quality-gate.md"), content: CHECKLIST_AGENT_QUALITY_GATE_CONTENT })
+
+  // .kord/AGENTS.md (root index)
+  entries.push({ path: join(baseDir, KORD_DIR, "AGENTS.md"), content: KORD_ROOT_AGENTS_CONTENT })
+
+  // .kord/standards/ files
+  const standardsDir = join(baseDir, KORD_DIR, "standards")
+  entries.push({ path: standardsDir, isDir: true })
+  entries.push({ path: join(standardsDir, "AGENTS.md"), content: KORD_STANDARDS_AGENTS_CONTENT })
+  entries.push({ path: join(standardsDir, "quality-gates.md"), content: KORD_STANDARDS_QUALITY_GATES_CONTENT })
+  entries.push({ path: join(standardsDir, "decision-heuristics.md"), content: KORD_STANDARDS_DECISION_HEURISTICS_CONTENT })
+
+  // .kord/guides/ files
+  const guidesDir = join(baseDir, KORD_DIR, "guides")
+  entries.push({ path: guidesDir, isDir: true })
+  entries.push({ path: join(guidesDir, "AGENTS.md"), content: KORD_GUIDES_AGENTS_CONTENT })
+  entries.push({ path: join(guidesDir, "new-project.md"), content: KORD_GUIDE_NEW_PROJECT_CONTENT })
+  entries.push({ path: join(guidesDir, "existing-project.md"), content: KORD_GUIDE_EXISTING_PROJECT_CONTENT })
+
   // kord-rules.md at project root
   entries.push({ path: join(baseDir, KORD_RULES_FILE), content: KORD_RULES_CONTENT })
+
+  // .kord/rules/project-mode.md - generated dynamically based on projectMode
+  const projectModeContent = getProjectModeContent(projectMode)
+  entries.push({ path: join(baseDir, KORD_DIR, "rules", "project-mode.md"), content: projectModeContent })
 
   return entries
 }
 
+/**
+ * Generate project-mode.md content based on project mode.
+ * This file tells agents how to onboard to this project.
+ */
+function getProjectModeContent(projectMode?: "new" | "existing"): string {
+  const mode = projectMode ?? "existing" // Default to existing for backward compatibility
+  const stage = mode === "new" ? "NEW_SETUP" : "EXISTING_UNASSESSED"
+  const readFirst = mode === "new" ? ".kord/guides/new-project.md" : ".kord/guides/existing-project.md"
+
+  return `# Project Mode
+
+Project Mode: ${mode}
+Project Stage: ${stage}
+Read-first: ${readFirst}
+
+## Context
+
+This file tells Kord agents how to onboard to this project.
+
+- **New Project**: Starting from scratch, no existing codebase
+- **Existing Project**: Adding Kord to an existing codebase that needs assessment
+
+## For New Projects
+
+Read \`.kord/guides/new-project.md\` for guidance on:
+- Setting up the initial project structure
+- Creating your first story
+- Establishing development workflow
+
+## For Existing Projects
+
+Read \`.kord/guides/existing-project.md\` for guidance on:
+- Assessing the existing codebase
+- Planning the migration
+- Identifying integration points
+`
+}
+
 export function scaffoldProject(options: ScaffoldOptions): ScaffoldResult {
-  const { directory, force = false } = options
+  const { directory, force = false, projectMode } = options
   const result: ScaffoldResult = { created: [], skipped: [], errors: [] }
 
-  const entries = getScaffoldEntries(directory)
+  const entries = getScaffoldEntries(directory, projectMode)
 
   for (const entry of entries) {
     try {
