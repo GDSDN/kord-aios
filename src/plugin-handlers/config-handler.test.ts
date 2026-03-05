@@ -237,6 +237,7 @@ describe("Plan agent behavior", () => {
     const agents = config.agent as Record<string, { mode?: string; name?: string; prompt?: string }>
     expect(agents.plan).toBeDefined()
     expect(agents.plan.mode).toBe("subagent")
+    expect((agents.plan as { hidden?: boolean }).hidden).toBe(true)
     expect(agents.planner).toBeDefined()
     expect(agents.planner.mode).toBe("all")
   })
