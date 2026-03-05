@@ -7,11 +7,13 @@ import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
 import { createMcpOAuthCommand } from "./mcp-oauth"
 import { extract } from "./extract"
+import { getStatus } from "./status"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
 import type { DoctorOptions } from "./doctor"
 import type { InitOptions } from "./init"
+import type { StatusOptions } from "./status"
 import packageJson from "../../package.json" with { type: "json" }
 
 const VERSION = packageJson.version
@@ -234,6 +236,31 @@ Examples:
       force: options.force ?? false,
       diff: options.diff ?? false,
     })
+    process.exit(exitCode)
+  })
+
+program
+  .command("status")
+  .description("Show Kord AIOS project status (mode, stage, configuration)")
+  .option("-d, --directory <path>", "Working directory (default: current directory)")
+  .option("--json", "Output in JSON format for scripting")
+  .addHelpText("after", `
+Examples:
+  $ bunx kord-aios status
+  $ bunx kord-aios status --json
+  $ bunx kord-aios status --directory /path/to/project
+
+This command shows:
+  - Project Mode and Stage from .kord/rules/project-mode.md
+  - Whether Kord plugin is configured
+  - Whether rules injection (.kord/rules/**) is enabled
+`)
+  .action(async (options) => {
+    const statusOptions: StatusOptions = {
+      directory: options.directory,
+      json: options.json ?? false,
+    }
+    const exitCode = await getStatus(statusOptions)
     process.exit(exitCode)
   })
 

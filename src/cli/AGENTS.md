@@ -2,19 +2,22 @@
 
 ## OVERVIEW
 
-CLI entry: `bunx kord-aios`. 5 commands with Commander.js + @clack/prompts TUI.
+CLI entry: `bunx kord-aios`. 6 commands with Commander.js + @clack/prompts TUI.
 
-**Commands**: install (interactive setup), doctor (14 health checks), run (session launcher), get-local-version, mcp-oauth
+**Commands**: install, init, doctor, run, get-local-version, status, mcp-oauth, extract, version
 
 ## STRUCTURE
 
 ```
 cli/
-├── index.ts              # Commander.js entry (5 commands)
-├── install.ts            # Interactive TUI (542 lines)
+├── index.ts              # Commander.js entry (9 commands)
+├── banner.ts             # Shared banner utility
+├── install.ts            # Interactive TUI (737 lines)
 ├── config-manager.ts     # JSONC parsing (667 lines)
 ├── model-fallback.ts     # Model fallback configuration
 ├── types.ts              # InstallArgs, InstallConfig
+├── status/
+│   └── index.ts          # Project status command
 ├── doctor/
 │   ├── index.ts          # Doctor entry
 │   ├── runner.ts         # Check orchestration
@@ -44,10 +47,14 @@ cli/
 | Command | Purpose |
 |---------|---------|
 | `install` | Interactive setup with provider selection |
+| `init` | Initialize Kord AIOS project structure |
 | `doctor` | 14 health checks for diagnostics |
 | `run` | Launch session with todo enforcement |
 | `get-local-version` | Version detection and update check |
+| `status` | Show project status (mode, stage, configuration) |
+| `extract` | Extract bundled methodology content |
 | `mcp-oauth` | MCP OAuth authentication flow |
+| `version` | Show version information |
 
 ## DOCTOR CATEGORIES (14 Checks)
 
