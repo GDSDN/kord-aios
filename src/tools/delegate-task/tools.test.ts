@@ -288,6 +288,43 @@ describe("kord-task", () => {
     })
   })
 
+  describe("resolveSubagentExecution (plan workflow)", () => {
+    test("allows planner to delegate to plan-analyzer", async () => {
+      // given
+      const { resolveSubagentExecution } = require("./executor")
+
+      const args: DelegateTaskArgs = {
+        description: "Plan analyze",
+        prompt: "Analyze this request",
+        subagent_type: "plan-analyzer",
+        run_in_background: false,
+        load_skills: [],
+      }
+
+      const executorCtx = {
+        client: {
+          app: {
+            agents: async () => ({
+              data: [{ name: "plan-analyzer", mode: "subagent" }],
+            }),
+          },
+        },
+      }
+
+      // when
+      const result = await resolveSubagentExecution(
+        args,
+        executorCtx,
+        "planner",
+        "'quick'"
+      )
+
+      // then
+      expect(result.error).toBeUndefined()
+      expect(result.agentToUse).toBe("plan-analyzer")
+    })
+  })
+
   describe("category delegation config validation", () => {
     test("fills subagent_type as dev-junior when category is provided without subagent_type", async () => {
       // given
