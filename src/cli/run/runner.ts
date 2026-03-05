@@ -1,5 +1,6 @@
 import { createOpencode } from "@opencode-ai/sdk"
 import pc from "picocolors"
+import { printBanner } from "../banner"
 import type { RunOptions, RunContext } from "./types"
 import { checkCompletionConditions } from "./completion"
 import { createEventState, processEvents, serializeError } from "./events"
@@ -87,6 +88,9 @@ export async function run(options: RunOptions): Promise<number> {
   // Set CLI run mode environment variable before any config loading
   // This signals to config-handler to deny Question tool (no TUI to answer)
   process.env.OPENCODE_CLI_RUN_MODE = "true"
+
+  // Print banner
+  printBanner({ mode: "run" })
 
   const {
     message,

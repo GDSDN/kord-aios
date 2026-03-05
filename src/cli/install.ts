@@ -1,5 +1,6 @@
 import * as p from "@clack/prompts"
 import color from "picocolors"
+import { printBanner } from "./banner"
 import type { InstallArgs, InstallConfig, ClaudeSubscription, BooleanArg, DetectedConfig, ProjectMaturityStatus } from "./types"
 import { detectProjectMaturity } from "./project-detector"
 import { runPostInstallDoctor } from "./post-install-doctor"
@@ -452,6 +453,7 @@ async function runNonTuiInstallWithArgs(args: InstallArgs, detected: DetectedCon
   const isUpdate = effectiveStatus === "existing"
 
   printHeader(isUpdate)
+  printBanner({ mode: isUpdate ? "update" : "install" })
   printInfo(getMaturityMessage(effectiveStatus))
 
   const totalSteps = 4

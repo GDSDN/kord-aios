@@ -2,9 +2,11 @@ import { createKordDirectory } from "../kord-directory"
 import { scaffoldProject } from "../scaffolder"
 import { writeProjectKordAiosConfig } from "../config-manager"
 import { extract } from "../extract"
+import { printBanner } from "../banner"
 import { bold, cyan } from "picocolors"
 import { existsSync, mkdirSync, cpSync, readFileSync, writeFileSync, rmSync } from "node:fs"
 import { join, resolve } from "node:path"
+import { execSync } from "node:child_process"
 import { KORD_DIR } from "../project-layout"
 import * as p from "@clack/prompts"
 import { parseJsonc } from "../../shared"
@@ -18,6 +20,7 @@ export interface InitOptions {
   force?: boolean
   skipExtract?: boolean
   projectMode?: "new" | "existing"
+  bootstrap?: boolean
 }
 
 export interface InitResult {
@@ -52,6 +55,13 @@ export interface InitResult {
     configPath?: string
     error?: string
   }
+  bootstrap: {
+    success: boolean
+    gitInitialized: boolean
+    packageJsonCreated: boolean
+    warning?: string
+    error?: string
+  }
   extract: {
     success: boolean
     exitCode: number
@@ -70,6 +80,7 @@ export interface InitResult {
  * - OpenCode config (.opencode/opencode.jsonc) with plugin and instructions
  * - Exports code squad to .kord/squads/code/
  * - Extracts agents, skills, commands to .opencode/ (unless skipExtract is true)
+ * - Optionally bootstrap (git init + package.json) if --bootstrap is set and mode is "new"
  *
  * Does NOT touch global config.
  */
@@ -77,6 +88,7 @@ export async function init(options: InitOptions): Promise<InitResult> {
   const cwd = options.directory ?? process.cwd()
   const force = options.force ?? false
   const skipExtract = options.skipExtract ?? false
+  const bootstrap = options.bootstrap ?? false
 
   // Step 0: Detect or prompt for project mode (for future use, currently just detection)
   // This can be used to customize behavior based on project type
@@ -93,13 +105,17 @@ export async function init(options: InitOptions): Promise<InitResult> {
   // Note: projectMode detection happens inline above. For TTY prompt in non-TTY mode,
   // the user should use --project-mode flag
 
+  // Print banner with project context
+  printBanner({ mode: projectMode })
+
   // Step 1: Create .kord/ directory
   const kordResult = createKordDirectory(cwd)
 
-  // Step 2: Scaffold project structure
+  // Step 2: Scaffold project structure (pass projectMode for project-mode.md generation)
   const scaffoldResult = scaffoldProject({
     directory: cwd,
     force,
+    projectMode,
   })
 
   // Step 2.5: Migrate legacy kord-rules.md to .kord/rules/ if needed
@@ -114,7 +130,10 @@ export async function init(options: InitOptions): Promise<InitResult> {
   // Step 5: Configure opencode.jsonc with plugin and instructions
   const opencodeConfigResult = await configureOpenCodeConfig(cwd, force)
 
-  // Step 6: Extract agents, skills, commands to .opencode/
+  // Step 6: Bootstrap if requested (git init + package.json for new projects)
+  const bootstrapResult = handleBootstrap(cwd, projectMode, bootstrap)
+
+  // Step 7: Extract agents, skills, commands to .opencode/
   let extractExitCode = 0
   if (!skipExtract) {
     extractExitCode = await extract({ directory: cwd, force })
@@ -129,9 +148,10 @@ export async function init(options: InitOptions): Promise<InitResult> {
     config: configResult,
     opencodeConfig: opencodeConfigResult,
     extractSkipped: skipExtract,
+    bootstrap: bootstrapResult,
   })
 
-  const success = kordResult.success && squadExportResult.success && configResult.success && opencodeConfigResult.success && extractExitCode === 0
+  const success = kordResult.success && squadExportResult.success && configResult.success && opencodeConfigResult.success && bootstrapResult.success && extractExitCode === 0
 
   return {
     success,
@@ -152,6 +172,7 @@ export async function init(options: InitOptions): Promise<InitResult> {
       configPath: opencodeConfigResult.configPath,
       error: opencodeConfigResult.error,
     },
+    bootstrap: bootstrapResult,
     extract: {
       success: extractExitCode === 0,
       exitCode: extractExitCode,
@@ -241,6 +262,92 @@ async function detectOrPromptProjectMode(cwd: string): Promise<"new" | "existing
   }
 
   return selection as "new" | "existing"
+}
+
+/**
+ * Handle bootstrap operation for new projects.
+ * If mode is "new" and bootstrap is true: run git init and create package.json if missing.
+ * If mode is "existing" and bootstrap is true: warn and skip bootstrap.
+ */
+function handleBootstrap(
+  projectDir: string,
+  projectMode: "new" | "existing",
+  bootstrap: boolean
+): {
+  success: boolean
+  gitInitialized: boolean
+  packageJsonCreated: boolean
+  warning?: string
+  error?: string
+} {
+  // No bootstrap requested - skip silently
+  if (!bootstrap) {
+    return {
+      success: true,
+      gitInitialized: false,
+      packageJsonCreated: false,
+    }
+  }
+
+  // Bootstrap requested but mode is existing - warn and skip
+  if (projectMode === "existing") {
+    return {
+      success: true,
+      gitInitialized: false,
+      packageJsonCreated: false,
+      warning: "--bootstrap ignored: project mode is 'existing'. Bootstrap only applies to 'new' projects.",
+    }
+  }
+
+  // Bootstrap for new projects
+  let gitInitialized = false
+  let packageJsonCreated = false
+  let error: string | undefined
+
+  // 1. Run git init if .git doesn't exist
+  const gitDir = join(projectDir, ".git")
+  if (!existsSync(gitDir)) {
+    try {
+      execSync("git init", { cwd: projectDir, stdio: "ignore" })
+      gitInitialized = true
+    } catch (err) {
+      error = `Failed to run git init: ${err instanceof Error ? err.message : String(err)}`
+    }
+  }
+
+  // 2. Create minimal package.json if it doesn't exist
+  const packageJsonPath = join(projectDir, "package.json")
+  if (!existsSync(packageJsonPath)) {
+    try {
+      // Derive name from directory
+      const projectName = require("node:path").basename(projectDir)
+        .replace(/[^a-z0-9-]/gi, "-")
+        .toLowerCase()
+
+      const packageJsonContent = JSON.stringify(
+        {
+          name: projectName,
+          version: "1.0.0",
+          description: `Project initialized with Kord AIOS`,
+          type: "module",
+        },
+        null,
+        2
+      )
+
+      writeFileSync(packageJsonPath, packageJsonContent, "utf-8")
+      packageJsonCreated = true
+    } catch (err) {
+      error = `Failed to create package.json: ${err instanceof Error ? err.message : String(err)}`
+    }
+  }
+
+  return {
+    success: !error,
+    gitInitialized,
+    packageJsonCreated,
+    error,
+  }
 }
 
 /**
@@ -395,11 +502,18 @@ interface PrintResultsParams {
     configPath?: string
     error?: string
   }
+  bootstrap: {
+    success: boolean
+    gitInitialized: boolean
+    packageJsonCreated: boolean
+    warning?: string
+    error?: string
+  }
   extractSkipped: boolean
 }
 
 function printInitResults(params: PrintResultsParams): void {
-  const { kordCreated, scaffold, migration, squadExport, config, opencodeConfig, extractSkipped } = params
+  const { kordCreated, scaffold, migration, squadExport, config, opencodeConfig, bootstrap, extractSkipped } = params
 
   // Print directory creation status
   if (kordCreated) {
@@ -442,6 +556,18 @@ function printInitResults(params: PrintResultsParams): void {
     console.log(`${cyan("✗")} Failed to configure opencode.jsonc: ${opencodeConfig.error}`)
   }
 
+  // Print bootstrap result
+  if (bootstrap.warning) {
+    console.log(`${cyan("⚠")} ${bold("Bootstrap")} ${bootstrap.warning}`)
+  } else if (bootstrap.gitInitialized || bootstrap.packageJsonCreated) {
+    if (bootstrap.gitInitialized) {
+      console.log(`${cyan("✓")} ${bold("Bootstrap")} git initialized`)
+    }
+    if (bootstrap.packageJsonCreated) {
+      console.log(`${cyan("✓")} ${bold("Bootstrap")} package.json created`)
+    }
+  }
+
   // Print extract result
   if (extractSkipped) {
     console.log(`${cyan("○")} ${bold("Extract")} skipped (--skip-extract flag)`)
@@ -458,5 +584,10 @@ function printInitResults(params: PrintResultsParams): void {
   // Print squad export error if any
   if (squadExport.error) {
     console.log(`${cyan("✗")} Squad export error: ${squadExport.error}`)
+  }
+
+  // Print bootstrap error if any
+  if (bootstrap.error) {
+    console.log(`${cyan("✗")} Bootstrap error: ${bootstrap.error}`)
   }
 }
