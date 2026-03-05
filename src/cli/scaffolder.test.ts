@@ -220,3 +220,58 @@ describe("isProjectScaffolded", () => {
     expect(result).toBe(false)
   })
 })
+
+describe("project-mode.md generation", () => {
+  beforeEach(() => {
+    if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true })
+    mkdirSync(TEST_DIR, { recursive: true })
+  })
+
+  afterEach(() => {
+    if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true })
+  })
+
+  test("generates project-mode.md with new project settings", () => {
+    //#given - empty project directory
+    //#when - scaffold with projectMode = "new"
+    scaffoldProject({ directory: TEST_DIR, projectMode: "new" })
+
+    //#then - project-mode.md contains new project settings
+    const projectModePath = join(TEST_DIR, ".kord", "rules", "project-mode.md")
+    expect(existsSync(projectModePath)).toBe(true)
+
+    const content = readFileSync(projectModePath, "utf-8")
+    expect(content).toContain("Project Mode: new")
+    expect(content).toContain("Project Stage: NEW_SETUP")
+    expect(content).toContain("Read-first: .kord/guides/new-project.md")
+  })
+
+  test("generates project-mode.md with existing project settings", () => {
+    //#given - empty project directory
+    //#when - scaffold with projectMode = "existing"
+    scaffoldProject({ directory: TEST_DIR, projectMode: "existing" })
+
+    //#then - project-mode.md contains existing project settings
+    const projectModePath = join(TEST_DIR, ".kord", "rules", "project-mode.md")
+    expect(existsSync(projectModePath)).toBe(true)
+
+    const content = readFileSync(projectModePath, "utf-8")
+    expect(content).toContain("Project Mode: existing")
+    expect(content).toContain("Project Stage: EXISTING_UNASSESSED")
+    expect(content).toContain("Read-first: .kord/guides/existing-project.md")
+  })
+
+  test("defaults to existing project when projectMode is not specified", () => {
+    //#given - empty project directory
+    //#when - scaffold without projectMode
+    scaffoldProject({ directory: TEST_DIR })
+
+    //#then - project-mode.md defaults to existing
+    const projectModePath = join(TEST_DIR, ".kord", "rules", "project-mode.md")
+    expect(existsSync(projectModePath)).toBe(true)
+
+    const content = readFileSync(projectModePath, "utf-8")
+    expect(content).toContain("Project Mode: existing")
+    expect(content).toContain("Project Stage: EXISTING_UNASSESSED")
+  })
+})

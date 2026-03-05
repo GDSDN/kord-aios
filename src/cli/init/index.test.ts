@@ -18,6 +18,7 @@ const lspTest = HAS_TSLS ? test : ((title: string, fn: any) => (test as any).ski
 const lspDiagnosticsTest = HAS_TSLS ? test : ((title: string, fn: any) => (test as any).skip(title, fn))
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
+import { execSync } from "node:child_process"
 import { init } from "./index"
 import { KORD_DIR, KORD_DOCS_DIR, KORD_RULES_FILE } from "../project-layout"
 import { resetConfigContext } from "../config-manager"
@@ -519,5 +520,94 @@ describe("init", () => {
     expect(config.instructions).toContain(".kord/rules/**")
     expect(config.instructions).toContain(".other/rules/**")
     expect(config.customSetting).toBe("preserved")
+  })
+})
+
+describe("bootstrap", () => {
+  beforeEach(() => {
+    if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true })
+    mkdirSync(TEST_DIR, { recursive: true })
+  })
+
+  afterEach(() => {
+    if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true })
+  })
+
+  test("does not bootstrap when bootstrap flag is false (default)", async () => {
+    //#given - empty directory
+    //#when - init without bootstrap flag
+    const result = await init({ directory: TEST_DIR, skipExtract: true })
+
+    //#then - no git init or package.json created
+    expect(result.bootstrap.gitInitialized).toBe(false)
+    expect(result.bootstrap.packageJsonCreated).toBe(false)
+    expect(result.bootstrap.success).toBe(true)
+  })
+
+  test("runs git init and creates package.json when bootstrap=true and mode=new", async () => {
+    //#given - empty directory
+    //#when - init with bootstrap=true and projectMode=new
+    const result = await init({
+      directory: TEST_DIR,
+      projectMode: "new",
+      bootstrap: true,
+      skipExtract: true,
+    })
+
+    //#then - git initialized and package.json created
+    expect(result.bootstrap.gitInitialized).toBe(true)
+    expect(result.bootstrap.packageJsonCreated).toBe(true)
+    expect(result.bootstrap.success).toBe(true)
+    expect(existsSync(join(TEST_DIR, ".git"))).toBe(true)
+    expect(existsSync(join(TEST_DIR, "package.json"))).toBe(true)
+
+    const pkgJson = JSON.parse(readFileSync(join(TEST_DIR, "package.json"), "utf-8"))
+    expect(pkgJson.name).toBeDefined()
+    expect(pkgJson.version).toBe("1.0.0")
+  })
+
+  test("skips bootstrap with warning when bootstrap=true but mode=existing", async () => {
+    //#given - existing directory (has markers)
+    mkdirSync(join(TEST_DIR, "src"), { recursive: true })
+    writeFileSync(join(TEST_DIR, "src", "index.js"), "// existing code")
+
+    //#when - init with bootstrap=true but mode=existing
+    const result = await init({
+      directory: TEST_DIR,
+      projectMode: "existing",
+      bootstrap: true,
+      skipExtract: true,
+      force: true,
+    })
+
+    //#then - warning returned, no git init or package.json
+    expect(result.bootstrap.gitInitialized).toBe(false)
+    expect(result.bootstrap.packageJsonCreated).toBe(false)
+    expect(result.bootstrap.success).toBe(true)
+    expect(result.bootstrap.warning).toContain("--bootstrap ignored")
+    expect(result.bootstrap.warning).toContain("existing")
+  })
+
+  test("does not overwrite existing git or package.json during bootstrap", async () => {
+    //#given - existing git and package.json
+    execSync("git init", { cwd: TEST_DIR, stdio: "ignore" })
+    writeFileSync(join(TEST_DIR, "package.json"), JSON.stringify({ name: "my-existing-project", version: "2.0.0" }, null, 2))
+
+    //#when - init with bootstrap=true
+    const result = await init({
+      directory: TEST_DIR,
+      projectMode: "new",
+      bootstrap: true,
+      skipExtract: true,
+    })
+
+    //#then - existing files not overwritten
+    expect(result.bootstrap.gitInitialized).toBe(false) // already existed
+    expect(result.bootstrap.packageJsonCreated).toBe(false) // already existed
+    expect(result.bootstrap.success).toBe(true)
+
+    const pkgJson = JSON.parse(readFileSync(join(TEST_DIR, "package.json"), "utf-8"))
+    expect(pkgJson.name).toBe("my-existing-project") // unchanged
+    expect(pkgJson.version).toBe("2.0.0") // unchanged
   })
 })
