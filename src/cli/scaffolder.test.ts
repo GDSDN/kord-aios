@@ -129,14 +129,14 @@ describe("scaffoldProject", () => {
     expect(selfCritique).toBe(CHECKLIST_SELF_CRITIQUE_CONTENT)
   })
 
-  test("creates kord-rules.md at project root", () => {
+  test("creates kord-rules.md in .kord/rules/", () => {
     //#given - empty project directory
 
     //#when
     scaffoldProject({ directory: TEST_DIR })
 
     //#then
-    const rules = readFileSync(join(TEST_DIR, "kord-rules.md"), "utf-8")
+    const rules = readFileSync(join(TEST_DIR, ".kord", "rules", "kord-rules.md"), "utf-8")
     expect(rules).toContain("Kord AIOS")
     expect(rules).toContain("docs/kord/plans/")
     expect(rules).toContain("docs/kord/drafts/")

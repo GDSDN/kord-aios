@@ -116,10 +116,11 @@ describe("init", () => {
       expect(existsSync(join(templatesDir, template))).toBe(true)
     }
 
-    // Verify exactly 13 files (not more, not less)
+    // Verify exactly 14 files (not more, not less)
+    // Note: 13 original + 1 checklist-agent-quality-gate
     const { readdirSync } = await import("node:fs")
     const files = readdirSync(templatesDir).filter((f) => f.endsWith(".md"))
-    expect(files).toHaveLength(13)
+    expect(files).toHaveLength(14)
   })
 
   test("creates kord-rules.md at project root", async () => {
