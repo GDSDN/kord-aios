@@ -1,94 +1,266 @@
-# Kord AIOS - Guia de Uso de Modelos
+# Kord AIOS - Model Configuration Guide
 
-> **Objetivo**: Definir qual modelo usar para cada agente/tarefa, considerando qualidade vs custo.
+> **Objective**: Define which model to use for each agent/task, considering quality vs cost.
 
-## Benchmark dos Modelos Free (Kilo Gateway)
+## Configuration Paths
 
-| Modelo | Provider ID | SWE-Bench | Reasoning | Tool Calling | Foco Principal |
-|--------|-------------|-----------|-----------|--------------|----------------|
+### Where Provider Models Live
+
+Kord AIOS uses two configuration files:
+
+| File | Location | Purpose |
+|------|----------|---------|
+| `.opencode/kord-aios.json` | Project | Project-specific overrides |
+| `~/.config/opencode/kord-aios.json` | User | User-global defaults |
+
+### Provider Configuration
+
+Provider models (Google, OpenAI, Anthropic, etc.) are configured in the `provider` key:
+
+```json
+{
+  "provider": {
+    "google": {
+      "name": "Google",
+      "models": {
+        "antigravity-gemini-3.1-pro": { ... }
+      }
+    }
+  }
+}
+```
+
+### Agent Fallback Configuration
+
+Agent fallback chains are configured in the `agents` key:
+
+```json
+{
+  "agents": {
+    "kord": {
+      "model": "anthropic/claude-opus-4-6",
+      "fallback": [
+        { "model": "kimi-for-coding/k2p5" },
+        { "model": "openai/gpt-5.2" }
+      ]
+    }
+  }
+}
+```
+
+---
+
+## Init Modes: Greenfield vs Brownfield
+
+When running `bunx kord-aios init`, Kord detects your project maturity:
+
+### Greenfield (New Project)
+- No existing `.opencode/` directory
+- Creates full scaffolding:
+  - `.kord/templates/` - Story, ADR, PRD, Epic, Task templates
+  - `.kord/rules/` - Project rules
+  - `docs/kord/plans/` - Work plan directory
+  - `docs/kord/stories/` - User story delivery directory
+  - `docs/kord/epics/` - Epic delivery directory
+  - `docs/kord/prds/` - Product requirements directory
+  - `docs/kord/drafts/` - Draft documents
+  - `docs/kord/notepads/` - Agent working memory
+- Generates default `kord-aios.json` with all providers and fallback chains
+
+### Brownfield (Existing Project)
+- Has existing `.opencode/` directory
+- Performs add-only merge: existing values are preserved
+- Does NOT overwrite custom agent configurations
+- Only adds missing provider models and fallback entries
+
+---
+
+## Manual Fallback Override
+
+### Priority Order
+
+The fallback resolution follows this priority:
+
+```
+1. User config (agents.<name>.fallback)     ← Highest priority
+2. Squad manifest (for squad-* agents)
+3. Hardcoded AGENT_MODEL_REQUIREMENTS       ← Lowest priority
+```
+
+### How to Override
+
+**Option 1: Project-level override**
+
+Create/edit `.opencode/kord-aios.json`:
+
+```json
+{
+  "agents": {
+    "explore": {
+      "fallback": [
+        { "model": "google/gemini-3-flash" },
+        { "model": "anthropic/claude-haiku-4-5" }
+      ]
+    }
+  }
+}
+```
+
+**Option 2: User-global override**
+
+Edit `~/.config/opencode/kord-aios.json`:
+
+```json
+{
+  "agents": {
+    "kord": {
+      "fallback": [
+        { "model": "anthropic/claude-opus-4-6" }
+      ]
+    }
+  }
+}
+```
+
+**Option 3: Squad manifest override**
+
+Define fallback in `.opencode/squads/my-squad/SQUAD.yaml`:
+
+```yaml
+agents:
+  chief:
+    fallback:
+      - model: anthropic/claude-opus-4-6
+      - model: openai/gpt-5.2
+```
+
+### Verifying Override Works
+
+Run the test to confirm user config overrides hardcoded chains:
+
+```bash
+bun test src/shared/agent-fallback.test.ts
+```
+
+The test `uses user-configured fallback chain when provided` verifies this behavior.
+
+---
+
+## Antigravity Provider Updates
+
+### Latest Model Bumps (vCurrent)
+
+| Previous Model | New Model | Notes |
+|---------------|-----------|-------|
+| `antigravity-claude-sonnet-4-5` | `antigravity-claude-sonnet-4-6` | Claude 4.6 |
+| `antigravity-claude-opus-4-5-thinking` | `antigravity-claude-opus-4-6-thinking` | Opus 4.6 with thinking |
+| `antigravity-claude-sonnet-4-5-thinking` | `antigravity-claude-sonnet-4-6-thinking` | Sonnet 4.6 with thinking |
+| `antigravity-gemini-3-pro` | `antigravity-gemini-3.1-pro` | Gemini 3.1 Pro |
+
+### Variant System
+
+Since opencode-antigravity-auth v1.3.0, models support variants:
+
+```json
+{
+  "antigravity-gemini-3.1-pro": {
+    "variants": {
+      "low": { "thinkingLevel": "low" },
+      "high": { "thinkingLevel": "high" }
+    }
+  }
+}
+```
+
+---
+
+## Benchmark: Free Models (Kilo Gateway)
+
+| Model | Provider ID | SWE-Bench | Reasoning | Tool Calling | Primary Focus |
+|-------|-------------|-----------|-----------|--------------|----------------|
 | **GLM-5 Free** | `kilo/z-ai/glm-5:free` | 77.8% | **92.7%** (AIME) | — | Reasoning, Agentic, Long-context |
 | **MiniMax M2.5 Free** | `kilo/minimax/minimax-m2.5:free` | **80.2%** | — | **76.8%** (BFCL) | Coding, Tool Calling |
 
-### Caracteristicas por Modelo
+### Model Characteristics
 
 **GLM-5 Free** (744B params, 40B active):
-- "Agentic engineering" - otimizado para tarefas de longo horizonte
+- "Agentic engineering" - optimized for long-horizon tasks
 - 200K context window
-- Excelente para decisoes arquiteturais, validacao, orquestracao
-- Melhor reasoning geral (AIME 92.7%)
+- Excellent for architectural decisions, validation, orchestration
+- Best general reasoning (AIME 92.7%)
 
 **MiniMax M2.5 Free** (230B params, 10B active):
-- SOTA em coding open-source (80.2% SWE-Bench)
-- "Spec-writing tendency" - planeja como arquiteto antes de codar
-- Melhor tool calling (BFCL 76.8%)
-- ~2.7x mais barato que GLM-5
+- SOTA in coding open-source (80.2% SWE-Bench)
+- "Spec-writing tendency" - plans like an architect before coding
+- Best tool calling (BFCL 76.8%)
+- ~2.7x cheaper than GLM-5
 
 ---
 
-## Stacks por Prioridade
+## Stacks by Priority
 
-### Stack Maxima (Qualidade) - Quando custo nao e problema
+### Maximum Stack (Quality) - When cost is not a concern
 
-| Agente | Modelo | Provider ID | Por que |
-|--------|--------|-------------|---------|
-| **Kord** | Claude Opus 4.6 | `anthropic/claude-opus-4-6` | Orquestracao principal, maximo reasoning |
-| **Builder** | Kimi K2.5 | `kimi-for-coding/k2p5` | Tool calling excelente, coordenacao |
-| **Dev** | GPT-5.3 Codex | `openai/gpt-5.3-codex` | Melhor coding disponivel |
-| **Dev-Junior** | Claude Sonnet 4.5 | `anthropic/claude-sonnet-4-5` | Coding solido, rapido |
-| **Architect** | GPT-5.2 | `openai/gpt-5.2` | Consultoria arquitetural, alto reasoning |
-| **Analyst** | Claude Opus 4.6 | `anthropic/claude-opus-4-6` | Analise pre-planejamento |
-| **Librarian** | GLM-4.7 | `zai-coding-plan/glm-4.7` | Pesquisa de docs, barato |
-| **Explore** | Claude Haiku 4.5 | `anthropic/claude-haiku-4-5` | Grep rapido, barato |
-| **Vision** | Gemini 3 Flash | `google/gemini-3-flash` | Analise de midia |
+| Agent | Model | Provider ID | Why |
+|-------|-------|-------------|-----|
+| **Kord** | Claude Opus 4.6 | `anthropic/claude-opus-4-6` | Main orchestration, max reasoning |
+| **Builder** | Kimi K2.5 | `kimi-for-coding/k2p5` | Excellent tool calling, coordination |
+| **Dev** | GPT-5.3 Codex | `openai/gpt-5.3-codex` | Best coding available |
+| **Dev-Junior** | Claude Sonnet 4.6 | `anthropic/claude-sonnet-4-6` | Solid, fast coding |
+| **Architect** | GPT-5.2 | `openai/gpt-5.2` | Architectural consulting, high reasoning |
+| **Analyst** | Claude Opus 4.6 | `anthropic/claude-opus-4-6` | Pre-planning analysis |
+| **Librarian** | GLM-4.7 | `zai-coding-plan/glm-4.7` | Doc research, cheap |
+| **Explore** | Claude Haiku 4.5 | `anthropic/claude-haiku-4-5` | Fast grep, cheap |
+| **Vision** | Gemini 3 Flash | `google/gemini-3-flash` | Media analysis |
 
-### Stack Economica (Free Tier) - Maximo custo-beneficio
+### Economic Stack (Free Tier) - Maximum cost-effectiveness
 
-| Agente | Modelo | Provider ID | Por que |
-|--------|--------|-------------|---------|
-| **Kord** | GLM-5 Free | `kilo/z-ai/glm-5:free` | Melhor reasoning free, agentic engineering |
-| **Builder** | GLM-5 Free | `kilo/z-ai/glm-5:free` | Coordenacao precisa de reasoning, nao coding |
-| **Dev** | MiniMax M2.5 Free | `kilo/minimax/minimax-m2.5:free` | Melhor coding free (80.2% SWE-Bench) |
-| **Dev-Junior** | MiniMax M2.5 Free | `kilo/minimax/minimax-m2.5:free` | Executor de codigo, melhor coding |
-| **Architect** | GLM-5 Free | `kilo/z-ai/glm-5:free` | Consultoria = reasoning > coding |
-| **Analyst** | GLM-5 Free | `kilo/z-ai/glm-5:free` | Analise = reasoning |
-| **Librarian** | GLM-4.7 Free | `kilo/z-ai/glm-4.7:free` | Pesquisa simples, mais barato |
-| **Explore** | GPT-5 Nano | `opencode/gpt-5-nano` | Grep rapido, mais barato |
-| **Vision** | Gemini 3 Flash | `kilo/google/gemini-3-flash` | Analise de midia free |
+| Agent | Model | Provider ID | Why |
+|-------|-------|-------------|-----|
+| **Kord** | GLM-5 Free | `kilo/z-ai/glm-5:free` | Best reasoning free, agentic engineering |
+| **Builder** | GLM-5 Free | `kilo/z-ai/glm-5:free` | Precise reasoning coordination, not coding |
+| **Dev** | MiniMax M2.5 Free | `kilo/minimax/minimax-m2.5:free` | Best coding free (80.2% SWE-Bench) |
+| **Dev-Junior** | MiniMax M2.5 Free | `kilo/minimax/minimax-m2.5:free` | Code executor, best coding |
+| **Architect** | GLM-5 Free | `kilo/z-ai/glm-5:free` | Consulting = reasoning > coding |
+| **Analyst** | GLM-5 Free | `kilo/z-ai/glm-5:free` | Analysis = reasoning |
+| **Librarian** | GLM-4.7 Free | `kilo/z-ai/glm-4.7:free` | Simple research, cheapest |
+| **Explore** | GPT-5 Nano | `opencode/gpt-5-nano` | Fast grep, cheapest |
+| **Vision** | Gemini 3 Flash | `kilo/google/gemini-3-flash` | Free media analysis |
 
 ---
 
-## Logica de Atribuicao: Reasoning vs Coding
+## Assignment Logic: Reasoning vs Coding
 
-### Principio Fundamental
+### Fundamental Principle
 
 ```
 +-----------------------------------------------------------------+
-|  Papel           |  O que faz                    |  Precisa de  |
+|  Role           |  What it does                |  Needs         |
 +-----------------------------------------------------------------+
-|  KORD            |  Decide, orquestra, valida    |  Reasoning   |
-|  BUILDER         |  Delega, verifica, coordena   |  Reasoning   |
-|  DEV             |  Analisa, arquiteta, planeja  |  Reasoning   |
-|  ARCHITECT       |  Consulta, debugga, aconselha |  Reasoning   |
-|  ANALYST         |  Analisa requisitos, pesquisa |  Reasoning   |
-|  DEV-JUNIOR      |  IMPLEMENTA codigo            |  Coding OK   |
+|  KORD           |  Decide, orchestrate, validate|  Reasoning   |
+|  BUILDER        |  Delegate, verify, coordinate |  Reasoning   |
+|  DEV            |  Analyze, architect, plan    |  Reasoning   |
+|  ARCHITECT      |  Consult, debug, advise       |  Reasoning   |
+|  ANALYST        |  Analyze requirements, research| Reasoning   |
+|  DEV-JUNIOR     |  IMPLEMENT code               |  Coding OK   |
 +-----------------------------------------------------------------+
 ```
 
-### Regra Pratica
+### Practical Rule
 
-| Agente | Stack Maxima | Stack Economica | Criterio |
-|--------|--------------|-----------------|----------|
-| **Orquestradores** (Kord, Builder) | Opus/Kimi | **GLM-5 Free** | Reasoning para decisoes |
-| **Arquitetos** (Dev, Architect, Analyst) | Opus/GPT-5.2 | **GLM-5 Free** | Reasoning para analise |
-| **Executores** (Dev-Junior) | Sonnet/GPT-5.3 | **MiniMax M2.5 Free** | Coding para implementar |
+| Agent | Maximum Stack | Economic Stack | Criterion |
+|-------|--------------|-----------------|----------|
+| **Orchestrators** (Kord, Builder) | Opus/Kimi | **GLM-5 Free** | Reasoning for decisions |
+| **Architects** (Dev, Architect, Analyst) | Opus/GPT-5.2 | **GLM-5 Free** | Reasoning for analysis |
+| **Executors** (Dev-Junior) | Sonnet/GPT-5.3 | **MiniMax M2.5 Free** | Coding to implement |
 
 ---
 
-## Fallback Chains por Agente
+## Fallback Chains by Agent
 
-### Kord (Orquestrador Principal)
+### Kord (Main Orchestrator)
 
-**Stack Maxima:**
+**Maximum Stack:**
 ```
 1. anthropic/claude-opus-4-6 (variant: max)
 2. kimi-for-coding/k2p5
@@ -97,76 +269,76 @@
 5. opencode/glm-4.7-free
 ```
 
-**Stack Economica:**
+**Economic Stack:**
 ```
 1. kilo/z-ai/glm-5:free
 2. kilo/minimax/minimax-m2.5:free
 3. opencode/glm-4.7-free
 ```
 
-### Builder (Coordenador de Implementacao)
+### Builder (Implementation Coordinator)
 
-**Stack Maxima:**
+**Maximum Stack:**
 ```
 1. kimi-for-coding/k2p5
 2. opencode/kimi-k2.5-free
-3. anthropic/claude-sonnet-4-5
+3. anthropic/claude-sonnet-4-6
 4. openai/gpt-5.2
 ```
 
-**Stack Economica:**
+**Economic Stack:**
 ```
 1. kilo/z-ai/glm-5:free
 2. kilo/minimax/minimax-m2.5:free
 3. opencode/glm-4.7-free
 ```
 
-### Dev (Arquiteto de Solucoes)
+### Dev (Solution Architect)
 
-**Stack Maxima:** (requer GPT-5.3 Codex)
+**Maximum Stack:** (requires GPT-5.3 Codex)
 ```
 1. openai/gpt-5.3-codex (variant: medium)
 ```
 
-**Stack Economica:**
+**Economic Stack:**
 ```
-1. kilo/minimax/minimax-m2.5:free  # Melhor coding free
+1. kilo/minimax/minimax-m2.5:free  # Best coding free
 2. kilo/z-ai/glm-5:free            # Fallback reasoning
 ```
 
-### Dev-Junior (Executor de Codigo)
+### Dev-Junior (Code Executor)
 
-**Stack Maxima:**
+**Maximum Stack:**
 ```
-1. anthropic/claude-sonnet-4-5
+1. anthropic/claude-sonnet-4-6
 2. openai/gpt-5.2
 3. opencode/gpt-5-nano
 ```
 
-**Stack Economica:**
+**Economic Stack:**
 ```
-1. kilo/minimax/minimax-m2.5:free  # Melhor coding free
+1. kilo/minimax/minimax-m2.5:free  # Best coding free
 2. kilo/z-ai/glm-5:free            # Fallback
 ```
 
-### Architect (Consultor)
+### Architect (Consultant)
 
-**Stack Maxima:**
+**Maximum Stack:**
 ```
 1. openai/gpt-5.2 (variant: high)
-2. google/gemini-3-pro (variant: high)
+2. google/gemini-3.1-pro (variant: high)
 3. anthropic/claude-opus-4-6 (variant: max)
 ```
 
-**Stack Economica:**
+**Economic Stack:**
 ```
-1. kilo/z-ai/glm-5:free            # Reasoning para consultoria
+1. kilo/z-ai/glm-5:free            # Reasoning for consulting
 2. kilo/minimax/minimax-m2.5:free
 ```
 
-### Analyst (Pre-planejamento)
+### Analyst (Pre-Planning)
 
-**Stack Maxima:**
+**Maximum Stack:**
 ```
 1. anthropic/claude-opus-4-6 (variant: max)
 2. kimi-for-coding/k2p5
@@ -174,81 +346,88 @@
 4. openai/gpt-5.2 (variant: high)
 ```
 
-**Stack Economica:**
+**Economic Stack:**
 ```
-1. kilo/z-ai/glm-5:free            # Reasoning para analise
+1. kilo/z-ai/glm-5:free            # Reasoning for analysis
 2. kilo/minimax/minimax-m2.5:free
 ```
 
-### Librarian (Pesquisa)
+### Librarian (Research)
 
-**Stack Maxima:**
+**Maximum Stack:**
 ```
 1. zai-coding-plan/glm-4.7
 2. opencode/glm-4.7-free
-3. anthropic/claude-sonnet-4-5
+3. anthropic/claude-sonnet-4-6
 ```
 
-**Stack Economica:**
+**Economic Stack:**
 ```
-1. kilo/z-ai/glm-4.7:free          # Mais barato
+1. kilo/z-ai/glm-4.7:free          # Cheapest
 2. opencode/gpt-5-nano
 ```
 
-### Explore (Grep Contextual)
+### Explore (Contextual Grep)
 
-**Stack Maxima:**
+**Maximum Stack:**
 ```
 1. anthropic/claude-haiku-4-5
 2. opencode/gpt-5-nano
 ```
 
-**Stack Economica:**
+**Economic Stack:**
 ```
-1. opencode/gpt-5-nano             # Mais barato
+1. opencode/gpt-5-nano             # Cheapest
 2. kilo/z-ai/glm-4.7:free
 ```
 
 ---
 
-## Uso por Tipo de Tarefa
+## Usage by Task Type
 
-### Tarefas que Precisam de Reasoning (GLM-5 Free)
+### Tasks Needing Reasoning (GLM-5 Free)
 
-| Tarefa | Agente | Por que |
-|--------|--------|---------|
-| Decisoes de arquitetura | Architect, Kord | Trade-offs, analise |
-| Analise de requisitos | Analyst | Identificar ambiguidades |
-| Validacao de implementacao | Builder, Kord | Verificar se esta correto |
-| Planejamento | PM, SM, PO | Estruturacao de pensamento |
-| Debugging complexo | Architect | Root cause analysis |
-| Code review | QA, Plan-Reviewer | Identificar problemas |
+| Task | Agent | Why |
+|------|-------|-----|
+| Architecture decisions | Architect, Kord | Trade-offs, analysis |
+| Requirements analysis | Analyst | Identify ambiguities |
+| Implementation validation | Builder, Kord | Verify correctness |
+| Planning | PM, SM, PO | Thought structuring |
+| Complex debugging | Architect | Root cause analysis |
+| Code review | QA, Plan-Reviewer | Identify issues |
 
-### Tarefas que Precisam de Coding (MiniMax M2.5 Free)
+### Tasks Needing Coding (MiniMax M2.5 Free)
 
-| Tarefa | Agente | Por que |
-|--------|--------|---------|
-| Implementacao de features | Dev-Junior, Dev | Escrever codigo |
-| Bug fixes | Dev-Junior | Corrigir codigo |
-| Refactoring | Dev, Dev-Junior | Reestruturar codigo |
+| Task | Agent | Why |
+|------|-------|-----|
+| Feature implementation | Dev-Junior, Dev | Write code |
+| Bug fixes | Dev-Junior | Fix code |
+| Refactoring | Dev, Dev-Junior | Restructure code |
 | UI/UX implementation | Dev-Junior (visual-engineering) | Frontend code |
-| Test writing | Dev-Junior | Codigo de testes |
-| Script creation | Dev-Junior (quick) | Scripts simples |
+| Test writing | Dev-Junior | Test code |
+| Script creation | Dev-Junior (quick) | Simple scripts |
 
-### Tarefas Mistas (Depende do contexto)
+### Mixed Tasks (Depends on context)
 
-| Tarefa | Recomendacao |
-|--------|--------------|
-| **Refactoring complexo** | GLM-5 para analise -> MiniMax para implementacao |
-| **Nova feature grande** | GLM-5 (Analyst) -> GLM-5 (Plan) -> MiniMax (Dev-Junior) |
-| **Bug fix simples** | MiniMax direto (quick category) |
-| **Documentacao** | GLM-5 (reasoning) ou writing category |
+| Task | Recommendation |
+|------|----------------|
+| **Complex refactoring** | GLM-5 for analysis -> MiniMax for implementation |
+| **Large new feature** | GLM-5 (Analyst) -> GLM-5 (Plan) -> MiniMax (Dev-Junior) |
+| **Simple bug fix** | MiniMax direct (quick category) |
+| **Documentation** | GLM-5 (reasoning) or writing category |
 | **UI/UX design** | MiniMax + skill frontend-ui-ux |
 
 ---
 
-## Categorias e Modelos Recomendados
+## Categories and Recommended Models
 
-| Categoria | Stack Maxima | Stack Economica | Uso |
-|-----------|--------------|-----------------|-----|
-| **visual-engineering** | `gemini-3-pro` | `kilo/google/gemini-3
+| Category | Maximum Stack | Economic Stack | Usage |
+|----------|--------------|-----------------|-------|
+| **visual-engineering** | `gemini-3.1-pro` | `kilo/google/gemini-3-flash` | Frontend, UI/UX |
+| **ultrabrain** | `gpt-5.3-codex` | — | Deep logic, complex algorithms |
+| **deep** | `gpt-5.3-codex` | — | Requires Codex |
+| **artistry** | `gemini-3.1-pro` | — | Creative tasks |
+| **quick** | `claude-haiku-4-5` | `opencode/gpt-5-nano` | Fast, simple tasks |
+| **unspecified-low** | `claude-sonnet-4-6` | `gpt-5.3-codex` | Default low priority |
+| **unspecified-high** | `claude-opus-4-6` | `gpt-5.2` | Default high priority |
+| **writing** | `gemini-3-flash` | — | Documentation, content |

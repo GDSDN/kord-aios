@@ -668,7 +668,7 @@ export async function runBunInstallWithDetails(): Promise<BunInstallResult> {
  * IMPORTANT: Model names MUST use `antigravity-` prefix for stability.
  *
  * Since opencode-antigravity-auth v1.3.0, models use a variant system:
- * - `antigravity-gemini-3-pro` with variants: low, high
+ * - `antigravity-gemini-3.1-pro` with variants: low, high
  * - `antigravity-gemini-3-flash` with variants: minimal, low, medium, high
  *
  * Legacy tier-suffixed names (e.g., `antigravity-gemini-3-pro-high`) still work
@@ -680,8 +680,8 @@ export const ANTIGRAVITY_PROVIDER_CONFIG = {
   google: {
     name: "Google",
     models: {
-      "antigravity-gemini-3-pro": {
-        name: "Gemini 3 Pro (Antigravity)",
+      "antigravity-gemini-3.1-pro": {
+        name: "Gemini 3.1 Pro (Antigravity)",
         limit: { context: 1048576, output: 65535 },
         modalities: { input: ["text", "image", "pdf"], output: ["text"] },
         variants: {
@@ -700,13 +700,13 @@ export const ANTIGRAVITY_PROVIDER_CONFIG = {
           high: { thinkingLevel: "high" },
         },
       },
-      "antigravity-claude-sonnet-4-5": {
-        name: "Claude Sonnet 4.5 (Antigravity)",
+      "antigravity-claude-sonnet-4-6": {
+        name: "Claude Sonnet 4.6 (Antigravity)",
         limit: { context: 200000, output: 64000 },
         modalities: { input: ["text", "image", "pdf"], output: ["text"] },
       },
-      "antigravity-claude-sonnet-4-5-thinking": {
-        name: "Claude Sonnet 4.5 Thinking (Antigravity)",
+      "antigravity-claude-sonnet-4-6-thinking": {
+        name: "Claude Sonnet 4.6 Thinking (Antigravity)",
         limit: { context: 200000, output: 64000 },
         modalities: { input: ["text", "image", "pdf"], output: ["text"] },
         variants: {
@@ -714,8 +714,8 @@ export const ANTIGRAVITY_PROVIDER_CONFIG = {
           max: { thinkingConfig: { thinkingBudget: 32768 } },
         },
       },
-      "antigravity-claude-opus-4-5-thinking": {
-        name: "Claude Opus 4.5 Thinking (Antigravity)",
+      "antigravity-claude-opus-4-6-thinking": {
+        name: "Claude Opus 4.6 Thinking (Antigravity)",
         limit: { context: 200000, output: 64000 },
         modalities: { input: ["text", "image", "pdf"], output: ["text"] },
         variants: {
