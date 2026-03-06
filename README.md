@@ -104,7 +104,7 @@ Kord AIOS ships a full development team. All agents are customizable — overrid
 
 ### Squads
 
-Define domain-specific agent teams via `SQUAD.yaml` manifests. Each squad declares its agents, categories for task routing, and skill dependencies. The built-in default is `code` (`src/features/builtin-squads/code/SQUAD.yaml`).
+Squads are portable, reusable orchestration-aware domain packages. A squad brings domain-specialized agents, package assets (workflows/tasks/templates), skill references, and orchestration metadata — all defined in a single `SQUAD.yaml` manifest. The built-in default is `code` (`src/features/builtin-squads/code/SQUAD.yaml`).
 
 **Chief + Worker Model:** Squads support L2 (chief) and L1 (worker) agent hierarchy. Chiefs have `is_chief: true` with auto-generated Squad Awareness and coordination protocol. Workers are standard subagents.
 
@@ -129,9 +129,13 @@ agents:
     model: anthropic/claude-sonnet-4-5
     prompt: "You are a domain specialist..."
 
-categories:
-  my-domain:
-    description: "Domain-specific tasks"
+components:
+  workflows: ["workflows/main.yaml"]
+  tasks: ["tasks/create-campaign.md"]
+
+orchestration:
+  runner: workflow-engine
+  delegation_mode: chief
 ```
 
 ### Skills (149)

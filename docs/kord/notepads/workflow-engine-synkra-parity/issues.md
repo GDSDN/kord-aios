@@ -1,0 +1,10 @@
+- Alias recursion risk in `engine.ts` remains unresolved because alias dispatch does not clear `aliasWorkflowId`.
+- Importer path is still a stub response, blocking real workflow ingestion/execution behavior.
+- Builtin source-of-truth is incorrect for parity (inline TS strings instead of asset-backed YAML pack).
+- Runtime semantics gap persists vs Synkra: interactive main-session flow, JIT prompt assembly, true parallel/gate behavior.
+- Boulder summary integration is missing from current workflow state/reporting output.
+- README/workflow runtime documentation gap prevents accurate operator understanding.
+- Workflow catalog parity gap remains critical: expected 14 Synkra workflows are not present in the current builtin set.
+- Alias command routing safety is incomplete until recursion guards clear alias context deterministically.
+- Current implementation can mislead continuation decisions because scaffold presence is easy to misread as runtime parity completion.
+- Runtime evidence baseline is not yet reflected in implementation depth (`run-workflow-engine.md`, `subagent-prompt-builder.js`, `workflow-state-schema.yaml`).
