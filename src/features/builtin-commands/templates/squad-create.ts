@@ -11,8 +11,8 @@ Create a new specialized agent squad for the requested domain.
 2. **Delegate to Squad Creator**: Use \`call_kord_agent\` to delegate to @squad-creator:
    \`\`\`
    call_kord_agent({
-     agent: "squad-creator",
-     task: "Create a new squad for the '{domain}' domain. Research the domain, design agent personas, create SKILL.md files, and generate a v2 SQUAD.yaml manifest with prompt_file references, tags, and kord.minVersion."
+      agent: "squad-creator",
+      task: "Create a new squad for the '{domain}' domain. First ask whether install scope should be Local (project) or Global (all projects). Then research the domain, design agent personas, create SKILL.md files, and generate a v2 SQUAD.yaml manifest with prompt_file references, package components (workflows/tasks/templates/checklists/scripts/data), orchestration metadata, tags, and kord.minVersion."
    })
    \`\`\`
 
@@ -33,10 +33,19 @@ Examples:
   /squad-create devops        — Create a DevOps squad (infra, monitoring, security)
   /squad-create data-science  — Create a data science squad (analyst, ML engineer, visualizer)
 
-The squad will be created in .opencode/squads/<domain-name>/ with:
+The squad creator will ask scope:
+  - Local (default): .kord/squads/<domain-name>/
+  - Global: {OpenCodeConfigDir}/squads/<domain-name>/
+  - Also supported local path: .opencode/squads/<domain-name>/
+
+Generated structure:
   - SQUAD.yaml (v2 manifest)
   - README.md
   - agents/*.md (prompt files)
+  - workflows/*.yaml (optional package workflows)
+  - tasks/*.md (optional package tasks)
+  - templates/*.md (optional package templates)
+  - checklists/*.md (optional package checklists)
   - skills/*/SKILL.md
 \`\`\`
 `

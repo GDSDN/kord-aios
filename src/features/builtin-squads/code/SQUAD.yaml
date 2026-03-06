@@ -3,6 +3,12 @@ description: Software development team — the default squad for code-related wo
 version: 1.0.0
 
 agents:
+  chief:
+    description: "Chief orchestrator for the code squad"
+    mode: all
+    is_chief: true
+    skills:
+      - git-master
   developer:
     description: "Implementation specialist — writes code, tests, and fixes bugs"
     mode: subagent
@@ -10,15 +16,17 @@ agents:
       - git-master
       - frontend-ui-ux
 
-categories:
-  quick:
-    description: "Fast fixes, small changes, one-file edits"
-  visual:
-    description: "UI/UX work, styling, layout, responsive design"
-  ultrabrain:
-    description: "Complex logic, algorithms, architecture, multi-file refactors"
-  artistry:
-    description: "Creative coding, animations, data visualization"
+components:
+  tasks: []
+  workflows: []
+  templates: []
+  checklists: []
+  scripts: []
+  data: []
+
+orchestration:
+  runner: workflow-engine
+  delegation_mode: chief
 
 default_executor: developer
 contract_type: story

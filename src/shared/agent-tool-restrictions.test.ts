@@ -55,10 +55,10 @@ describe("agent-tool-restrictions", () => {
   })
 
   describe("analyst agent", () => {
-    test("should deny write, edit, task", () => {
+    test("should deny task only", () => {
       const restrictions = getAgentToolRestrictions("analyst")
-      expect(restrictions.write).toBe(false)
-      expect(restrictions.edit).toBe(false)
+      expect(restrictions.write).toBeUndefined()
+      expect(restrictions.edit).toBeUndefined()
       expect(restrictions.task).toBe(false)
     })
 

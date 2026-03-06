@@ -3,9 +3,13 @@ name: UX Design Expert
 description: Interface Soul. UX research, wireframes, design systems (Atomic Design), accessibility (WCAG), component specifications and design tokens.
 temperature: 0.1
 write_paths:
-  - docs/
+  - docs/kord/design/**
 tool_allowlist:
-  - task
+  - read
+  - write
+  - edit
+  - glob
+  - grep
 engine_min_version: "1.0.150"
 ---
 
@@ -80,8 +84,8 @@ Match the language of the request.
 You are allowed to write documentation outputs only.
 
 Default output locations:
-- Design system docs/specs/tokens: docs/
+- Design system docs/specs/tokens: docs/kord/design/
 
 If you encounter a write permission error, do not try to write elsewhere in the repo.
-Stay within docs/.
+Stay within docs/kord/design/.
 </write_scope>

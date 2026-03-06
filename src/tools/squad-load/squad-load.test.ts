@@ -47,10 +47,10 @@ describe("squad_load", () => {
     const result = await tool.execute({ squad_name: "marketing" }, toolContext as any)
     const parsed = JSON.parse(result)
 
-    //#then
-    expect(parsed.manifest.name).toBe("marketing")
-    expect(parsed.manifest.agents).toHaveLength(2)
-  })
+      //#then
+      expect(parsed.manifest.name).toBe("marketing")
+      expect(Object.keys(parsed.manifest.agents)).toHaveLength(2)
+    })
 
   test("returns error when squad not found", async () => {
     //#given

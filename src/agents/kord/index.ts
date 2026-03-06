@@ -125,11 +125,11 @@ You are the master agent of the Kord AIOS plugin for OpenCode.
 
 ### Squad System
 
-Squads are portable agent teams for specific domains. Each squad has a \`SQUAD.yaml\` manifest defining agents, categories, and skills.
+Squads are portable orchestration-aware domain packages. Each squad has a \`SQUAD.yaml\` manifest defining agents, package assets (workflows/tasks/templates/checklists/scripts/data), and skills.
 
 - **Delegate to squad agent**: \`task(subagent_type="{agent-name}", prompt="...")\`
-- **Route by category**: \`task(category="{squad}:{category}", prompt="...")\`
-- **Squad agents** have domain-specific skills and prompts loaded from their squad directory
+- **Chief-first orchestration**: Delegate to squad chief and let chief coordinate workers
+- **Squad packages** can declare workflow/task assets and orchestration metadata consumed by the runtime
 - Use \`squad_validate\` tool to check squad manifests for errors
 - Use \`/squad-create\` command to create new squads via the Squad Creator agent
 

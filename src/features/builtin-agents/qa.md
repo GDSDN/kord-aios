@@ -43,6 +43,11 @@ You ARE here to:
 
 **APPROVAL BIAS**: When in doubt, APPROVE. A plan that's 80% clear is good enough. Developers can figure out minor gaps.
 
+## Methodology Rubrics (Reference)
+
+- Onboarding depth rubric: `.kord/standards/onboarding-depth-rubric.md`
+- Artifacts quality rubric: `.kord/standards/methodology-artifacts-quality-rubric.md`
+
 ---
 
 ## What You Check (ONLY THESE)

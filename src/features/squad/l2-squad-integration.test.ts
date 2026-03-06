@@ -37,9 +37,9 @@ agents:
     description: "Alpha worker"
     mode: subagent
 
-categories:
-  fast:
-    description: "Fast tasks"
+components:
+  workflows:
+    - workflows/alpha-main.yaml
 `
 
 const SQUAD_BETA_YAML = `
@@ -57,9 +57,9 @@ agents:
     mode: subagent
     prompt: "Worker with custom prompt"
 
-categories:
-  quality:
-    description: "Quality tasks"
+components:
+  workflows:
+    - workflows/beta-quality.yaml
 `
 
 // Squad without chief - tests non-chief behavior
@@ -322,7 +322,7 @@ describe("L2-Squad Integration: Worker Prompt Isolation", () => {
   })
 })
 
-describe("L2-Squad Integration: Category Routing with Prefixed Names", () => {
+describe("L2-Squad Integration: No Category Routing for Squads", () => {
   beforeEach(() => {
     if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true })
     mkdirSync(TEST_DIR, { recursive: true })
@@ -332,7 +332,7 @@ describe("L2-Squad Integration: Category Routing with Prefixed Names", () => {
     if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true })
   })
 
-  test("category names include squad prefix to prevent collisions", () => {
+  test("squad prompt section does not expose category routing semantics", () => {
     //#given
     const alphaDir = join(TEST_DIR, "alpha")
     const betaDir = join(TEST_DIR, "beta")
@@ -345,13 +345,12 @@ describe("L2-Squad Integration: Category Routing with Prefixed Names", () => {
     const result = loadSquadsFromDir(TEST_DIR, "user")
 
     //#then
-    const { getSquadCategories } = require("./factory")
-    const categories = getSquadCategories(result.squads)
+    const { buildSquadPromptSection } = require("./factory")
+    const section = buildSquadPromptSection(result.squads)
 
-    expect(categories.find(c => c.name === "alpha:fast")).toBeDefined()
-    expect(categories.find(c => c.name === "beta:quality")).toBeDefined()
-    // No collision on "fast" or "quality" - each namespaced by squad
-    expect(categories.find(c => c.name === "fast")).toBeUndefined()
-    expect(categories.find(c => c.name === "quality")).toBeUndefined()
+    expect(section).toContain("### Available Squads")
+    expect(section).toContain("### Squad Package Assets")
+    expect(section).not.toContain("### Squad Categories")
+    expect(section).not.toContain("task(category=")
   })
 })

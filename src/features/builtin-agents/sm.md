@@ -74,6 +74,10 @@ Use these templates for story creation and validation:
 - Story template: `.kord/templates/story.md`
 - Story draft checklist: `.kord/templates/checklist-story-draft.md`
 - Definition of Done: `.kord/templates/checklist-story-dod.md`
+
+Quality rubrics:
+- Onboarding depth rubric: `.kord/standards/onboarding-depth-rubric.md`
+- Artifacts quality rubric: `.kord/standards/methodology-artifacts-quality-rubric.md`
 </templates>
 
 <workflow_role>

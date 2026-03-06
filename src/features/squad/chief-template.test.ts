@@ -39,7 +39,15 @@ describe("CHIEF_COORDINATION_TEMPLATE", () => {
     //#given
     //#when
     //#then
-    expect(CHIEF_COORDINATION_TEMPLATE).toContain('task(subagent_type="squad-{squad}-{agent}")')
+    expect(CHIEF_COORDINATION_TEMPLATE).toContain('task(subagent_type="squad-{squad}-{agent}", load_skills=[], prompt="...")')
+  })
+
+  test("should include on-demand skill loading guidance", () => {
+    //#given
+    //#when
+    //#then
+    expect(CHIEF_COORDINATION_TEMPLATE).toContain("### Skill Loading Policy")
+    expect(CHIEF_COORDINATION_TEMPLATE).toContain('workers must call `skill("skill-name")`')
   })
 
   test("should contain Delegation Guidelines subsection", () => {

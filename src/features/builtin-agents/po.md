@@ -71,6 +71,10 @@ Match the language of the request.
 <templates>
 Use these templates for story validation:
 - Story draft checklist: `.kord/templates/checklist-story-draft.md`
+
+Quality rubrics:
+- Onboarding depth rubric: `.kord/standards/onboarding-depth-rubric.md`
+- Artifacts quality rubric: `.kord/standards/methodology-artifacts-quality-rubric.md`
 </templates>
 
 <workflow_role>

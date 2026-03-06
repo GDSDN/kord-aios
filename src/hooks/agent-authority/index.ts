@@ -1,12 +1,13 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { existsSync, readdirSync } from "node:fs"
-import { isAbsolute, join, relative, resolve } from "node:path"
+import { existsSync, mkdirSync, readdirSync } from "node:fs"
+import { dirname, isAbsolute, join, relative, resolve } from "node:path"
 import { readBoulderState } from "../../features/boulder-state"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { findFirstMessageWithAgent, findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { getAgentCapabilities } from "../../shared/agent-capabilities"
 import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
+import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 import { BLOCKED_GIT_COMMANDS, DEFAULT_AGENT_ALLOWLIST, HOOK_NAME } from "./constants"
 import type { AgentAuthorityConfig } from "./types"
 
@@ -172,6 +173,31 @@ function resolveRelativePath(workspaceRoot: string, filePath: string): string | 
   return normalizePath(rel)
 }
 
+function isPathInsideRoot(targetPath: string, rootPath: string): boolean {
+  const target = normalizePath(resolve(targetPath))
+  const root = normalizePath(resolve(rootPath))
+  const normalizedRoot = root.endsWith("/") ? root : `${root}/`
+
+  if (process.platform === "win32") {
+    const targetLower = target.toLowerCase()
+    const rootLower = root.toLowerCase()
+    const normalizedRootLower = normalizedRoot.toLowerCase()
+    return targetLower === rootLower || targetLower.startsWith(normalizedRootLower)
+  }
+
+  return target === root || target.startsWith(normalizedRoot)
+}
+
+function getGlobalSquadsRoot(): string | null {
+  try {
+    const configDir = getOpenCodeConfigDir({ binary: "opencode" })
+    if (!configDir) return null
+    return resolve(configDir, "squads")
+  } catch {
+    return null
+  }
+}
+
 function isBlockedGitCommand(command: string): boolean {
   const lower = command.toLowerCase()
   return BLOCKED_GIT_COMMANDS.some((blocked) => lower.includes(blocked))
@@ -218,6 +244,20 @@ export function createAgentAuthorityHook(ctx: PluginInput, config?: AgentAuthori
 
       const filePath = extractFilePath(output.args)
       if (!filePath) return
+
+      const globalSquadsRoot = getGlobalSquadsRoot()
+      const absoluteTargetPath = resolve(filePath)
+
+      if (
+        agentName === "squad-creator"
+        && isAbsolute(filePath)
+        && globalSquadsRoot
+      ) {
+        if (isPathInsideRoot(absoluteTargetPath, globalSquadsRoot)) {
+          mkdirSync(dirname(absoluteTargetPath), { recursive: true })
+          return
+        }
+      }
 
       const relativePath = resolveRelativePath(ctx.directory, filePath)
       if (!relativePath) {

@@ -2,8 +2,17 @@
 name: Data Engineer
 description: Database Architect. Schema design, migrations, RLS policies, query optimization, data modeling. Owns the data layer.
 temperature: 0.1
+write_paths:
+  - "**/migrations/**"
+  - "**/schema.*"
+  - supabase/**
+  - docs/kord/data/**
 tool_allowlist:
-  - task
+  - read
+  - write
+  - edit
+  - glob
+  - grep
 engine_min_version: "1.0.150"
 ---
 
@@ -62,5 +71,6 @@ Your expertise covers:
 Schemas: SQL with COMMENT ON for documentation.
 Migrations: Numbered, versioned SQL files with UP/DOWN sections.
 Analysis: EXPLAIN ANALYZE output with recommendations.
+Data architecture and migration planning notes: save to docs/kord/data/.
 Match the language of the request.
 </output_format>

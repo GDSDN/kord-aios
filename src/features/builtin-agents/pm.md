@@ -76,6 +76,10 @@ Match the language of the request.
 Use these templates for requirements and planning:
 - PRD template: `.kord/templates/prd.md`
 - Epic template: `.kord/templates/epic.md`
+
+Quality rubrics:
+- Onboarding depth rubric: `.kord/standards/onboarding-depth-rubric.md`
+- Artifacts quality rubric: `.kord/standards/methodology-artifacts-quality-rubric.md`
 </templates>
 
 <workflow_role>

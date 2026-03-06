@@ -5,6 +5,7 @@ import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin
 import yaml from "js-yaml"
 import { SQUAD_LOAD_DESCRIPTION } from "./constants"
 import type { SquadLoadArgs } from "./types"
+import { squadSchema } from "../../features/squad/schema"
 import type { SquadManifest, SquadAgent, SquadConfig, PlanType } from "../../shared/types"
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 
@@ -61,7 +62,9 @@ function buildConfig(raw: Record<string, unknown>): SquadConfig | undefined {
   const planFormat = normalizePlanType(raw.contract_type)
   const executionRules = Array.isArray(raw.execution_rules)
     ? raw.execution_rules.filter((value): value is string => typeof value === "string")
-    : undefined
+    : (Array.isArray((raw.config as { rules?: unknown[] } | undefined)?.rules)
+      ? ((raw.config as { rules?: unknown[] }).rules?.filter((value): value is string => typeof value === "string"))
+      : undefined)
 
   const overrides = typeof raw.overrides === "object" && raw.overrides !== null
     ? (raw.overrides as Record<string, string>)
@@ -81,16 +84,24 @@ export function parseSquadManifest(content: string): SquadManifest {
   if (!raw || typeof raw !== "object") {
     throw new Error("Invalid SQUAD.yaml content")
   }
+
+  const parsed = squadSchema.safeParse(raw)
+  if (!parsed.success) {
+    const issues = parsed.error.issues
+      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+      .join(", ")
+    throw new Error(`Invalid SQUAD.yaml schema: ${issues}`)
+  }
+
+  const validated = parsed.data
   const data = raw as Record<string, unknown>
-  const name = typeof data.name === "string" ? data.name : "unknown"
-  const description = typeof data.description === "string" ? data.description : undefined
   const agentsRaw = typeof data.agents === "object" && data.agents !== null
     ? (data.agents as Record<string, { description?: string; role?: string }>)
     : {}
 
   return {
-    name,
-    description,
+    name: validated.name,
+    description: validated.description,
     agents: mapAgents(agentsRaw),
     config: buildConfig(data),
   }

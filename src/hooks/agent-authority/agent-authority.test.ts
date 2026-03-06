@@ -1,10 +1,11 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { pathToFileURL } from "node:url"
 import { createAgentAuthorityHook } from "./index"
 import { updateSessionAgent, _resetForTesting } from "../../features/claude-code-session-state"
+import * as opencodeConfigDir from "../../shared/opencode-config-dir"
 
 describe("createAgentAuthorityHook", () => {
   let tempDir: string
@@ -12,10 +13,12 @@ describe("createAgentAuthorityHook", () => {
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), "agent-authority-"))
+    spyOn(opencodeConfigDir, "getOpenCodeConfigDir").mockReturnValue(join(tempDir, "opencode-global"))
     hook = createAgentAuthorityHook({ directory: tempDir } as any)
   })
 
   afterEach(() => {
+    ;(opencodeConfigDir.getOpenCodeConfigDir as any)?.mockRestore?.()
     _resetForTesting()
     rmSync(tempDir, { recursive: true, force: true })
   })
@@ -204,6 +207,61 @@ describe("createAgentAuthorityHook", () => {
 
     //#then
     await expect(result).resolves.toBeUndefined()
+  })
+
+  test("allows squad-creator writing to .kord squad files", async () => {
+    //#given
+    updateSessionAgent("ses_squad_kord", "squad-creator")
+    const input = { tool: "Write", sessionID: "ses_squad_kord", callID: "call_7b" }
+    const output = { args: { filePath: ".kord/squads/my-squad/SQUAD.yaml", content: "name: my-squad" } }
+
+    //#when
+    const result = hook["tool.execute.before"]?.(input as any, output as any)
+
+    //#then
+    await expect(result).resolves.toBeUndefined()
+  })
+
+  test("allows squad-creator writing global squad files with absolute path", async () => {
+    //#given
+    updateSessionAgent("ses_squad_global", "squad-creator")
+    const input = { tool: "Write", sessionID: "ses_squad_global", callID: "call_7c" }
+    const globalPath = join(tempDir, "opencode-global", "squads", "global-team", "SQUAD.yaml")
+    const output = { args: { filePath: globalPath, content: "name: global-team" } }
+
+    //#when
+    const result = hook["tool.execute.before"]?.(input as any, output as any)
+
+    //#then
+    await expect(result).resolves.toBeUndefined()
+  })
+
+  test("blocks non-squad-creator writing global squad files with absolute path", async () => {
+    //#given
+    updateSessionAgent("ses_pm_global", "pm")
+    const input = { tool: "Write", sessionID: "ses_pm_global", callID: "call_7d" }
+    const globalPath = join(tempDir, "opencode-global", "squads", "global-team", "SQUAD.yaml")
+    const output = { args: { filePath: globalPath, content: "name: global-team" } }
+
+    //#when
+    const result = hook["tool.execute.before"]?.(input as any, output as any)
+
+    //#then
+    await expect(result).rejects.toThrow("does not have write permission")
+  })
+
+  test("blocks squad-creator absolute path traversal outside global squads root", async () => {
+    //#given
+    updateSessionAgent("ses_squad_escape", "squad-creator")
+    const input = { tool: "Write", sessionID: "ses_squad_escape", callID: "call_7e" }
+    const escapedPath = join(tempDir, "opencode-global", "squads", "..", "..", "evil.txt")
+    const output = { args: { filePath: escapedPath, content: "evil" } }
+
+    //#when
+    const result = hook["tool.execute.before"]?.(input as any, output as any)
+
+    //#then
+    await expect(result).rejects.toThrow("does not have write permission")
   })
 
   // Tests for getAgentCapabilities integration
