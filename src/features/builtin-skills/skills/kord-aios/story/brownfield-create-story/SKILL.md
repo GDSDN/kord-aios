@@ -1,5 +1,5 @@
 ---
-name: create-brownfield-story
+name: brownfield-create-story
 description: "Create Brownfield Story Task methodology and workflow"
 agent: sm
 subtask: false
@@ -95,17 +95,17 @@ Create detailed, implementation-ready stories for brownfield projects where trad
 
 Check for available documentation in this order:
 
-1. *Sharded PRD/Architecture** (docs/prd/, docs/architecture/)
+1. *Sharded PRD/Architecture** (`docs/kord/prds/`, architecture docs in your repo)
    - If found, recommend using create-next-story task instead
 
-2. *Brownfield Architecture Document** (docs/brownfield-architecture.md or similar)
+2. *Brownfield Architecture Document** (`docs/kord/drafts/brownfield-architecture.md` or similar)
    - Created by document-project task
    - Contains actual system state, technical debt, workarounds
 
-3. *Brownfield PRD** (docs/prd.md)
+3. *Brownfield PRD** (`docs/kord/prds/*.md`)
    - May contain embedded technical details
 
-4. *Epic Files** (docs/epics/ or similar)
+4. *Epic Files** (`docs/kord/epics/` or similar)
    - Created by brownfield-create-epic task
 
 5. *User-Provided Documentation**
@@ -148,23 +148,10 @@ If using brownfield-architecture.md from document-project:
 - *Known Issues**: Check if story touches problematic areas
 - *Actual Tech Stack**: Verify versions and constraints
 
-## Configuration Dependencies
+## Output Locations (Kord)
 
-This task requires the following configuration keys from `core-config.yaml`:
-
-- **`qaLocation`**: QA output directory (typically docs/qa) - Required to write quality reports
-
-*Loading Config:**
-```javascript
-const yaml = require('js-yaml');
-const fs = require('fs');
-const path = require('path');
-
-const configPath = path.join(__dirname, '../../core-config.yaml');
-const config = yaml.load(fs.readFileSync(configPath, 'utf8'));
-
-const qaLocation = config.qa?.qaLocation || 'docs/qa';
-```
+- Story files: `docs/kord/stories/`
+- QA artifacts (when needed): use `.kord/templates/qa-gate.md` and `.kord/templates/qa-report.md` and save under `docs/kord/drafts/` (or the project's established QA directory)
 
 #### 2.2 From Brownfield PRD
 

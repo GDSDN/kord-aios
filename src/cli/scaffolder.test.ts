@@ -54,11 +54,24 @@ describe("scaffoldProject", () => {
     const story = readFileSync(join(TEST_DIR, ".kord", "templates", "story.md"), "utf-8")
     expect(story).toContain("Acceptance Criteria")
     expect(story).toContain("Definition of Done")
+    expect(story).toContain("## Purpose")
+    expect(story).toContain("## Scope")
+    expect(story).toContain("## Inputs")
+    expect(story).toContain("## Output")
+    expect(story).toContain("## Verification")
+    expect(story).toContain("## Failure Modes")
 
     const adr = readFileSync(join(TEST_DIR, ".kord", "templates", "adr.md"), "utf-8")
     expect(adr).toContain("Context")
     expect(adr).toContain("Decision")
     expect(adr).toContain("Consequences")
+    expect(adr).toContain("## Purpose")
+    expect(adr).toContain("## Scope")
+    expect(adr).toContain("## Inputs")
+    expect(adr).toContain("## Output")
+    expect(adr).toContain("## Acceptance Criteria")
+    expect(adr).toContain("## Verification")
+    expect(adr).toContain("## Failure Modes")
   })
 
   test("creates .kord/templates/ with new templates (prd, epic, task, qa-gate, qa-report)", () => {
@@ -77,22 +90,57 @@ describe("scaffoldProject", () => {
     const prd = readFileSync(join(TEST_DIR, ".kord", "templates", "prd.md"), "utf-8")
     expect(prd).toContain("Product Requirements Document")
     expect(prd).toContain("Executive Summary")
+    expect(prd).toContain("## Purpose")
+    expect(prd).toContain("## Scope")
+    expect(prd).toContain("## Inputs")
+    expect(prd).toContain("## Output")
+    expect(prd).toContain("## Acceptance Criteria")
+    expect(prd).toContain("## Verification")
+    expect(prd).toContain("## Failure Modes")
 
     const epic = readFileSync(join(TEST_DIR, ".kord", "templates", "epic.md"), "utf-8")
     expect(epic).toContain("Epic:")
     expect(epic).toContain("Vision")
+    expect(epic).toContain("## Purpose")
+    expect(epic).toContain("## Scope")
+    expect(epic).toContain("## Inputs")
+    expect(epic).toContain("## Output")
+    expect(epic).toContain("## Acceptance Criteria")
+    expect(epic).toContain("## Verification")
+    expect(epic).toContain("## Failure Modes")
 
     const task = readFileSync(join(TEST_DIR, ".kord", "templates", "task.md"), "utf-8")
     expect(task).toContain("Task:")
     expect(task).toContain("Description")
+    expect(task).toContain("## Purpose")
+    expect(task).toContain("## Scope")
+    expect(task).toContain("## Inputs")
+    expect(task).toContain("## Output")
+    expect(task).toContain("## Acceptance Criteria")
+    expect(task).toContain("## Verification")
+    expect(task).toContain("## Failure Modes")
 
     const qaGate = readFileSync(join(TEST_DIR, ".kord", "templates", "qa-gate.md"), "utf-8")
     expect(qaGate).toContain("QA Gate")
     expect(qaGate).toContain("Gate Decision")
+    expect(qaGate).toContain("## Purpose")
+    expect(qaGate).toContain("## Scope")
+    expect(qaGate).toContain("## Inputs")
+    expect(qaGate).toContain("## Output")
+    expect(qaGate).toContain("## Acceptance Criteria")
+    expect(qaGate).toContain("## Verification")
+    expect(qaGate).toContain("## Failure Modes")
 
     const qaReport = readFileSync(join(TEST_DIR, ".kord", "templates", "qa-report.md"), "utf-8")
     expect(qaReport).toContain("QA Report")
     expect(qaReport).toContain("Test Results Summary")
+    expect(qaReport).toContain("## Purpose")
+    expect(qaReport).toContain("## Scope")
+    expect(qaReport).toContain("## Inputs")
+    expect(qaReport).toContain("## Output")
+    expect(qaReport).toContain("## Acceptance Criteria")
+    expect(qaReport).toContain("## Verification")
+    expect(qaReport).toContain("## Failure Modes")
   })
 
   test("creates .kord/templates/ with checklist templates", () => {
@@ -127,6 +175,105 @@ describe("scaffoldProject", () => {
 
     const selfCritique = readFileSync(join(TEST_DIR, ".kord", "templates", "checklist-self-critique.md"), "utf-8")
     expect(selfCritique).toBe(CHECKLIST_SELF_CRITIQUE_CONTENT)
+  })
+
+  test("creates .kord/guides/ with deep new/existing onboarding content", () => {
+    //#given - empty project directory
+
+    //#when
+    scaffoldProject({ directory: TEST_DIR })
+
+    //#then
+    const newGuidePath = join(TEST_DIR, ".kord", "guides", "new-project.md")
+    const existingGuidePath = join(TEST_DIR, ".kord", "guides", "existing-project.md")
+    expect(existsSync(newGuidePath)).toBe(true)
+    expect(existsSync(existingGuidePath)).toBe(true)
+
+    const newGuide = readFileSync(newGuidePath, "utf-8")
+    expect(newGuide).toContain("## Who This Is For")
+    expect(newGuide).toContain("## When Not To Use This")
+    expect(newGuide).toContain("## Phases")
+    expect(newGuide).toContain("## Gates")
+    expect(newGuide).toContain("## Artifacts (Outputs)")
+    expect(newGuide).toContain("## Recommended Skills")
+    expect(newGuide).toContain("## Verification Commands")
+    expect(newGuide).toContain("## Failure Modes")
+    expect(newGuide).toContain("First Story Gate")
+
+    const existingGuide = readFileSync(existingGuidePath, "utf-8")
+    expect(existingGuide).toContain("## Safety First")
+    expect(existingGuide).toContain("## Discovery Options")
+    expect(existingGuide).toContain("## Baseline Gates")
+    expect(existingGuide).toContain("## Artifacts (Outputs)")
+    expect(existingGuide).toContain("## Recommended Skills")
+    expect(existingGuide).toContain("## Verification Commands")
+    expect(existingGuide).toContain("## What Not To Do")
+    expect(existingGuide.toLowerCase()).toContain("rollback")
+  })
+
+  test("creates workflow pack and workflow alias commands", () => {
+    //#given - empty project directory
+
+    //#when
+    scaffoldProject({ directory: TEST_DIR })
+
+    //#then
+    const workflowTemplatePath = join(TEST_DIR, ".kord", "workflows", "_template.yaml")
+    const workflowReadmePath = join(TEST_DIR, ".kord", "workflows", "README.md")
+    const greenfieldPath = join(TEST_DIR, ".kord", "workflows", "greenfield-fullstack.yaml")
+    const brownfieldPath = join(TEST_DIR, ".kord", "workflows", "brownfield-discovery.yaml")
+    const greenfieldAliasPath = join(TEST_DIR, ".opencode", "command", "greenfield-fullstack.md")
+    const brownfieldAliasPath = join(TEST_DIR, ".opencode", "command", "brownfield-discovery.md")
+
+    expect(existsSync(workflowTemplatePath)).toBe(true)
+    expect(existsSync(workflowReadmePath)).toBe(true)
+    expect(existsSync(greenfieldPath)).toBe(true)
+    expect(existsSync(brownfieldPath)).toBe(true)
+    expect(existsSync(greenfieldAliasPath)).toBe(true)
+    expect(existsSync(brownfieldAliasPath)).toBe(true)
+
+    const builtinGreenfieldAssetPath = join(import.meta.dir, "..", "features", "builtin-workflows", "greenfield-fullstack.yaml")
+    const builtinBrownfieldAssetPath = join(import.meta.dir, "..", "features", "builtin-workflows", "brownfield-discovery.yaml")
+    const scaffoldedGreenfield = readFileSync(greenfieldPath, "utf-8")
+    const scaffoldedBrownfield = readFileSync(brownfieldPath, "utf-8")
+    const builtinGreenfield = readFileSync(builtinGreenfieldAssetPath, "utf-8")
+    const builtinBrownfield = readFileSync(builtinBrownfieldAssetPath, "utf-8")
+
+    expect(scaffoldedGreenfield).toBe(builtinGreenfield)
+    expect(scaffoldedBrownfield).toBe(builtinBrownfield)
+
+    const aliasContent = readFileSync(greenfieldAliasPath, "utf-8")
+    const workflowReadme = readFileSync(workflowReadmePath, "utf-8")
+    expect(aliasContent).toContain("<workflow-context>")
+    expect(aliasContent).toContain("<workflow-id>greenfield-fullstack</workflow-id>")
+    expect(workflowReadme).toContain("Workflow Authoring Workspace")
+    expect(workflowReadme).toContain("/create-workflow <id>")
+    expect(workflowReadme).toContain("/workflow create <id>")
+  })
+
+  test("creates .kord/standards/ with onboarding and artifact quality rubrics", () => {
+    //#given - empty project directory
+
+    //#when
+    scaffoldProject({ directory: TEST_DIR })
+
+    //#then
+    const onboardingRubricPath = join(TEST_DIR, ".kord", "standards", "onboarding-depth-rubric.md")
+    const artifactsRubricPath = join(TEST_DIR, ".kord", "standards", "methodology-artifacts-quality-rubric.md")
+    expect(existsSync(onboardingRubricPath)).toBe(true)
+    expect(existsSync(artifactsRubricPath)).toBe(true)
+
+    const onboardingRubric = readFileSync(onboardingRubricPath, "utf-8")
+    expect(onboardingRubric).toContain("## Required Sections")
+    expect(onboardingRubric).toContain("## Depth Markers")
+    expect(onboardingRubric).toContain("## Size Budgets")
+    expect(onboardingRubric).toContain("## Verification")
+
+    const artifactsRubric = readFileSync(artifactsRubricPath, "utf-8")
+    expect(artifactsRubric).toContain("## Templates")
+    expect(artifactsRubric).toContain("## Checklists")
+    expect(artifactsRubric).toContain("## Standards")
+    expect(artifactsRubric).toContain("## Skills")
   })
 
   test("creates kord-rules.md in .kord/rules/", () => {
@@ -244,6 +391,11 @@ describe("project-mode.md generation", () => {
     expect(content).toContain("Project Mode: new")
     expect(content).toContain("Project Stage: NEW_SETUP")
     expect(content).toContain("Read-first: .kord/guides/new-project.md")
+    expect(content).toContain("## Stage Gates")
+    expect(content).toContain("## Sunset Clause")
+
+    const size = Buffer.byteLength(content, "utf-8")
+    expect(size).toBeLessThanOrEqual(2048)
   })
 
   test("generates project-mode.md with existing project settings", () => {
@@ -259,6 +411,11 @@ describe("project-mode.md generation", () => {
     expect(content).toContain("Project Mode: existing")
     expect(content).toContain("Project Stage: EXISTING_UNASSESSED")
     expect(content).toContain("Read-first: .kord/guides/existing-project.md")
+    expect(content).toContain("## Stage Gates")
+    expect(content).toContain("## Sunset Clause")
+
+    const size = Buffer.byteLength(content, "utf-8")
+    expect(size).toBeLessThanOrEqual(2048)
   })
 
   test("defaults to existing project when projectMode is not specified", () => {

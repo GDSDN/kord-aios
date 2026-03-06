@@ -83,6 +83,29 @@ assignee: ""
 
 # {TITLE}
 
+## Purpose
+
+_Why does this story exist? What user value does it deliver?_
+
+## Scope
+
+### In Scope
+
+- _What will be delivered_
+
+### Out of Scope
+
+- _What will NOT be delivered (explicitly)_
+
+## Inputs
+
+- _Links to PRD/epic (if any)_
+- _Relevant constraints (tech, timeline, security)_
+
+## Output
+
+- _What changes for users and where it shows up_
+
 ## User Story
 
 _As a [user/role], I want [goal] so that [benefit]._
@@ -96,6 +119,20 @@ _What problem does this story solve? Why is it needed now?_
 - [ ] Criterion 1: _Description of expected behavior_
 - [ ] Criterion 2: _Description of expected behavior_
 - [ ] Criterion 3: _Description of expected behavior_
+
+## Verification
+
+_How to prove acceptance criteria are met (commands and/or manual steps)._
+
+~~~bash
+# examples (adapt to project)
+bun test
+bun run build
+~~~
+
+## Failure Modes
+
+- _What commonly goes wrong and how to detect/recover_
 
 ## Technical Notes
 
@@ -129,6 +166,39 @@ created: "{DATE}"
 ---
 
 # ADR-{NUMBER}: {TITLE}
+
+## Purpose
+
+_Why do we need a decision record? What decision is being captured?_
+
+## Scope
+
+_What this ADR covers and what it explicitly does not cover._
+
+## Inputs
+
+- _Constraints (security, performance, cost, timeline)_
+- _Alternatives considered_
+- _Prior art / existing patterns_
+
+## Output
+
+_The decision and the resulting constraints for implementation._
+
+## Acceptance Criteria
+
+- [ ] Decision is clear, concrete, and testable in implementation
+- [ ] Trade-offs are documented (pros/cons)
+
+## Verification
+
+- [ ] Implementation references this ADR when relevant
+- [ ] Risks are mitigated or explicitly accepted
+
+## Failure Modes
+
+- Decision is vague or untestable
+- Alternatives were not evaluated
 
 ## Status
 
@@ -166,6 +236,44 @@ created: "{DATE}"
 ---
 
 # Product Requirements Document: {TITLE}
+
+## Purpose
+
+_What are we building and why now?_
+
+## Scope
+
+### In Scope
+
+- _In scope item_
+
+### Out of Scope (Non-Goals)
+
+- _Explicitly out of scope item_
+
+## Inputs
+
+- _Context, constraints, and stakeholders_
+
+## Output
+
+- _What changes for users and how success will be measured_
+
+## Acceptance Criteria
+
+- [ ] Requirements are specific and testable (no vague aspirations)
+- [ ] Non-goals are explicit
+- [ ] Success metrics are measurable
+
+## Verification
+
+- [ ] Stories can be derived without missing information
+- [ ] Risks and mitigations are documented
+
+## Failure Modes
+
+- Requirements are ambiguous or untestable
+- Missing constraints (integration, performance, security)
 
 ## Executive Summary
 
@@ -245,6 +353,43 @@ wave: 1
 
 # Epic: {TITLE}
 
+## Purpose
+
+_Why this epic exists and what it enables._
+
+## Scope
+
+### In Scope
+
+- _Item_
+
+### Out of Scope
+
+- _Item_
+
+## Inputs
+
+- _PRD link(s) and constraints_
+- _Dependencies and integration points_
+
+## Output
+
+- _What the system looks like when the epic is complete_
+
+## Acceptance Criteria
+
+- [ ] Waves and dependencies are explicit
+- [ ] Stories are independently executable within a wave
+
+## Verification
+
+- [ ] Each story has verification commands or steps
+
+## Failure Modes
+
+- Epic mixes multiple unrelated deliverables
+- Dependencies are implicit
+
 ## Vision
 
 _One-sentence description of the epic's end state._
@@ -309,6 +454,45 @@ story: ""
 
 # Task: {TITLE}
 
+## Purpose
+
+_Why this task exists and how it supports the story/epic._
+
+## Scope
+
+### In Scope
+
+- _What will be done_
+
+### Out of Scope
+
+- _What will not be done_
+
+## Inputs
+
+- _Story link and relevant docs_
+- _Constraints and patterns to follow_
+
+## Output
+
+- _What will be produced/changed (files, behavior)_
+
+## Acceptance Criteria
+
+- [ ] Task completion is objectively verifiable
+
+## Verification
+
+~~~bash
+# examples (adapt to project)
+bun test
+~~~
+
+## Failure Modes
+
+- Missing context causes rework
+- Task scope expands beyond a single change
+
 ## Description
 
 _Detailed description of what needs to be done._
@@ -351,6 +535,42 @@ story: ""
 ---
 
 # QA Gate: {TITLE}
+
+## Purpose
+
+_What is being validated and why this gate exists._
+
+## Scope
+
+### In Scope
+
+- _What is validated by this gate_
+
+### Out of Scope
+
+- _What is not validated here_
+
+## Inputs
+
+- _Story link and acceptance criteria_
+- _Relevant risk profile_
+
+## Output
+
+- Gate decision: APPROVED / REJECTED / CONDITIONAL
+
+## Acceptance Criteria
+
+- [ ] Gate decision is backed by evidence (tests, logs, manual checks)
+
+## Verification
+
+- [ ] Evidence is recorded in this document
+
+## Failure Modes
+
+- Gate decision made without evidence
+- Acceptance criteria not traced to tests/steps
 
 ## Gate Purpose
 
@@ -413,6 +633,42 @@ story: ""
 ---
 
 # QA Report: {TITLE}
+
+## Purpose
+
+_Summarize verification results for a story or release._
+
+## Scope
+
+### In Scope
+
+- _What was tested_
+
+### Out of Scope
+
+- _What was not tested and why_
+
+## Inputs
+
+- _Story link, plan link, and artifacts under test_
+
+## Output
+
+- Pass/fail status and actionable defect list
+
+## Acceptance Criteria
+
+- [ ] Report traces results back to acceptance criteria
+- [ ] Defects are actionable and reproducible
+
+## Verification
+
+- [ ] Commands and environments are recorded
+
+## Failure Modes
+
+- Vague defects without reproduction steps
+- Results not tied to acceptance criteria
 
 ## Executive Summary
 
@@ -497,23 +753,29 @@ Use this checklist before submitting a story for PO validation.
 
 ## Structure
 
-- [ ] Title is clear and descriptive
-- [ ] Description follows "As a... I want... so that..." format
-- [ ] Acceptance criteria are specific and testable
-- [ ] Scope is a single deliverable
+- [ ] Title is clear and action-oriented (verb + object)
+- [ ] User Story states role, capability, and value (not implementation)
+- [ ] Scope is a single deliverable (no hidden sub-stories)
+- [ ] Acceptance Criteria are objectively testable (pass/fail)
+- [ ] Story includes explicit verification steps (commands or manual steps) tied to AC
 
 ## Content
 
-- [ ] Technical notes included
-- [ ] Dependencies listed
-- [ ] File references included
-- [ ] Risks identified
+- [ ] Technical Notes include concrete file paths and patterns to follow
+- [ ] Dependencies are explicit and actionable (what must exist first)
+- [ ] Risks include at least one mitigation (even if "accept risk")
+- [ ] "Must NOT" section exists to prevent scope creep
 
 ## Quality
 
-- [ ] Acceptance criteria have clear pass/fail conditions
-- [ ] No ambiguous language
-- [ ] Dependencies are achievable
+- [ ] No ambiguous language ("should", "nice", "as needed") without criteria
+- [ ] No placeholders like "TODO" or "TBD" without a follow-up task
+- [ ] If behavior changes are risky, rollback plan is described
+
+## Evidence
+
+- [ ] Story references where results will be saved (e.g. \`docs/kord/stories/\`)
+- [ ] Verification commands are realistic for this repo (prefer \`bun test\`, \`bun run build\`)
 `
 
 export const CHECKLIST_STORY_DOD_CONTENT = `---
@@ -529,27 +791,33 @@ Verify all items before marking story as complete.
 
 ## Code Complete
 
-- [ ] Code implemented
-- [ ] Code passes linting
-- [ ] No type errors
+- [ ] Code implemented for all acceptance criteria
+- [ ] No debug leftovers (console logs, temp flags, commented blocks)
+- [ ] No type error suppression (no \`as any\`, \`@ts-ignore\`, \`@ts-expect-error\`)
 
 ## Testing
 
-- [ ] Unit tests written
-- [ ] Unit tests passing
-- [ ] Integration tests passing (if applicable)
-- [ ] No regressions
+- [ ] Unit tests cover happy path and at least one failure path
+- [ ] All relevant tests pass locally
+- [ ] If no tests exist, story includes documented verification steps
+- [ ] No regressions in previously working flows
 
 ## Review
 
-- [ ] PR reviewed
-- [ ] PR approved
-- [ ] Comments addressed
+- [ ] Self-review completed (diff reviewed, no unintended files)
+- [ ] PR is review-ready (description, screenshots/logs if relevant)
+- [ ] Review comments addressed or tracked as follow-ups
 
 ## Documentation
 
-- [ ] Documentation updated
-- [ ] README updated (if needed)
+- [ ] Documentation updated where behavior changed
+- [ ] Operational notes captured (config, env vars, migrations)
+
+## Evidence
+
+- [ ] Commands executed and captured in notes:
+  - \`bun test\`
+  - \`bun run build\`
 `
 
 export const CHECKLIST_PR_REVIEW_CONTENT = `---
@@ -588,6 +856,11 @@ Use this checklist when reviewing pull requests.
 - [ ] No security vulnerabilities
 - [ ] Input validation present
 - [ ] Authentication/authorization correct
+
+## Evidence
+
+- [ ] PR description links to story/plan and explains verification
+- [ ] Risky changes have rollback notes (feature flag, config toggle, revert path)
 `
 
 export const CHECKLIST_ARCHITECT_CONTENT = `---
@@ -625,6 +898,11 @@ Use this checklist when reviewing architectural decisions.
 - [ ] Code is testable
 - [ ] Complexity is manageable
 - [ ] Dependencies are clear
+
+## Evidence
+
+- [ ] ADR exists for significant trade-offs (when applicable)
+- [ ] Integration points are enumerated with concrete file paths
 `
 
 export const CHECKLIST_PRE_PUSH_CONTENT = `---
@@ -656,6 +934,13 @@ Run this checklist before pushing to remote.
 - [ ] Self-review completed
 - [ ] Code changes verified
 - [ ] Related issues linked
+
+## Evidence
+
+- [ ] Ran and recorded:
+  - \`bun run typecheck\` (if present)
+  - \`bun run build\`
+  - \`bun test\`
 `
 
 export const CHECKLIST_SELF_CRITIQUE_CONTENT = `---
@@ -693,6 +978,10 @@ Reflect on your work before submission.
 - [ ] Potential refactors identified
 - [ ] Technical debt noted
 - [ ] Follow-up items documented
+
+## Evidence
+
+- [ ] If trade-offs were made, they are documented (ADR or story notes)
 `
 
 // ============================================================================
@@ -719,6 +1008,12 @@ This directory contains project-level methodology and configuration for Kord AIO
 - Standards provide guidance for agent decision-making
 - Guides help onboard agents to project context
 
+## Read Order (Recommended)
+
+1. \`.kord/rules/project-mode.md\` (injected; current mode/stage + gates)
+2. \`.kord/standards/onboarding-depth-rubric.md\` (quality bar for onboarding)
+3. \`.kord/standards/methodology-artifacts-quality-rubric.md\` (quality bar for templates/checklists)
+
 For details, see individual directory \`AGENTS.md\` files.
 `
 
@@ -732,6 +1027,8 @@ This directory contains quality gates and decision heuristics for Kord AIOS agen
 |------|---------|
 | \`quality-gates.md\` | Checkpoints that must pass before advancing |
 | \`decision-heuristics.md\` | Guidelines for agent decision-making |
+| \`onboarding-depth-rubric.md\` | Auditable depth bar for new vs existing onboarding |
+| \`methodology-artifacts-quality-rubric.md\` | Auditable quality bar for templates/checklists/standards/skills |
 
 ## Quality Gates
 
@@ -771,6 +1068,101 @@ These guides are loaded by the agent when initializing work. They provide contex
 - Development workflow
 - Team conventions
 - Quality expectations
+
+## Quality Bar
+
+Guides should follow the rubric:
+- \`.kord/standards/onboarding-depth-rubric.md\`
+`
+
+export const KORD_STANDARDS_ONBOARDING_DEPTH_RUBRIC_CONTENT = `# Onboarding Depth Rubric
+
+This file defines the minimum acceptable depth for onboarding content.
+
+## Required Sections
+
+### Guides
+
+New project guide MUST include:
+- \`## Who This Is For\`
+- \`## When Not To Use This\`
+- \`## Phases\`
+- \`## Gates\`
+- \`## Artifacts (Outputs)\`
+- \`## Recommended Skills\`
+- \`## Verification Commands\`
+- \`## Failure Modes\`
+
+Existing project guide MUST include:
+- \`## Safety First\`
+- \`## Discovery Options\`
+- \`## Baseline Gates\`
+- \`## Artifacts (Outputs)\`
+- \`## Recommended Skills\`
+- \`## Verification Commands\`
+- \`## What Not To Do\`
+
+### Injected Rules
+
+\`.kord/rules/project-mode.md\` MUST include:
+- \`Project Mode:\` (single token value)
+- \`Project Stage:\`
+- \`Read-first:\`
+- \`## Stage Gates\`
+- \`## Sunset Clause\`
+
+## Depth Markers
+
+- Phases: numbered or named sequence with clear intent
+- Gates: entry/exit criteria with checkable items
+- Artifacts: explicit file paths and templates
+- Verification: runnable commands or explicit manual steps
+- Failure modes: common mistakes + recovery
+
+## Size Budgets
+
+- \`.kord/rules/project-mode.md\`: keep <= 2048 bytes (injected context budget)
+
+## Verification
+
+- Enforced by \`bun test src/cli/scaffolder.test.ts\`.
+`
+
+export const KORD_STANDARDS_METHODOLOGY_ARTIFACTS_QUALITY_RUBRIC_CONTENT = `# Methodology Artifacts Quality Rubric
+
+This file defines the minimum quality bar for scaffolded templates, checklists, standards, and mode-relevant skills.
+
+## Templates
+
+Each template in \`.kord/templates/\` MUST include these headings:
+- \`## Purpose\`
+- \`## Scope\`
+- \`## Inputs\`
+- \`## Output\`
+- \`## Acceptance Criteria\`
+- \`## Verification\`
+- \`## Failure Modes\`
+
+## Checklists
+
+Each checklist template MUST be:
+- Objective: each item can be verified (pass/fail)
+- Actionable: includes file paths or commands when relevant
+- Risk-aware: includes at least one negative/failure condition
+
+## Standards
+
+Standards MUST:
+- Define what "good" looks like
+- Include evidence requirements (commands, artifacts)
+- Map to Kord flow: \`/plan\` -> \`/start-work\`
+
+## Skills (Mode-Relevant)
+
+Skills used for onboarding MUST:
+- Reference real Kord paths (\`.kord/\`, \`.opencode/\`, \`docs/kord/\`)
+- Avoid foreign/legacy framework tokens (e.g. \`core-config.yaml\`, \`documentation-integrity\`)
+- Provide a clear sequence and outputs
 `
 
 export const KORD_STANDARDS_QUALITY_GATES_CONTENT = `# Quality Gates
@@ -784,6 +1176,11 @@ Advisory checkpoints that agents should verify before marking work complete.
 - [ ] Dependencies are identified
 - [ ] Scope is manageable (single deliverable)
 
+### Evidence
+
+- [ ] A plan exists in \`docs/kord/plans/\` with executable steps
+- [ ] Stories reference \`.kord/templates/story.md\` and include verification steps
+
 ## Implementation Gate
 
 - [ ] Code compiles without errors
@@ -792,12 +1189,21 @@ Advisory checkpoints that agents should verify before marking work complete.
 - [ ] No type errors
 - [ ] No debug code (console.log, etc.)
 
+### Evidence
+
+- [ ] \`bun test\` passes (or failures are documented as pre-existing)
+- [ ] \`bun run build\` passes (when the project has a build command)
+
 ## Review Gate
 
 - [ ] PR description is complete
 - [ ] Code follows project conventions
 - [ ] No AI comment bloat
 - [ ] No "as any", "@ts-ignore", "@ts-expect-error"
+
+### Evidence
+
+- [ ] PR links to story/plan and includes verification performed
 
 ## Agent Quality Gate
 
@@ -840,88 +1246,150 @@ When making decisions, consider:
 - **Cons**: Costs and risks
 - **Alternatives**: Other options considered
 - **Mitigation**: How to address downsides
+
+## When to Stop and Escalate
+
+- If requirements are mutually exclusive, document it and checkpoint with PO
+- If verification is impossible (no tests, no build), document the gap and add a QA plan
+- If a change is irreversible, prefer an ADR first
 `
 
 export const KORD_GUIDE_NEW_PROJECT_CONTENT = `# New Project Guide
 
-Guide for starting a new project with Kord AIOS.
+This mode assumes you are starting a new codebase (or a new product/module) and want a traceable delivery pipeline.
 
-## Prerequisites
+## Who This Is For
 
-- OpenCode >= 1.0.150 installed
-- Kord AIOS plugin installed
+- Greenfield repositories with no legacy constraints
+- Teams that want traceable artifacts (PRD -> Epic -> Stories -> QA)
+- Projects where you want agents to follow a consistent methodology
 
-## Quick Start
+## When Not To Use This
 
-1. Run the installer: \`bunx kord-aios init\`
-2. Follow interactive prompts
-3. Review generated \`.kord/\` structure
+- If you are integrating into an existing codebase with production risk: use \`.kord/guides/existing-project.md\`
+- If you need only a one-off experiment and do not want artifacts: keep it lightweight
 
-## What Gets Created
+## Phases
 
-- \`.kord/templates/\` — Story, ADR, task, checklist templates
-- \`.kord/standards/\` — Quality gates and decision heuristics
-- \`.kord/guides/\` — This guide and existing-project guide
-- \`docs/kord/\` — Plans, stories, epics, drafts directories
+### Phase 0: Confirm Mode and Stage
 
-## First Steps
+- Read \`.kord/rules/project-mode.md\` (mode, stage, stage gates)
+- If your repo already has substantial code, consider switching to existing-project mode
 
-1. Create your first story: \`/plan\`
-2. Execute via Build: \`/start-work\`
-3. Add team members as needed
+### Phase 1: Requirements (PRD)
 
-## Configuration
+- Create a PRD using \`.kord/templates/prd.md\`
+- Ensure requirements are testable and include success metrics
 
-Edit \`.opencode/kord-aios.json\` to customize:
+### Phase 2: Architecture + Epic
 
-- Agent models and temperatures
-- Background task concurrency
-- Disabled hooks/skills
+- Create an epic using \`.kord/templates/epic.md\`
+- If architecture decisions are non-trivial, write an ADR using \`.kord/templates/adr.md\`
 
-See \`docs/guide/configurations.md\` for details.
+### Phase 3: Story Cycle
+
+- Create stories using \`.kord/templates/story.md\`
+- Validate with PO using \`.kord/templates/checklist-story-draft.md\`
+- Implement via \`/start-work\`
+- Record QA outcomes using \`.kord/templates/qa-gate.md\` and \`.kord/templates/qa-report.md\`
+
+## Gates
+
+### Planning Gate
+
+- [ ] PRD has clear goals, non-goals, and testable requirements
+- [ ] Epic defines waves and dependencies
+
+### Architecture Gate
+
+- [ ] ADR exists for meaningful trade-offs
+- [ ] Risks and mitigations are documented
+
+### First Story Gate
+
+- [ ] First story includes verification commands and failure modes
+- [ ] Story scope is a single deliverable
+
+## Artifacts (Outputs)
+
+- PRDs: \`docs/kord/prds/\`
+- Epics: \`docs/kord/epics/\`
+- Stories: \`docs/kord/stories/\`
+- Plans: \`docs/kord/plans/\`
+
+## Recommended Skills
+
+- \`greenfield-kickoff\` (create PRD + epic structure)
+- \`create-next-story\` (standard story creation)
+- \`validate-next-story\` (PO validation)
+
+## Verification Commands
+
+~~~bash
+bun test
+bun run build
+~~~
+
+## Failure Modes
+
+- Writing vague acceptance criteria (fix: rewrite as pass/fail)
+- Starting implementation before the first story is validated (fix: PO gate)
+- Letting scope creep across multiple deliverables (fix: split story)
 `
 
 export const KORD_GUIDE_EXISTING_PROJECT_CONTENT = `# Existing Project Guide
 
-Guide for adding Kord AIOS to an existing project.
+This mode assumes your project has existing behavior that must not be broken.
 
-## Prerequisites
+## Safety First
 
-- OpenCode >= 1.0.150 installed
-- Existing project with code
+- Preserve existing behavior by default
+- Establish a baseline before refactoring
+- Always have a rollback plan for risky changes
 
-## Quick Start
+## Discovery Options
 
-1. Run: \`bunx kord-aios install\`
-2. Configure agents in \`.opencode/kord-aios.json\`
-3. Start using \`/plan\` and \`/start-work\`
+### Option A: PRD-First (Recommended for big changes)
 
-## Integration Tips
+- Define enhancement scope and constraints first
+- Document only the impacted areas
 
-### Migrate Existing Docs
+### Option B: Document-First (Recommended when unfamiliar)
 
-- Move existing specs to \`docs/kord/stories/\`
-- Move roadmaps to \`docs/kord/epics/\`
-- Move plans to \`docs/kord/plans/\`
+- Document the current system reality (including debt)
+- Then write PRD/epic with real constraints
 
-### Configure Agents
+## Baseline Gates
 
-Start with default configurations, then tune:
+- [ ] Tests/build baseline captured (what passes now)
+- [ ] Critical flows identified with a minimal repro
+- [ ] Rollback plan exists (revert path, feature flag, or staged rollout)
 
-- Temperature: 0.1-0.3 for code agents
-- Models: Use Opus/Sonnet for planning, Codex for code
+## Artifacts (Outputs)
 
-### Preserve Workflow
+- Discovery notes: \`docs/kord/notepads/\`
+- Draft assessments: \`docs/kord/drafts/\`
+- PRDs: \`docs/kord/prds/\`
+- Stories: \`docs/kord/stories/\`
 
-- Keep existing CI/CD
-- Adapt Kord methodology to existing processes
-- Start small: use \`/plan\` for one feature
+## Recommended Skills
 
-## Common Issues
+- \`document-project\` (brownfield architecture + reality map)
+- \`generate-shock-report\` (optional: make UI debt visible)
+- \`create-brownfield-story\` (turn discovery into executable story)
 
-- **Conflicting configs**: Check \`.opencode/\` takes precedence
-- **Missing permissions**: Verify \`write_paths\` in config
-- **Model issues**: Use doctor: \`bunx kord-aios doctor\`
+## Verification Commands
+
+~~~bash
+bun test
+bun run build
+~~~
+
+## What Not To Do
+
+- Do not rewrite large areas before baseline is established
+- Do not change dependencies blindly
+- Do not remove tests to "make it pass"
 `
 
 export const CHECKLIST_AGENT_QUALITY_GATE_CONTENT = `---

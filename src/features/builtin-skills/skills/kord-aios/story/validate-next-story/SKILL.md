@@ -28,7 +28,7 @@ The story must follow these status transitions:
 ## Pre-Conditions
 - Validation rules loaded.
 - Target story available for validation.
-- `core-config.yaml` or equivalent project configuration must exist.
+- Project onboarding context is available (prefer `.kord/rules/project-mode.md` if present).
 - Required templates are available in `.kord/templates/` (e.g. `.kord/templates/checklist-story-draft.md`).
 
 ## Sequential Task Execution
@@ -43,10 +43,10 @@ The story must follow these status transitions:
 - **Required Fields**: `executor` and `quality_gate` must be present and not empty.
 - **Constraint Validation (CRITICAL)**: `executor != quality_gate`. An agent cannot be their own quality gate.
 - **Role Consistency**:
-  - Code/Logic → `@dev` (QA by `@architect`)
-  - Schema/DB → `@data-engineer` (QA by `@dev`)
-  - UI Components → `@ux-design-expert` (QA by `@dev`)
-  - Architecture → `@architect` (QA by `@pm`)
+  - Code/Logic -> `@dev` (QA by `@architect`)
+  - Schema/DB -> `@data-engineer` (QA by `@dev`)
+  - UI Components -> `@ux-design-expert` (QA by `@dev`)
+  - Architecture -> `@architect` (QA by `@pm`)
 
 ### 3. File Structure and Source Tree Validation
 - Validate paths using GitHub CLI or local file system exploration.
