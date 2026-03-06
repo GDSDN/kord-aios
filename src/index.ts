@@ -44,6 +44,7 @@ import {
   createPreemptiveCompactionHook,
   createTasksTodowriteDisablerHook,
   createWriteExistingFileGuardHook,
+  createWorkflowHook,
 } from "./hooks";
 import { createAnthropicEffortHook } from "./hooks/anthropic-effort";
 import {
@@ -282,6 +283,10 @@ const KordAIOSPlugin: Plugin = async (ctx) => {
 
   const startWork = isHookEnabled("start-work")
     ? createStartWorkHook(ctx)
+    : null;
+
+  const workflow = isHookEnabled("workflow")
+    ? createWorkflowHook(ctx)
     : null;
 
   const planMdOnly = isHookEnabled("plan-md-only")
@@ -655,6 +660,7 @@ const KordAIOSPlugin: Plugin = async (ctx) => {
       await claudeCodeHooks["chat.message"]?.(input, output);
       await autoSlashCommand?.["chat.message"]?.(input, output);
       await startWork?.["chat.message"]?.(input, output);
+      await workflow?.["chat.message"]?.(input, output);
 
       if (!hasConnectedProvidersCache()) {
         ctx.client.tui

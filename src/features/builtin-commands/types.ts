@@ -2,6 +2,7 @@ import type { CommandDefinition } from "../claude-code-command-loader"
 
 export type BuiltinCommandName =
   | "init-deep"
+  | "create-workflow"
   | "ralph-loop"
   | "cancel-ralph"
   | "ulw-loop"
@@ -14,6 +15,7 @@ export type BuiltinCommandName =
   | "squad-create"
   | "git-commit"
   | "git-create-pr"
+  | "workflow"
 
 export interface BuiltinCommandConfig {
   disabled_commands?: BuiltinCommandName[]

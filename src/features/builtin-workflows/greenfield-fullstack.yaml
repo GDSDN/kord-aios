@@ -1,0 +1,23 @@
+schema_version: "1"
+workflow:
+  id: greenfield-fullstack
+  name: Greenfield Fullstack
+  version: "1.0.0"
+  type: development
+  runner_agent: kord
+sequence:
+  - id: kickoff
+    intent: interview
+    title: Product kickoff and scope lock
+    notes: Collect scope, constraints, and success criteria.
+    creates: ["docs/kord/prds/greenfield-prd.md"]
+  - id: architecture
+    intent: research
+    title: Architecture and stack decisions
+    requires: ["docs/kord/prds/greenfield-prd.md"]
+    creates: ["docs/kord/adrs/architecture.md"]
+  - id: implementation-plan
+    intent: handoff_to_plan
+    title: Build implementation plan
+    requires: ["docs/kord/adrs/architecture.md"]
+    creates: ["docs/kord/plans/greenfield-fullstack.md"]

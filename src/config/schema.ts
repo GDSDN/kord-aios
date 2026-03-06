@@ -130,10 +130,12 @@ export const HookNameSchema = z.enum([
   "auto-qa-gate",
   "decision-logger",
   "anthropic-effort",
+  "workflow",
 ])
 
 export const BuiltinCommandNameSchema = z.enum([
   "init-deep",
+  "create-workflow",
   "ralph-loop",
   "ulw-loop",
   "cancel-ralph",
@@ -146,6 +148,7 @@ export const BuiltinCommandNameSchema = z.enum([
   "squad-create",
   "git-commit",
   "git-create-pr",
+  "workflow",
 ])
 
 export const AgentOverrideConfigSchema = z.object({
