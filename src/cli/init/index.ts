@@ -100,8 +100,8 @@ export interface InitResult {
  * - Project config (.opencode/kord-aios.json)
  * - OpenCode config (.opencode/opencode.jsonc) with plugin and instructions
  * - Exports code squad to .kord/squads/code/
- * - Exports approved T2 agents and methodology skills to .opencode/ (unless skipExtract is true)
- * - Syncs builtin squads to .opencode/squads/ (unless skipExtract is true)
+ * - Exports approved T2 agents and methodology skills to .opencode/ (unless sync is skipped)
+ * - Syncs builtin squads to .opencode/squads/ (unless sync is skipped)
  * - Optionally bootstrap (git init + package.json) if --bootstrap is set and mode is "new"
  *
  * Does NOT touch global config.
@@ -685,9 +685,9 @@ function printInitResults(params: PrintResultsParams): void {
     }
   }
 
-  // Print extract result
+  // Print sync result
   if (extractSkipped) {
-    console.log(`${cyan("○")} ${bold("Extract")} skipped (--skip-extract flag)`)
+    console.log(`${cyan("○")} ${bold("Content Sync")} skipped (--skip-sync flag)`)
   }
 
   // Print errors if any

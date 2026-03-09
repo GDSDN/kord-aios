@@ -16,7 +16,7 @@ const maybeTest = HAS_TSLS ? test : ((title: string, fn: any) => (test as any).s
 const lspTest = HAS_TSLS ? test : ((title: string, fn: any) => (test as any).skip(title, fn))
 // Guarded alias for a diagnostics-related test placeholder (no-op when TSLS is unavailable)
 const lspDiagnosticsTest = HAS_TSLS ? test : ((title: string, fn: any) => (test as any).skip(title, fn))
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { execSync } from "node:child_process"
 import { init } from "./index"
@@ -24,6 +24,19 @@ import { KORD_DIR, KORD_DOCS_DIR, KORD_RULES_FILE } from "../project-layout"
 import { resetConfigContext } from "../config-manager"
 
 const TEST_DIR = resolve(__dirname, "__test_init__")
+const APPROVED_T2_AGENT_FILES = [
+  "pm.md",
+  "po.md",
+  "sm.md",
+  "qa.md",
+  "devops.md",
+  "data-engineer.md",
+  "ux-design-expert.md",
+  "squad-creator.md",
+  "analyst.md",
+  "plan-analyzer.md",
+  "plan-reviewer.md",
+]
 
 describe("init", () => {
   beforeEach(() => {
@@ -89,13 +102,13 @@ describe("init", () => {
     expect(adr).toContain("Context")
   })
 
-  test("creates exactly 13 template files under .kord/templates/", async () => {
+  test("creates exactly 7 template files under .kord/templates/", async () => {
     //#given - empty project directory
 
     //#when
     await init({ directory: TEST_DIR })
 
-    //#then - The init-delivery contract: 13 templates must exist
+    //#then - The init-delivery contract: 7 templates must exist
     const templatesDir = join(TEST_DIR, KORD_DIR, "templates")
     const expectedTemplates = [
       "story.md",
@@ -105,23 +118,16 @@ describe("init", () => {
       "task.md",
       "qa-gate.md",
       "qa-report.md",
-      "checklist-story-draft.md",
-      "checklist-story-dod.md",
-      "checklist-pr-review.md",
-      "checklist-architect.md",
-      "checklist-pre-push.md",
-      "checklist-self-critique.md",
     ]
 
     for (const template of expectedTemplates) {
       expect(existsSync(join(templatesDir, template))).toBe(true)
     }
 
-    // Verify exactly 14 files (not more, not less)
-    // Note: 13 original + 1 checklist-agent-quality-gate
+    // Verify exactly 7 files (not more, not less)
     const { readdirSync } = await import("node:fs")
     const files = readdirSync(templatesDir).filter((f) => f.endsWith(".md"))
-    expect(files).toHaveLength(14)
+    expect(files).toHaveLength(7)
   })
 
   test("creates kord-rules.md at project root", async () => {
@@ -358,16 +364,35 @@ describe("init", () => {
     }
   })
 
-  test("init should extract agents, skills, and commands to .opencode/", async () => {
+  test("init exports only approved T2 agents to .opencode/agents and exports skills", async () => {
     //#given - empty project directory
 
     //#when
-    await init({ directory: TEST_DIR })
+    const result = await init({ directory: TEST_DIR })
 
-    //#then - extract should have created .opencode/ agents, skills, commands
-    expect(existsSync(join(TEST_DIR, ".opencode", "agents"))).toBe(true)
+    //#then - curated agent export should include exactly the approved T2 set
+    const agentsDir = join(TEST_DIR, ".opencode", "agents")
+    expect(result.agentExport.success).toBe(true)
+    expect(existsSync(agentsDir)).toBe(true)
+
+    const exportedAgents = readdirSync(agentsDir).filter((file) => file.endsWith(".md")).sort()
+    expect(exportedAgents).toEqual([...APPROVED_T2_AGENT_FILES].sort())
+
+    expect(exportedAgents).not.toContain("kord.md")
+    expect(exportedAgents).not.toContain("dev.md")
+    expect(exportedAgents).not.toContain("builder.md")
+    expect(exportedAgents).not.toContain("planner.md")
+    expect(exportedAgents).not.toContain("architect.md")
+    expect(exportedAgents).not.toContain("librarian.md")
+    expect(exportedAgents).not.toContain("explore.md")
+    expect(exportedAgents).not.toContain("vision.md")
+    expect(exportedAgents).not.toContain("dev-junior.md")
+
+    expect(result.agentExport.exported.sort()).toEqual([...APPROVED_T2_AGENT_FILES].sort())
+    expect(result.agentExport.skipped).toHaveLength(0)
+
+    //#then - skills should still be exported
     expect(existsSync(join(TEST_DIR, ".opencode", "skills"))).toBe(true)
-    expect(existsSync(join(TEST_DIR, ".opencode", "commands"))).toBe(true)
   })
 
   test("init with skipExtract should NOT extract agents, skills, commands", async () => {
@@ -485,17 +510,17 @@ describe("init", () => {
     expect(config.plugin).toContain("kord-aios")
   })
 
-  test("adds .kord/rules/** to instructions in opencode.jsonc", async () => {
+  test("adds .kord/instructions/** to instructions in opencode.jsonc", async () => {
     //#given - empty project directory
 
     //#when
     await init({ directory: TEST_DIR, skipExtract: true })
 
-    //#then - opencode.jsonc should have .kord/rules/** in instructions
+    //#then - opencode.jsonc should have .kord/instructions/** in instructions
     const opencodeJsoncPath = join(TEST_DIR, ".opencode", "opencode.jsonc")
     const content = readFileSync(opencodeJsoncPath, "utf-8")
     const config = JSON.parse(content)
-    expect(config.instructions).toContain(".kord/rules/**")
+    expect(config.instructions).toContain(".kord/instructions/**")
   })
 
   test("preserves existing opencode.jsonc plugins and instructions", async () => {
@@ -517,7 +542,7 @@ describe("init", () => {
     const config = JSON.parse(content)
     expect(config.plugin).toContain("kord-aios")
     expect(config.plugin).toContain("some-other-plugin")
-    expect(config.instructions).toContain(".kord/rules/**")
+    expect(config.instructions).toContain(".kord/instructions/**")
     expect(config.instructions).toContain(".other/rules/**")
     expect(config.customSetting).toBe("preserved")
   })

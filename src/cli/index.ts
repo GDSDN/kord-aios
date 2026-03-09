@@ -6,7 +6,6 @@ import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
 import { createMcpOAuthCommand } from "./mcp-oauth"
-import { extract } from "./extract"
 import { getStatus } from "./status"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
@@ -81,14 +80,14 @@ program
   .description("Initialize Kord AIOS project structure (non-interactive)")
   .option("-d, --directory <path>", "Working directory (default: current directory)")
   .option("--force", "Overwrite existing scaffolded files (templates, kord-rules.md)")
-  .option("--skip-extract", "Skip extracting agents, skills, and commands to .opencode/")
+  .option("--skip-sync", "Skip syncing bundled methodology content to .opencode/")
   .option("--project-mode <mode>", "Project mode: 'new' for greenfield, 'existing' for brownfield")
   .addHelpText("after", `
 Examples:
   $ bunx kord-aios init
   $ bunx kord-aios init --directory /path/to/project
   $ bunx kord-aios init --force
-  $ bunx kord-aios init --skip-extract
+  $ bunx kord-aios init --skip-sync
   $ bunx kord-aios init --project-mode existing
 
 What it creates:
@@ -96,8 +95,8 @@ What it creates:
   - docs/kord/ subdirectories (plans, drafts, notepads)
   - Template files (story.md, adr.md, kord-rules.md)
   - Project config (.opencode/kord-aios.json) - copies from global if exists
-  - OpenCode config (.opencode/opencode.jsonc) - adds kord-aios plugin and .kord/rules/**
-  - Extracted agents, skills, commands to .opencode/ (unless --skip-extract)
+  - OpenCode config (.opencode/opencode.jsonc) - adds kord-aios plugin and .kord/instructions/**
+  - Synced bundled methodology content to .opencode/ (unless --skip-sync)
 
 What it does NOT do:
   - Does NOT configure provider authentication
@@ -108,7 +107,7 @@ What it does NOT do:
     const initOptions: InitOptions = {
       directory: options.directory,
       force: options.force ?? false,
-      skipExtract: options.skipExtract ?? false,
+      skipExtract: options.skipSync ?? false,
       projectMode: options.projectMode,
     }
     const result = await init(initOptions)
@@ -209,37 +208,6 @@ Categories:
   })
 
 program
-  .command("extract")
-  .description("Extract bundled methodology content into local or global OpenCode directories")
-  .option("--global", "Extract into global OpenCode config directory")
-  .option("--agents-only", "Extract only builtin T2 agent defaults")
-  .option("--skills-only", "Extract only builtin skills")
-  .option("--squads-only", "Extract only builtin squads")
-  .option("--commands-only", "Extract only builtin command templates")
-  .option("--force", "Overwrite existing files")
-  .option("--diff", "Dry-run; print what would be written")
-  .addHelpText("after", `
-Examples:
-  $ bunx kord-aios extract
-  $ bunx kord-aios extract --global
-  $ bunx kord-aios extract --skills-only --commands-only
-  $ bunx kord-aios extract --diff
-  $ bunx kord-aios extract --agents-only --force
-`)
-  .action(async (options) => {
-    const exitCode = await extract({
-      global: options.global ?? false,
-      agentsOnly: options.agentsOnly ?? false,
-      skillsOnly: options.skillsOnly ?? false,
-      squadsOnly: options.squadsOnly ?? false,
-      commandsOnly: options.commandsOnly ?? false,
-      force: options.force ?? false,
-      diff: options.diff ?? false,
-    })
-    process.exit(exitCode)
-  })
-
-program
   .command("status")
   .description("Show Kord AIOS project status (mode, stage, configuration)")
   .option("-d, --directory <path>", "Working directory (default: current directory)")
@@ -251,9 +219,9 @@ Examples:
   $ bunx kord-aios status --directory /path/to/project
 
 This command shows:
-  - Project Mode and Stage from .kord/rules/project-mode.md
+  - Project Mode from .kord/instructions/{greenfield,brownfield}.md
   - Whether Kord plugin is configured
-  - Whether rules injection (.kord/rules/**) is enabled
+  - Whether rules injection (.kord/instructions/**) is enabled
 `)
   .action(async (options) => {
     const statusOptions: StatusOptions = {
