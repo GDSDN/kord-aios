@@ -2,18 +2,15 @@
 
 ## TL;DR
 
-> **Quick Summary**: Define and align Kord AIOS as a two-layer system: a builtin execution engine and a curated, exportable content layer. Analyze Synkra's `.aios-core`, Kord's current init/extract/wizard/runtime architecture, and document exactly what must change across workflows, agents, skills, squads, guides, rules, templates, commands, and tooling so future follow-on plans can build on a stable contract.
+> **Quick Summary**: Execute one architecture-led migration so Kord becomes a self-improving system with a clear engine layer and a canonical methodology/content layer. Builtin content becomes the framework source of truth, `init` exports the full approved content layer to `.kord/**` and `.opencode/**`, and local copies become overrides rather than hidden sources of truth.
 >
-> **Deliverables**:
-> - One architecture contract for `builtin-only` vs `exportable content`
-> - One canonical content-source model for `init`, `install`, and `extract`
-> - A category-by-category gap map across workflows, agents, skills, guides, rules, squads, commands, templates, docs, and tools
-> - A migration strategy from the current inconsistent state
-> - Explicit follow-on plan map for runtime parity, content parity, sync/update behavior, and documentation completion
+> **Executor**: `builder`
 >
-> **Estimated Effort**: Large
-> **Parallel Execution**: YES - 4 waves
-> **Critical Path**: contract definition -> topology audit -> category decisions -> migration design -> docs/update contract -> continuation backlog
+> **Primary Outcome**: after execution, Kord ships a complete canonical methodology layer from `src/features/builtin-*`, exports it through `init`, and no longer carries ambiguous duplicate sources across workflows, agents, skills, scaffolder content, or docs.
+>
+> **Estimated Effort**: XL
+> **Parallel Execution**: YES - staged waves
+> **Critical Path**: content-source unification -> agent/skill/workflow canonicalization -> init export alignment -> docs/final verification
 
 ---
 
@@ -21,110 +18,165 @@
 
 ### Original Request
 
-Analyze Synkra's current framework packaging (`.aiox-core/`), Kord's wizard/init layer, and Kord's current architecture to define what should be builtin-only versus exportable, document what is missing, and leave a mapped continuation path for later plans.
+Use a full planning pass to understand Kord vs Synkra/AIOX, define the correct architecture, and only then produce a real builder-executable implementation plan.
 
-### Confirmed Decisions
+### Planning Source Of Truth
 
-- Default content policy: **curated export**
-- Kord should distinguish:
-  - an **engine/runtime layer** that improves and runs the plugin
-  - a **framework content layer** that can be exported, initialized, overridden, and evolved
-- This needs to be documented so future work does not keep drifting across scaffolder/runtime/content paths
-- Subagent analysis should be used to preserve the mapping and avoid losing architecture context
+The planning workflow came from:
 
-### Evidence (already verified)
+- `docs/kord/drafts/plan-to-plan-content-layer-curated-export-aligment.md`
 
-- Workflow registry load order is `builtin -> squad -> project` in `src/features/workflow-engine/registry.ts`
-- `src/cli/scaffolder.ts` currently hardcodes only two workflow exports into `.kord/workflows/`
-- `src/features/builtin-workflows/` is underpopulated relative to project-local `.kord/workflows/`
-- Project-local `.kord/workflows/` currently contains 14 Synkra-derived workflows
-- Builtin content already exists across multiple categories:
-  - `src/features/builtin-agents/`
-  - `src/features/builtin-skills/`
-  - `src/features/builtin-squads/`
-  - `src/features/builtin-workflows/`
-  - `src/features/builtin-commands/`
-- Additional architect-verified violations:
-  - command export currently copies TypeScript source templates instead of markdown command files usable by OpenCode
-  - skill export currently flattens domain hierarchy during extraction
-  - guides, templates, standards, and rules still live as string literals inside `src/cli/project-layout.ts`
-  - several high-value methodology skills remain hardcoded TypeScript instead of exportable `SKILL.md`
-  - builtin workflow source-of-truth remains fragmented across plugin assets, scaffolder assumptions, and project-local `.kord/workflows/`
-- Existing adjacent plans already touched parts of this problem without defining one shared content contract:
-  - `docs/kord/plans/init-delivery.md`
-  - `docs/kord/plans/init-onboarding-depth-gap-fix.md`
-  - `docs/kord/plans/workflow-engine-synkra-parity.md`
-- Plan-analyzer findings that materially affect the architecture:
-  - Synkra's current repository/content root is `.aiox-core/`, not `.aios-core/`
-  - `.aiox-core/` is not a content-only layer; it ships engine + content together into projects
-  - the most reusable Synkra patterns for Kord are the documented preset/profile schema and install-manifest/checksum upgrade strategy, not Synkra's overall deployment model
+The resulting architecture artifacts are:
 
-### Architecture Framing
+- `docs/kord/architecture/engine-vs-content-boundary.md`
+- `docs/kord/architecture/kord-content-topology-audit.md`
+- `docs/kord/architecture/synkra-kord-content-depth-comparison.md`
+- `docs/kord/architecture/content-source-canonical-map.md`
+- `docs/kord/architecture/content-layer-target-architecture-adr.md`
 
-The working product model is:
+### Locked Product Decisions
 
-- **Engine Layer**: builtin, internal, required for Kord to run
-- **Content Layer**: shipped by the plugin, selectively exportable, project-overridable, and versioned as framework content
+- builtin content is the framework **source of truth**
+- `init` exports the **full approved content layer**
+- there are **no** `minimal/default/full` profiles
+- `.kord/**` and `.opencode/**` are exported working copies / override layers
+- methodology skills under `src/features/builtin-skills/skills/kord-aios/**` are content-layer and are exported
+- builtin commands are engine-only and are **not** exported as methodology content
+- all 14 workflows currently in `.kord/workflows/` are in scope for canonical builtin promotion/reclassification
+- `extract` is removed from the product-facing delivery model; `init` is the only supported content-delivery path
+- agent-facing project guidance is unified under `.kord/instructions/`
+- exported public methodology naming uses `greenfield|brownfield`; backend may still detect `new|existing` internally
+- Kord is inspired by Synkra/AIOX patterns, but follows its **own** plugin/content architecture
+- Kord is a self-improving system:
+  - engine executes and enforces
+  - content layer evolves
+  - delivery/update architecture must let methodology improve without recreating ambiguity
 
-The core failure to fix is not only "missing files". It is the absence of a single contract that answers:
+### Authoritative ADR
 
-- what stays builtin-only
-- what is shipped as content
-- what gets exported during `init` / `install`
-- what is extract-only
-- what is overrideable in `.kord/**` or `.opencode/**`
-- how content evolves without drifting away from the runtime
+If this plan conflicts with older notes, the authoritative decision record is:
 
-This plan therefore treats Synkra as a **reference for content-packaging patterns**, not as a one-to-one engine/content architecture model.
+- `docs/kord/architecture/content-layer-target-architecture-adr.md`
 
 ---
 
-## Project Artifacts
+## Final Architecture Summary
 
-| Artifact | Agent | Path | Status |
-|----------|-------|------|--------|
-| Work Plan | planner | `docs/kord/plans/content-layer-curated-export-alignment.md` | generated |
-| Working Draft | planner | `docs/kord/drafts/content-layer-architecture.md` | active |
-| Architecture Review | architect | `docs/kord/architecture/engine-vs-content-boundary.md` | generated |
-| Kord Content Topology Audit | explore | pending consolidation into plan/draft | pending |
-| Synkra Content Model Comparison | librarian | pending consolidation into plan/draft | pending |
+### Engine Layer (builtin-only)
+
+Stays compiled and never exported:
+
+- T0 agents in `src/agents/*.ts`
+- hooks, tools, MCP/runtime machinery
+- workflow runtime code in `src/features/workflow-engine/*.ts`
+- plugin infrastructure and CLI machinery
+- runtime-bound skills (only those with real execution/config dependence)
+- builtin commands as engine behavior
+
+### Content Layer (canonical builtin + init export)
+
+Lives canonically under `src/features/builtin-*` and is exported by `init`:
+
+- exportable agent prompts / subagent prompts
+- methodology skills
+- squads
+- workflows
+- templates
+- checklists
+- instructions
+- standards
+- scaffolded project guidance / `AGENTS.md`
+
+### Override Model
+
+- builtin content remains the framework source of truth
+- `init` exports the full approved content layer
+- local files are editable overrides
+- runtime precedence remains local override first, builtin fallback second
 
 ---
 
-## Decision Points
+## Architecture Findings That Drive This Plan
 
-- [ ] Decision: canonical source for exportable content
-  - Options: `src/features/builtin-*` per category (recommended) | separate `content/` tree | mixed category-specific locations
-  - Evaluation rubric: discoverability | extractability | testability | maintenance cost
-  - Provisional direction: `src/features/builtin-*` becomes the canonical shipped-content contract
+### Workflows are currently ambiguous
 
-- [ ] Decision: export policy for `init`
-  - Options: export everything | curated profiles (recommended) | minimal-only
-  - Locked user preference: curated profiles
-  - Remaining design work: define profiles (`minimal`, `default`, `full`) and declaration mechanism
+Current state:
+- `src/features/builtin-workflows/` -> 1 builtin workflow
+- `src/cli/scaffolder.ts` -> 2 hardcoded exported workflows
+- `.kord/workflows/` -> 14 richer adapted workflows
 
-- [ ] Decision: content declaration model
-  - Options: inline hardcoded lists | per-file metadata marker | category manifest file (recommended)
-  - Evaluation rubric: maintainability | testability | category consistency
-  - Provisional direction: manifest-driven export declarations per content category
+This is not acceptable for a self-improving system.
 
-- [ ] Decision: content override model
-  - Options: plugin wins | project wins (recommended) | merge engine
-  - Evaluation rubric: user control | predictability | complexity
-  - Provisional direction: project-local overrides win by stable IDs; no generic merge engine
+Target:
+- the full approved 14-workflow catalog must be resolved into the builtin canonical catalog
+- `init` exports that full approved set
+- local `.kord/workflows/` files are override copies, not the canonical source
+- duplicate live versions must be removed or reclassified
 
-- [ ] Decision: workflow treatment during transition
-  - Options: immediately promote all Synkra-derived workflows to builtin | keep only Kord-native executable workflows builtin and classify others separately (recommended) | keep workflow content project-local only
-  - Evaluation rubric: runtime fidelity | maintenance risk | user clarity
+### Agent prompt ownership must be formalized
 
-- [ ] Decision: content synchronization after install
-  - Options: no sync behavior | manual extract diff only | doctor/status-aware checksum drift reporting (recommended target)
-  - Evaluation rubric: upgrade safety | user clarity | operational overhead
+Current state:
+- T2 methodology agents already use `src/features/builtin-agents/*.md` as canonical prompt source
+- generated `prompts.ts` plus `src/agents/*.ts` wrappers form the current adapter pipeline
+- T0/T1 engine agents still live inline in `src/agents/*.ts`
 
-- [ ] Decision: Synkra adoption level
-  - Options: schema-compatible | inspired-by (recommended) | reference-only
-  - Evaluation rubric: maintenance risk | conceptual fit | upgrade pressure
-  - Provisional direction: inspired-by; adopt useful packaging patterns without mirroring Synkra's deploy-engine-to-project model
+Target:
+- exportable T2 prompt content stays canonical in `src/features/builtin-agents/*.md`
+- T2 `src/agents/*.ts` files act as runtime wrapper/config only
+- T0/T1 agents stay engine-only unless explicitly reclassified later
+- exportable subset is explicitly declared and exported by `init`
+
+### `project-layout.ts` is a hidden methodology source
+
+Current state:
+- templates/checklists/legacy guide content/standards/legacy rule content/scaffolded guidance live in TS string literals
+
+Target:
+- move them into `src/features/builtin-*`
+- keep `project-layout.ts` as plumbing only
+
+### `extract` is removed from the target architecture
+
+Current state:
+- `extract` is broken and incomplete
+
+Target:
+- `init` is the only supported content delivery path
+- `extract` is removed from the product-facing architecture
+- command export is removed from the methodology-delivery target entirely
+
+### Project-type guidance is fragmented
+
+Current state:
+- legacy `project-mode.md` mixes project selection with onboarding guidance
+- legacy rules/guides surfaces, workflows, and standalone skills overlap on greenfield/brownfield guidance
+
+Target:
+- agent-facing guidance is unified under `.kord/instructions/`
+- `init` always exports core instruction content plus exactly one project-type instruction file
+- installer detection remains the only project-type selection mechanism
+- no persistent project-state file exists in the target architecture
+- workflows become the primary greenfield/brownfield execution path
+- standalone kickoff/documentation skills become escape hatches, not the scaffolded primary path
+
+---
+
+## Category Source And Delivery Model
+
+| Category | Canonical Builtin Source | Exported By `init` To | Engine or Content |
+|---|---|---|---|
+| T0 agents | `src/agents/*.ts` | not exported | engine |
+| Exportable agent prompts | `src/features/builtin-agents/` | `.opencode/agents/` | content |
+| Methodology skills | `src/features/builtin-skills/skills/kord-aios/**` | `.opencode/skills/` | content |
+| Runtime-only skills | TS | not exported | engine |
+| Squads | `src/features/builtin-squads/` | `.opencode/squads/` | content |
+| Commands | TS engine registration | not exported | engine |
+| Workflows | `src/features/builtin-workflows/` | `.kord/workflows/` | content |
+| Templates | `src/features/builtin-templates/` | `.kord/templates/` | content |
+| Checklists | `src/features/builtin-checklists/` | `.kord/checklists/` | content |
+| Instructions | `src/features/builtin-instructions/` | `.kord/instructions/` | content |
+| Standards | `src/features/builtin-standards/` | `.kord/standards/` | content |
+| Scaffolded AGENTS/project guidance | `src/features/builtin-docs/` | project files | content |
 
 ---
 
@@ -132,304 +184,297 @@ This plan therefore treats Synkra as a **reference for content-packaging pattern
 
 ### Core Objective
 
-Define the content contract that lets Kord evolve safely as a framework+engine system, instead of continuing with fragmented content sources and ad hoc export behavior.
-
-### Concrete Deliverables
-
-- A documented engine-vs-content boundary
-- A category inventory for what is:
-  - builtin-only
-  - exportable by default
-  - extract-only
-  - overrideable in project-local paths
-- A canonical content source decision
-- A curated-export delivery model for `init` / `install` / `extract`
-- A migration strategy for current mismatches
-- A continuation backlog of follow-on plans needed after this contract is set
-- A concrete violation list for current broken/incomplete content-export behavior
-- A declared adoption level for Synkra patterns and the specific patterns Kord should borrow
+Make the content layer truly canonical, complete, and exportable while leaving the engine layer clean and runtime-focused.
 
 ### Definition of Done
 
-- A single plan documents the target content architecture and the current mismatches by category
-- The plan explicitly maps how existing adjacent plans (`init-delivery`, `init-onboarding-depth-gap-fix`, `workflow-engine-synkra-parity`) must be adjusted or continued
-- The plan leaves no ambiguity about which categories are engine-only versus content-layer
-- The plan includes a concrete continuation map for missing work still needed to reach Synkra-level effectiveness
+- builtin content under `src/features/builtin-*` is the framework source of truth
+- `init` exports the full approved content layer
+- no major content category still depends on `src/cli/project-layout.ts` as a hidden source
+- agent prompt ownership is unified
+- the full 14-workflow set is resolved into canonical builtin or explicitly non-shipped status
+- legacy project-guidance surfaces no longer exist as active exported/runtime paths
+- tests, typecheck, and build pass
 
-### Must NOT Have (Guardrails)
+### Guardrails
 
-- Do NOT collapse runtime-engine work and content-distribution work into one vague backlog
-- Do NOT assume every shipped artifact should be auto-exported
-- Do NOT let `scaffolder.ts` or other CLI code remain the source of truth for content selection
-- Do NOT treat imported/reference-only Synkra assets as executable Kord-native content without explicit classification
-- Do NOT rely on undocumented implicit behavior across `init`, `install`, `extract`, and runtime loaders
-- Do NOT require human-only review steps as acceptance criteria
-- Do NOT frame Kord's target architecture as "Synkra's content layer"; Synkra's current `.aiox-core/` bundles engine and content together
-
----
-
-## Verification Strategy
-
-### Test Decision
-- **Infrastructure exists**: YES
-- **Automated tests**: YES (tests-after for the later implementation work)
-- **Framework**: Bun test + structural verification in future continuation plans
-
-### Agent-Executed QA Scenarios
-
-Scenario: content contract is concretely documented
-  Tool: Bash / file existence checks
-  Preconditions: plan is written
-  Steps:
-    1. Assert `docs/kord/plans/content-layer-curated-export-alignment.md` exists
-    2. Assert the plan contains sections for decision points, category inventory, migration path, and continuation backlog
-  Expected Result: the architecture contract is recorded in a stable artifact
-
-Scenario: future implementation can be derived from the plan without hidden assumptions
-  Tool: Read / grep
-  Preconditions: plan finalized
-  Steps:
-    1. Verify the plan names concrete source files and categories
-    2. Verify the plan distinguishes engine-only and exportable content
-    3. Verify the plan includes explicit follow-on work areas
-  Expected Result: the plan is actionable and auditable
+- do not split this work into child execution plans before implementation starts
+- do not absorb workflow runtime parity work into this plan
+- do not leave ambiguous duplicate workflow/agent prompt sources alive
+- do not keep command export as part of the target methodology-delivery model
+- do not preserve profile logic; this architecture exports the full approved content layer
+- do not leave legacy project-guidance files anywhere under active `.kord/**`, hook scan paths, or init/scaffolder outputs after migration
+- if legacy guidance files are retained for history, archive them only under `docs/kord/**`
 
 ---
 
 ## Execution Strategy
 
-### Wave 1 - Contract and Topology
-- Task 1: define the engine-vs-content contract
-- Task 2: map the current Kord content topology
-- Task 3: map the Synkra content-layer topology and comparison points
+### Wave 1 - Remove Broken / Wrong Delivery Assumptions
 
-### Wave 2 - Category Decisions
-- Task 4: classify workflows, agents, skills, squads, commands, guides, rules, templates, and docs by delivery model
-- Task 5: define canonical content sources and manifest/profile strategy
-- Task 6: define override and precedence rules across builtin, squad/package, and project-local layers
+1. Remove `extract` and command-export assumptions from the product-facing delivery model and clean the related code paths/tests
+2. Fix methodology skill export semantics in the `init` delivery path so hierarchy and local path behavior stay correct
 
-### Wave 3 - Migration and Documentation
-- Task 7: identify current mismatches and required corrections in init/install/extract/scaffolder/loaders
-- Task 8: define documentation and AGENTS updates required to keep the contract discoverable
-- Task 9: define sync/update/drift-reporting requirements for shipped content
+### Wave 2 - Canonicalize Hidden Scaffold Content
 
-### Wave 4 - Continuation Backlog
-- Task 10: split remaining work into follow-on plans/epics
-- Task 11: map Synkra parity gaps that are content-layer versus runtime-layer
-- Task 12: final architecture closure review
+3. Move templates and checklists out of `src/cli/project-layout.ts` into canonical builtin asset directories
+4. Move instructions and standards out of `src/cli/project-layout.ts` into canonical builtin asset directories
+5. Move scaffolded `AGENTS.md` / project guidance out of `src/cli/project-layout.ts`
+6. Consolidate agent-facing project guidance into `.kord/instructions/`, retire legacy runtime consumers, and keep installer-only project-type detection
+7. Rewire `project-layout.ts`, `scaffolder.ts`, and instruction injection/loading paths to consume canonical file-based assets
 
-Critical Path: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 10 -> 11 -> 12
+### Wave 3 - Agent Prompt Canonicalization
+
+8. Define the exported agent/subagent set
+9. Formalize the T2 markdown-plus-wrapper pattern as the canonical exportable agent architecture
+10. Refactor any remaining exportable-agent wrappers so runtime config is separated from prompt ownership
+11. Implement the init export path for the approved agent subset from the canonical source
+
+### Wave 4 - Workflow Catalog Canonicalization
+
+12. Classify all 14 workflows currently in `.kord/workflows/`
+13. Promote the approved workflow set into `src/features/builtin-workflows/`
+14. Add builtin brownfield onboarding coverage so greenfield/brownfield scaffolding has symmetric canonical sources
+15. Replace hardcoded workflow scaffolder assumptions with iteration over the canonical builtin workflow catalog
+16. Remove or reclassify duplicate live workflow sources so there is no ambiguity
+
+### Wave 5 - Skill Content Completion
+
+17. Migrate exportable hardcoded methodology skills into `SKILL.md`
+18. Keep only truly runtime-bound skills compiled
+
+### Wave 6 - Init Alignment And Final Contract Closure
+
+19. Make `init` export the full approved content layer from canonical builtin sources
+20. Update docs and scaffolded guidance to encode the final engine/content contract
+21. Run final closure review and verification sweep
+
+Critical Path: 1 -> 3 -> 6 -> 7 -> 8 -> 9 -> 12 -> 13 -> 15 -> 19 -> 20 -> 21
 
 ---
 
 ## TODOs
 
-- [ ] 1. Define the Kord engine-vs-content contract
+- [ ] 1. Remove `extract` and command export from the product-facing delivery model
+  - **Basis**: Architecture-enforced + source-verified
+  - **References**: `src/cli/extract.ts`, `src/features/builtin-commands/commands.ts`, `docs/kord/architecture/content-layer-target-architecture-adr.md`
+  - **Acceptance Criteria**:
+    - [ ] commands are no longer treated as exportable methodology content
+    - [ ] `init` is the only supported content-delivery path in product docs and scaffolding guidance
+    - [ ] `src/cli/extract.ts` is deleted or reduced to non-user-facing internal-only code with no product-facing content export role
+    - [ ] no user-facing CLI help or docs present `extract` as a supported content-delivery command
 
-  **What to do**:
-  - Define stable category rules for:
-    - builtin-only engine internals
-    - shipped exportable content
-    - extract-only content
-    - project-local overrideable content
-  - Use current repo evidence plus Synkra comparison to justify the split
+- [ ] 2. Fix methodology skill export semantics
+  - **Basis**: Source-verified
+  - **References**: `src/features/builtin-skills/kord-aios-loader.ts`, `src/cli/init/index.ts`, `docs/kord/architecture/content-layer-target-architecture-adr.md`
+  - **Acceptance Criteria**:
+    - [ ] all methodology skills preserve domain hierarchy on export
+    - [ ] methodology skills exported by `init` resolve against the local `.opencode/skills/` hierarchy correctly
 
-  **References**:
-  - `docs/kord/drafts/content-layer-architecture.md`
-  - `src/features/workflow-engine/registry.ts`
-  - `src/features/builtin-commands/commands.ts`
-  - `docs/kord/plans/init-delivery.md`
-  - `docs/kord/plans/workflow-engine-synkra-parity.md`
+- [ ] 3. Move templates and checklists out of `src/cli/project-layout.ts`
+  - **Basis**: Source-verified + architecture-enforced
+  - **Acceptance Criteria**:
+    - [ ] template and checklist content is file-based builtin content
 
-  **Acceptance Criteria**:
-  - [ ] Contract explicitly names which categories stay engine-internal
-  - [ ] Contract explicitly names which categories are exportable content
+- [ ] 4. Move instructions and standards out of `src/cli/project-layout.ts`
+  - **Basis**: Source-verified + architecture-enforced
+  - **Acceptance Criteria**:
+    - [ ] instruction and standard content is file-based builtin content
+    - [ ] checklist content is exported to `.kord/checklists/` consistently across docs and scaffolding
 
-- [ ] 2. Audit current Kord content topology by category
+- [ ] 5. Move scaffolded project guidance out of `src/cli/project-layout.ts`
+  - **Basis**: Source-verified + architecture-enforced
+  - **Acceptance Criteria**:
+    - [ ] scaffolded AGENTS/project guidance is file-based builtin content
+    - [ ] legacy scaffold-only project guidance bodies are removed from `src/cli/project-layout.ts`
 
-  **What to do**:
-  - Map how each category currently exists in the repo:
-    - workflows
-    - agents
-    - skills
-    - squads
-    - commands
-    - guides/rules/templates/checklists/docs
-  - Classify each as:
-    - inline constant
-    - builtin asset
-    - scaffolded output
-    - extract output
-    - missing category contract
+- [ ] 6. Consolidate agent-facing project guidance into `.kord/instructions/`, retire legacy runtime consumers, and keep installer-only project-type detection
+  - **Basis**: Source-verified + architecture-enforced
+  - **References**: `src/cli/scaffolder.ts`, `src/cli/status/index.ts`, `src/hooks/rules-injector/`, `docs/kord/architecture/agent-source-and-project-guidance-architecture.md`
+  - **Acceptance Criteria**:
+    - [ ] `kord-rules.md` and project-type instruction content live under `.kord/instructions/`
+    - [ ] `init` exports exactly one project-type instruction file: `greenfield.md` or `brownfield.md`
+    - [ ] no persistent project-state file is introduced
+    - [ ] workflows are presented as the primary greenfield/brownfield path
+    - [ ] legacy `project-mode.md` is no longer exported or treated as an active runtime/project guidance surface
+    - [ ] legacy `.kord/guides/new-project.md` and `.kord/guides/existing-project.md` no longer exist as active exported project-type instruction surfaces
+    - [ ] `src/cli/status/index.ts` no longer reads or depends on `project-mode.md`
+    - [ ] `.kord/rules/` is no longer an active injection surface for project guidance, or the rules injector is explicitly updated so legacy project-guidance files cannot reactivate at runtime
 
-  **Acceptance Criteria**:
-  - [ ] The plan includes a file-by-file topology map or equivalent table
-  - [ ] Current mismatches are explicit, not implied
+- [ ] 7. Rewire `project-layout.ts`, `scaffolder.ts`, and instruction injection/loading paths to consume canonical builtin assets
+  - **Basis**: Source-verified + architecture-enforced
+  - **Acceptance Criteria**:
+    - [ ] `project-layout.ts` no longer stores large methodology bodies
+    - [ ] `init` scaffolding reads canonical file-based assets
 
-- [ ] 3. Audit Synkra `.aios-core` as the reference content-layer model
- - [ ] 3. Audit Synkra `.aiox-core/` packaging as the reference pattern source
+- [ ] 8. Define the exported agent/subagent set
+  - **Basis**: Architecture-enforced
+  - **Acceptance Criteria**:
+    - [ ] exportable T2 methodology agent classes are explicitly listed, including `plan-analyzer` and `plan-reviewer` unless explicitly excluded with rationale
+    - [ ] engine-only T0/T1 agent classes remain clearly separated
 
-  **What to do**:
-  - Map how Synkra organizes workflows, tasks, templates, guides, standards, and related content under the current `.aiox-core/` packaging model
-  - Distinguish which Synkra patterns are worth borrowing versus which are incompatible with Kord's plugin architecture
-  - Explicitly capture useful borrowed patterns:
-    - preset/profile schema concepts
-    - install-manifest/checksum drift detection concepts
-  - Extract the parts Kord still lacks conceptually
+- [ ] 9. Formalize the T2 markdown-plus-wrapper pattern as the canonical exportable agent architecture
+  - **Basis**: Architecture-enforced + source-verified
+  - **References**: `src/features/builtin-agents/`, `src/features/builtin-agents/prompts.ts`, `src/agents/pm.ts`, `docs/kord/architecture/agent-source-and-project-guidance-architecture.md`
+  - **Acceptance Criteria**:
+    - [ ] exportable T2 prompt content is authored only in `src/features/builtin-agents/*.md`
+    - [ ] generated prompt embedding remains build-driven, not manually edited
+    - [ ] architecture/docs no longer describe a false whole-tree duplication problem
 
-  **Acceptance Criteria**:
-  - [ ] The plan records the key `.aiox-core/` packaging patterns relevant to Kord
-  - [ ] The plan explicitly states what should NOT be copied verbatim or structurally mirrored
+- [ ] 10. Separate agent runtime wrappers from prompt ownership
+  - **Basis**: Architecture-enforced
+  - **Acceptance Criteria**:
+    - [ ] `src/agents/*.ts` acts as runtime config/wrapper only for exported-prompt agents
 
-- [ ] 4. Classify every major content category by delivery model
+- [ ] 11. Implement the init export path for the approved agent subset from the canonical source
+  - **Basis**: Architecture-enforced
+  - **Acceptance Criteria**:
+    - [ ] approved exportable agents are emitted from one canonical prompt source
 
-  **What to do**:
-  - For each category, define whether it should be:
-    - builtin-only
-    - exportable by default
-    - extract-only
-    - project-authored only
-  - Cover at minimum:
-    - T0 agents
-    - specialist agents
-    - workflows
-    - skills
-    - squads
-    - guides
-    - rules
-    - templates/checklists
-    - builtin slash command templates
+- [ ] 12. Classify the 14-workflow catalog
+  - **Basis**: Source-verified + architecture-enforced
+  - **References**: `.kord/workflows/`, `src/features/builtin-workflows/`, `docs/kord/architecture/synkra-kord-content-depth-comparison.md`
+  - **Acceptance Criteria**:
+    - [ ] all 14 workflows are classified
+    - [ ] the richer local/adapted workflow set is treated as the promotion baseline
+    - [ ] each candidate workflow is checked for workflow-engine schema/runtime compatibility before promotion
 
-  **Acceptance Criteria**:
-  - [ ] Every major category has a delivery classification
-  - [ ] No category is left ambiguous between engine and content
+- [ ] 13. Promote the approved workflow set into canonical builtin content
+  - **Basis**: Source-verified + architecture-enforced
+  - **Acceptance Criteria**:
+    - [ ] builtin workflow catalog matches the approved canonical shipped set
+    - [ ] `greenfield-fullstack` builtin now reflects the richer promoted baseline
 
-- [ ] 5. Define the canonical source-of-truth model for exportable content
+- [ ] 14. Add builtin brownfield onboarding coverage
+  - **Basis**: Source-verified + architecture-enforced
+  - **References**: `src/features/builtin-workflows/`, `src/cli/scaffolder.ts`, `docs/kord/architecture/agent-source-and-project-guidance-architecture.md`
+  - **Acceptance Criteria**:
+    - [ ] brownfield onboarding workflow exists as canonical builtin content
+    - [ ] scaffolding no longer depends on standalone brownfield skill references as the primary path
 
-  **What to do**:
-  - Choose the canonical content home for shipped exportable assets
-  - Define how `init`, `install`, and `extract` consume that source
-  - Define how categories that are currently inline should migrate into canonical asset directories
+- [ ] 15. Replace hardcoded workflow scaffolder assumptions with canonical catalog iteration
+  - **Basis**: Source-verified + architecture-enforced
+  - **Acceptance Criteria**:
+    - [ ] scaffolder no longer hardcodes 2 workflow IDs
+    - [ ] `init` exports the full approved workflow catalog
 
-  **Acceptance Criteria**:
-  - [ ] The plan names the canonical source model
-  - [ ] The plan forbids hardcoded content selection in CLI scaffolding
+- [ ] 16. Remove or reclassify duplicate live workflow sources
+  - **Basis**: Architecture-enforced
+  - **Acceptance Criteria**:
+    - [ ] ambiguous duplicate live workflow sources no longer remain
 
-- [ ] 6. Define curated export profiles and declaration mechanism
+- [ ] 17. Migrate exportable hardcoded methodology skills into `SKILL.md`
+  - **Basis**: Source-verified + architecture-enforced
+  - **Acceptance Criteria**:
+    - [ ] exportable methodology skills are no longer trapped in TS-only form
 
-  **What to do**:
-  - Define `minimal`, `default`, and `full` export intent
-  - Decide whether declaration is per-file metadata or per-category manifest
-  - Specify how aliases/commands derived from exportable workflows are generated from the same declaration
+- [ ] 18. Keep only truly runtime-bound skills compiled
+  - **Basis**: Architecture-enforced
+  - **Acceptance Criteria**:
+    - [ ] remaining TS-only skills have explicit runtime justification
 
-  **Acceptance Criteria**:
-  - [ ] The plan defines the profile model
-  - [ ] The plan specifies a manifest/declaration strategy
+- [ ] 19. Make `init` export the full approved content layer
+  - **Basis**: Architecture-enforced + source-verified
+  - **Acceptance Criteria**:
+    - [ ] `init` exports workflows, agents, methodology skills, squads, templates, instructions, standards, and project guidance
+    - [ ] no profile branching remains in the delivery model
+    - [ ] grep-style verification over init/scaffolder code shows no active `minimal/default/full` profile branching remains
 
-- [ ] 7. Map current implementation mismatches and required corrections
+- [ ] 20. Update docs and scaffolded guidance to encode the final contract
+  - **Basis**: Architecture-enforced
+  - **Acceptance Criteria**:
+    - [ ] docs and scaffolded guidance explain engine vs content, builtin source of truth, and local override role
+    - [ ] docs and scaffolded guidance describe workflows as the primary project-type path and kickoff/documentation skills as secondary escape hatches
+    - [ ] docs use `greenfield|brownfield` as the public methodology language
 
-  **What to do**:
-  - Record the concrete areas needing correction in:
-    - `init`
-    - `install`
-    - `extract`
-    - `scaffolder`
-    - workflow registry/loaders
-    - content asset directories
-    - docs and AGENTS discoverability
-  - Explicitly map the currently verified contract violations:
-    - broken commands export surface
-    - flattened skills hierarchy on export
-    - `project-layout.ts` as a monolithic content source
-    - non-extractable hardcoded methodology skills
-    - incomplete builtin workflow catalog and hardcoded scaffold assumptions
-  - Separate quick structural fixes from larger follow-on work
+- [ ] 21. Run final verification and closure review
+  - **Basis**: Source-verified + architecture-enforced
+  - **Acceptance Criteria**:
+    - [ ] `bun test src/cli/scaffolder.test.ts` -> PASS
+    - [ ] `bun test` -> PASS
+    - [ ] `bun run typecheck` -> PASS
+    - [ ] `bun run build` -> PASS
+    - [ ] no major content ambiguity remains across categories
 
-  **Acceptance Criteria**:
-  - [ ] The plan includes a correction matrix by file/area
-  - [ ] The plan distinguishes urgent contract bugs from broader parity epics
+---
 
-- [ ] 8. Define documentation and discoverability updates
+## Dependency Matrix
 
-  **What to do**:
-  - Map what must be updated in documentation so future contributors/agents know:
-    - what is builtin-only
-    - what is exportable content
-    - where each category lives
-    - how overrides work
-    - how content is expected to evolve
-  - Include internal agent-facing docs such as `AGENTS.md` and knowledge-base files
+| Task | Depends On | Blocks | Can Parallelize With |
+|------|------------|--------|----------------------|
+| 1 | None | 19 | 2 |
+| 2 | None | 17, 19 | 1 |
+| 3 | None | 7 | 4, 5 |
+| 4 | None | 7 | 3, 5 |
+| 5 | None | 7, 20 | 3, 4 |
+| 6 | 4, 5 | 7, 20 | 14 |
+| 7 | 3, 4, 5, 6 | 19, 20, 21 | None |
+| 8 | None | 9, 10, 11 | 12 |
+| 9 | 8 | 10, 11, 20 | None |
+| 10 | 9 | 11, 21 | None |
+| 11 | 8, 9, 10 | 19, 20 | None |
+| 12 | None | 13, 14, 15, 16 | 8 |
+| 13 | 12 | 15, 16, 19 | 17 |
+| 14 | 12 | 15, 19, 20 | 6 |
+| 15 | 12, 13, 14 | 19, 21 | None |
+| 16 | 12, 13 | 21 | None |
+| 17 | 2 | 18, 19 | 13 |
+| 18 | 17 | 19, 21 | None |
+| 19 | 1, 2, 7, 11, 13, 14, 15, 18 | 20, 21 | None |
+| 20 | 5, 6, 7, 9, 11, 14, 19 | 21 | None |
+| 21 | 7, 10, 15, 16, 18, 19, 20 | None | None |
 
-  **Acceptance Criteria**:
-  - [ ] The plan includes explicit documentation targets
-  - [ ] The plan requires final docs alignment after implementation
+---
 
-- [ ] 9. Define sync/update/drift-reporting requirements
+## Verification Strategy
 
-  **What to do**:
-  - Specify how shipped content drift should be detected after project export
-  - Decide what later commands/checks should exist for:
-    - content diff
-    - content update notice
-    - checksum/version tracking
-    - backup/reinstall behavior for managed exported files
-  - Keep this as planned behavior; no implementation in this plan
+- **Infrastructure exists**: YES
+- **Automated tests**: YES
+- **Framework**: Bun test + typecheck + build
 
-  **Acceptance Criteria**:
-  - [ ] The plan defines future drift/sync expectations
-  - [ ] The plan avoids implying silent overwrite behavior
-  - [ ] The plan captures whether Kord should adopt an install-manifest/checksum pattern inspired by Synkra
+### Agent-Executed QA Scenarios
 
-- [ ] 10. Produce a continuation map of follow-on plans
+Scenario: `init` exports the full approved content layer from canonical builtin sources
+  Tool: Bash
+  Preconditions: waves 1-6 complete
+  Steps:
+    1. run `bun test src/cli/scaffolder.test.ts`
+    2. run targeted init export tests that verify `.kord/workflows/`, `.kord/instructions/`, `.kord/checklists/`, and `.opencode/skills/` are populated from canonical builtin sources
+    3. assert commands are not exported as methodology content
+  Expected Result: `init` is the primary content delivery path and local copies are overrideable exports
 
-  **What to do**:
-  - Split post-contract work into distinct continuation tracks
-  - At minimum include:
-    - content architecture refactor
-    - init/install/extract alignment
-    - workflow content packaging
-    - workflow runtime parity
-    - documentation/AGENTS final alignment
-  - Seed the continuation map with the concrete story groups already surfaced by architecture review:
-    - fix commands export to markdown command assets
-    - preserve skill domain hierarchy on extract
-    - decompose `project-layout.ts` into builtin content directories
-    - migrate exportable hardcoded skills into `SKILL.md`
-    - audit/promote builtin workflow catalog from canonical shipped assets
+Scenario: runtime no longer depends on ambiguous duplicated content ownership
+  Tool: Bash
+  Preconditions: final migration complete
+  Steps:
+    1. run workflow/scaffolder/status/instruction-injection regression tests
+    2. run `bun run typecheck`
+    3. run `bun run build`
+  Expected Result: canonical builtin sources and override layers are aligned
 
-  **Acceptance Criteria**:
-  - [ ] The plan leaves a clear continuation backlog
-  - [ ] Follow-on areas are separated rather than mixed into one mega-story
+---
 
-- [ ] 11. Separate content-layer gaps from runtime-parity gaps
+## Commit Strategy
 
-  **What to do**:
-  - Identify what still needs to be brought from Synkra as content-layer capability
-  - Identify what instead belongs to runtime-engine parity work
-  - Use this split to prevent future plan confusion
-
-  **Acceptance Criteria**:
-  - [ ] The plan clearly separates content and runtime work
-  - [ ] Workflow engine parity is referenced as adjacent, not conflated
-
-- [ ] 12. Final architecture closure review
-
-  **What to do**:
-  - Re-check the plan against current evidence and research findings
-  - Verify no major category was omitted
-  - Verify the plan remains aligned with the chosen curated-export policy
-
-  **Acceptance Criteria**:
-  - [ ] The plan can be used as the parent architecture contract for future continuation plans
-  - [ ] No critical ambiguity remains around builtin-only vs exportable content
+| After Wave | Message | Verification |
+|------------|---------|--------------|
+| Wave 1 | `refactor(cli): remove extract-first delivery assumptions` | targeted tests + typecheck |
+| Wave 2 | `refactor(cli): externalize scaffold content assets` | scaffold tests |
+| Wave 3 | `refactor(agents): formalize exportable prompt wrappers` | targeted agent/init tests |
+| Wave 4 | `refactor(workflows): promote canonical workflow catalog` | targeted workflow/scaffold tests |
+| Wave 5 | `refactor(skills): move methodology skills into content layer` | targeted skills tests |
+| Wave 6 | `feat(cli): export full content layer from builtin sources` | full test/build sweep |
 
 ---
 
 ## Success Criteria
 
-- Kord has a documented, stable content contract
-- The curated-export policy is concretely defined rather than implied
-- Every major content category is classified by delivery model
-- Current mismatches in scaffolding/export/runtime discovery are explicitly mapped
-- Synkra comparison is used to reveal missing capability without collapsing engine and content concerns
-- Future continuation plans can be generated from this contract without re-litigating the architecture
+- builtin content under `src/features/builtin-*` is the framework source of truth
+- `init` exports the full approved content layer
+- `.kord/**` and `.opencode/**` are override layers, not hidden canonical sources
+- all 14 workflows are resolved into the canonical shipped catalog or explicitly non-live status
+- agent prompt ownership is unified
+- methodology skills are fully part of the content layer
+- builtin commands remain engine-only
+- agent-facing project guidance has one canonical instruction surface under `.kord/instructions/`
+- documentation and scaffolded guidance encode the final contract so the system can keep improving without recreating ambiguity

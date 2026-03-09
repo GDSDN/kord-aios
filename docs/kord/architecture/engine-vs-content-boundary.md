@@ -5,6 +5,19 @@
 **Author:** Architect  
 **Context:** Analysis grounded in current repo (`src/features/`, `src/cli/`, `.kord/`) and Synkra parity audit (`docs/kord/research/synkra-methodology-parity-audit.md`).
 
+> Note: this is a pre-decision audit snapshot.
+>
+> Authoritative final decisions now live in:
+> - `docs/kord/architecture/content-layer-target-architecture-adr.md`
+> - `docs/kord/architecture/content-source-canonical-map.md`
+> - `docs/kord/plans/content-layer-curated-export-alignment.md`
+>
+> In particular, newer decisions supersede parts of this audit:
+> - `init` is the only supported content-delivery path
+> - `extract` is removed from the product-facing architecture
+> - agent-facing project guidance is unified under `.kord/instructions/`
+> - exported public methodology naming uses `greenfield|brownfield`
+
 ---
 
 ## 1. Problem Statement
