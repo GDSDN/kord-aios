@@ -1,6 +1,6 @@
 {
   "name": "kord-aios-darwin-arm64",
-  "version": "3.3.6",
+  "version": "3.3.7",
   "description": "Platform-specific binary for kord-aios (darwin-arm64)",
   "license": "MIT",
   "repository": {
