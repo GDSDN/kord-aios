@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test"
+import yaml from "js-yaml"
 import { WorkflowDefinitionSchema } from "./schema"
+import { loadBuiltinWorkflowAssets } from "./builtin"
 
 describe("workflow schema", () => {
   test("accepts all currently supported step intents", () => {
@@ -192,5 +194,18 @@ describe("workflow schema", () => {
     })
 
     expect(result.success).toBe(false)
+  })
+
+  test("accepts every builtin workflow asset", () => {
+    const assets = loadBuiltinWorkflowAssets()
+
+    expect(assets).toHaveLength(14)
+
+    for (const asset of assets) {
+      const parsed = yaml.load(asset.content)
+      const result = WorkflowDefinitionSchema.safeParse(parsed)
+
+      expect(result.success, asset.id).toBe(true)
+    }
   })
 })

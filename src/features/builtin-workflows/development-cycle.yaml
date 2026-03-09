@@ -230,6 +230,322 @@ metadata:
   source: synkra
   source_path: D:\dev\synkra-aios\.aios-core\development\workflows\development-cycle.yaml
   synkra:
+    raw_document:
+      workflow:
+        id: development-cycle
+        name: Development Cycle (Projeto Bob)
+        version: 1.0.0
+        description: >-
+          Workflow orquestrado para ciclo de desenvolvimento por story. Implementa o fluxo PO → Executor → Quality Gate
+          → DevOps → Push com suporte a executor dinâmico, self-healing e checkpoints humanos.
+        orchestrator: '@po'
+        triggers:
+          - type: story_approved
+            description: Story aprovada pelo PO via validate-story-draft
+          - type: manual
+            description: Execução manual via *workflow development-cycle
+        config:
+          use_dynamic_executor: true
+          executor_assignment_module: .aios-core/core/orchestration/executor-assignment.js
+          use_terminal_spawning: true
+          terminal_spawner_module: .aios-core/core/orchestration/terminal-spawner.js
+          self_healing:
+            enabled: ${config.coderabbit_integration.enabled}
+            max_iterations: 3
+            severity_filter:
+              - CRITICAL
+              - HIGH
+          checkpoint:
+            enabled: true
+            require_human_decision: true
+            timeout_minutes: 30
+          timeouts:
+            validation: 10m
+            development: 2h
+            self_healing: 30m
+            quality_gate: 30m
+            push: 10m
+        inputs:
+          story_file:
+            type: path
+            required: true
+            description: Path to story file (.story.md)
+          epic_context:
+            type: object
+            required: false
+            description: Epic context with accumulated story info
+        phases:
+          1_validation:
+            id: validation
+            name: Story Validation
+            agent: '@po'
+            task: validate-story-draft
+            description: >-
+              PO valida a story com Epic Context antes de iniciar desenvolvimento. Garante que a story tem executor e
+              quality_gate atribuídos.
+            inputs:
+              - story_file
+              - epic_context
+            outputs:
+              - validation_result:
+                  type: object
+                  properties:
+                    passed: boolean
+                    score: number
+                    issues: array
+            validations:
+              - check: story.executor != null
+                error: Story must have an executor assigned
+              - check: story.quality_gate != null
+                error: Story must have a quality_gate assigned
+              - check: story.executor != story.quality_gate
+                error: Executor and Quality Gate must be different agents
+            on_success: 2_development
+            on_failure: reject_with_feedback
+          2_development:
+            id: development
+            name: Development
+            agent: ${story.executor}
+            task: develop
+            description: >-
+              Executor dinâmico desenvolve a story baseado na atribuição. Usa terminal spawning para contexto limpo
+              (Story 11.2).
+            spawn_in_terminal: true
+            inputs:
+              - validated_story:
+                  from: 1_validation.validation_result
+              - story_file
+            outputs:
+              - implementation:
+                  type: object
+                  properties:
+                    files_created: array
+                    files_modified: array
+                    tests_added: array
+              - test_results:
+                  type: object
+                  properties:
+                    passed: number
+                    failed: number
+                    skipped: number
+            timeout: ${config.timeouts.development}
+            on_success: 3_self_healing
+            on_failure: return_to_po
+          3_self_healing:
+            id: self_healing
+            name: Self-Healing
+            agent: '@dev'
+            task: self-heal
+            description: >-
+              Self-healing com CodeRabbit para corrigir issues automaticamente. Só executa se
+              coderabbit_integration.enabled == true.
+            condition: ${config.coderabbit_integration.enabled} == true
+            inputs:
+              - implementation:
+                  from: 2_development.implementation
+            outputs:
+              - healed_code:
+                  type: object
+                  properties:
+                    iterations: number
+                    issues_fixed: array
+                    issues_remaining: array
+            config:
+              max_iterations: 3
+              severity_filter:
+                - CRITICAL
+                - HIGH
+              auto_fix: true
+            on_success: 4_quality_gate
+            on_failure: 4_quality_gate
+            on_skip: 4_quality_gate
+          4_quality_gate:
+            id: quality_gate
+            name: Quality Gate
+            agent: ${story.quality_gate}
+            task: quality-review
+            description: Quality gate executado por agente DIFERENTE do executor. Valida código, testes, arquitetura e padrões.
+            spawn_in_terminal: true
+            inputs:
+              - implementation:
+                  from: 2_development.implementation
+              - healed_code:
+                  from: 3_self_healing.healed_code
+                  optional: true
+              - quality_gate_tools:
+                  from: story.quality_gate_tools
+            outputs:
+              - review_result:
+                  type: object
+                  properties:
+                    verdict: enum[APPROVED, REJECTED, NEEDS_WORK]
+                    score: number
+                    findings: array
+                    recommendations: array
+            validations:
+              - check: executor != quality_gate_agent
+                error: Quality Gate agent must be different from executor
+            on_success: 5_push
+            on_failure: return_to_development
+          5_push:
+            id: push
+            name: Push & PR
+            agent: '@devops'
+            task: push-and-pr
+            description: DevOps executa push ao final de cada story aprovada. Cria PR automaticamente com referência à story.
+            spawn_in_terminal: true
+            inputs:
+              - reviewed_code:
+                  from: 4_quality_gate.review_result
+              - story_file
+              - implementation:
+                  from: 2_development.implementation
+            outputs:
+              - push_result:
+                  type: object
+                  properties:
+                    commit_hash: string
+                    branch: string
+              - pr_url:
+                  type: string
+                  description: URL of created PR
+            pre_checks:
+              - name: lint
+                command: npm run lint
+              - name: test
+                command: npm test
+              - name: typecheck
+                command: npm run typecheck
+            on_success: 6_checkpoint
+            on_failure: return_to_quality_gate
+          6_checkpoint:
+            id: checkpoint
+            name: Story Checkpoint
+            agent: '@po'
+            task: story-checkpoint
+            description: 'PO pausa entre stories para perguntar: GO / PAUSE / REVIEW / ABORT. Requer interação humana para decisão.'
+            elicit: true
+            inputs:
+              - story_file
+              - pr_url:
+                  from: 5_push.pr_url
+              - implementation:
+                  from: 2_development.implementation
+              - review_result:
+                  from: 4_quality_gate.review_result
+            outputs:
+              - decision:
+                  type: enum
+                  values:
+                    - GO
+                    - PAUSE
+                    - REVIEW
+                    - ABORT
+              - next_story:
+                  type: path
+                  optional: true
+            options:
+              GO:
+                description: Continue to next story
+                action: suggest_next_story
+              PAUSE:
+                description: Save state and stop
+                action: save_session_state
+              REVIEW:
+                description: Show what was done
+                action: show_summary
+              ABORT:
+                description: Stop the epic
+                action: abort_epic
+            on_go: 1_validation
+            on_pause: workflow_paused
+            on_review: show_summary_then_checkpoint
+            on_abort: workflow_aborted
+        error_handlers:
+          reject_with_feedback:
+            description: Story rejected with feedback to SM
+            actions:
+              - log: Story validation failed
+              - notify: '@sm'
+              - save_feedback: true
+          return_to_po:
+            description: Development failed, return to PO for decision
+            actions:
+              - log: Development phase failed
+              - save_state: true
+              - await_decision: true
+          return_to_development:
+            description: Quality gate failed, return to executor
+            actions:
+              - log: Quality gate failed
+              - increment_attempt: true
+              - max_attempts: 3
+              - on_max_attempts: escalate_to_human
+          return_to_quality_gate:
+            description: Push failed, return to quality gate
+            actions:
+              - log: Push failed
+              - notify: '@devops'
+        state:
+          persistence:
+            enabled: true
+            location: .aios/workflow-state/
+            format: yaml
+          tracked_fields:
+            - current_phase
+            - current_story
+            - executor
+            - quality_gate
+            - attempt_count
+            - started_at
+            - last_updated
+            - accumulated_context
+          recovery:
+            enabled: true
+            auto_resume: true
+            checkpoint_interval: 5m
+        flow_diagram: |
+          ```
+          ┌─────────────────────────────────────────────────────────────┐
+          │                  DEVELOPMENT CYCLE WORKFLOW                  │
+          │                     (Projeto Bob - 11.3)                     │
+          └─────────────────────────────────────────────────────────────┘
+
+          ┌──────────┐    ┌──────────────┐    ┌──────────────┐
+          │   PO     │───▶│   Executor   │───▶│ Self-Healing │
+          │ Validate │    │   (Dynamic)  │    │ (if enabled) │
+          └──────────┘    └──────────────┘    └──────────────┘
+               │                                      │
+               │ ┌────────────────────────────────────┘
+               │ │
+               │ ▼
+          ┌──────────────┐    ┌──────────┐    ┌──────────────┐
+          │ Quality Gate │───▶│  DevOps  │───▶│  Checkpoint  │
+          │  (≠ Executor)│    │   Push   │    │   (Human)    │
+          └──────────────┘    └──────────┘    └──────────────┘
+                                                     │
+                                    ┌────────────────┼────────────────┐
+                                    │                │                │
+                                    ▼                ▼                ▼
+                                 [ GO ]          [ PAUSE ]       [ ABORT ]
+                                    │                │                │
+                                    ▼                ▼                ▼
+                               Next Story      Save State         Stop Epic
+          ```
+      metadata:
+        author: '@dev (Dex)'
+        story: '11.3'
+        epic: 11 - Projeto Bob
+        created_date: '2026-02-05'
+        version: 1.0.0
+        tags:
+          - projeto-bob
+          - orchestration
+          - development-cycle
+          - dynamic-executor
+          - terminal-spawning
+          - self-healing
+          - checkpoint
     raw_workflow:
       id: development-cycle
       name: Development Cycle (Projeto Bob)
@@ -566,4 +882,82 @@ metadata:
     error_handling: null
     resume: null
     integration: null
-sequence: []
+sequence:
+  - id: validate-story
+    intent: gate
+    title: Story Validation
+    notes: Validate the story draft before implementation starts. Ensure executor and quality gate assignments are present and the story is ready for execution.
+    requires:
+      - story-file
+      - epic-context
+    creates:
+      - validated-story
+    metadata:
+      synkra:
+        source_phase: 1_validation
+  - id: develop-story
+    intent: agent
+    title: Development
+    notes: Execute the story with the assigned executor, preserving the original development-cycle expectations for implementation output and test evidence.
+    requires:
+      - validated-story
+    creates:
+      - implementation
+      - test-results
+    metadata:
+      delegates_to: ${story.executor}
+      synkra:
+        source_phase: 2_development
+  - id: self-heal
+    intent: agent
+    title: Self-Healing
+    notes: Apply the original self-healing pass when enabled. This remains optional and the underlying Synkra condition is preserved in metadata for future runtime parity.
+    requires:
+      - implementation
+    creates:
+      - healed-code
+    optional: true
+    metadata:
+      delegates_to: dev
+      synkra:
+        source_phase: 3_self_healing
+  - id: quality-gate
+    intent: gate
+    title: Quality Gate
+    notes: Run the quality review with an agent different from the executor, preserving the original verdict-driven review contract.
+    requires:
+      - implementation
+      - id: healed-code
+        optional: true
+    creates:
+      - review-result
+    metadata:
+      delegates_to: ${story.quality_gate}
+      synkra:
+        source_phase: 4_quality_gate
+  - id: push-and-pr
+    intent: agent
+    title: Push and PR
+    notes: Publish the approved story branch and create the PR using the original DevOps handoff semantics.
+    requires:
+      - review-result
+      - implementation
+    creates:
+      - push-result
+      - pr-url
+    metadata:
+      delegates_to: devops
+      synkra:
+        source_phase: 5_push
+  - id: checkpoint
+    intent: gate
+    title: Story Checkpoint
+    notes: Pause after each story so the PO or user can decide whether to continue, review, pause, or abort the epic flow.
+    requires:
+      - pr-url
+      - review-result
+    confirmation_required: true
+    metadata:
+      delegates_to: po
+      synkra:
+        source_phase: 6_checkpoint

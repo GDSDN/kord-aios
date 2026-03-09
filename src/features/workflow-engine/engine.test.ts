@@ -41,7 +41,7 @@ describe("workflow-engine", () => {
     }
 
     expect(state.workflow_id).toBe("greenfield-fullstack")
-    expect(state.current_step_id).toBe("kickoff")
+    expect(state.current_step_id).toBe("step-1")
     expect(state.status).toBe("running")
 
     rmSync(directory, { recursive: true, force: true })
