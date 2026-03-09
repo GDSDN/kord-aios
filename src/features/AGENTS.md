@@ -14,7 +14,8 @@ features/
 │   ├── manager.ts              # Launch → poll → complete
 │   └── concurrency.ts          # Per-provider limits
 ├── builtin-skills/             # Core skills
-│   └── skills/                 # playwright, agent-browser, frontend-ui-ux, git-master, dev-browser
+│   ├── runtime/                # runtime wrappers and TS-only engine skills
+│   └── kord-aios/              # canonical/exportable SKILL.md content tree
 ├── builtin-commands/           # ralph-loop, refactor, ulw-loop, init-deep, start-work, cancel-ralph, stop-continuation
 ├── claude-code-agent-loader/   # ~/.claude/agents/*.md
 ├── claude-code-command-loader/ # ~/.claude/commands/*.md

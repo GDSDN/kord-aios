@@ -1,6 +1,6 @@
 ---
 name: dev-browser
-description: Browser automation with persistent page state. Use when users ask to navigate websites, fill forms, take screenshots, extract web data, test web apps, or automate browser workflows. Trigger phrases include "go to [url]", "click on", "fill out the form", "take a screenshot", "scrape", "automate", "test the website", "log into", or any browser interaction request.
+description: "Browser automation with persistent page state. Use when users ask to navigate websites, fill forms, take screenshots, extract web data, test web apps, or automate browser workflows. Trigger phrases include 'go to [url]', 'click on', 'fill out the form', 'take a screenshot', 'scrape', 'automate', 'test the website', 'log into', or any browser interaction request."
 ---
 
 # Dev Browser Skill
@@ -15,7 +15,7 @@ Browser automation that maintains page state across script executions. Write sma
 
 ## Setup
 
-> **Installation**: See [references/installation.md](references/installation.md) for detailed setup instructions including Windows support.
+**IMPORTANT**: Before using this skill, ensure the server is running. See [references/installation.md](references/installation.md) for platform-specific setup instructions (macOS, Linux, Windows).
 
 Two modes available. Ask the user if unclear which to use.
 
@@ -23,8 +23,14 @@ Two modes available. Ask the user if unclear which to use.
 
 Launches a new Chromium browser for fresh automation sessions.
 
+**macOS/Linux:**
 ```bash
 ./skills/dev-browser/server.sh &
+```
+
+**Windows (PowerShell):**
+```powershell
+Start-Process -NoNewWindow -FilePath "node" -ArgumentList "skills/dev-browser/server.js"
 ```
 
 Add `--headless` flag if user requests it. **Wait for the `Ready` message before running scripts.**
@@ -40,15 +46,17 @@ Connects to user's existing Chrome browser. Use this when:
 
 **Start the relay server:**
 
+**macOS/Linux:**
 ```bash
 cd skills/dev-browser && npm i && npm run start-extension &
 ```
 
-Wait for `Waiting for extension to connect...` followed by `Extension connected` in the console. To know that a client has connected and the browser is ready to be controlled.
-**Workflow:**
+**Windows (PowerShell):**
+```powershell
+cd skills/dev-browser; npm i; Start-Process -NoNewWindow -FilePath "npm" -ArgumentList "run", "start-extension"
+```
 
-1. Scripts call `client.page("name")` just like the normal mode to create new pages / connect to existing ones.
-2. Automation runs on the user's actual browser session
+Wait for `Waiting for extension to connect...` followed by `Extension connected` in the console.
 
 If the extension hasn't connected yet, tell the user to launch and activate it. Download link: https://github.com/SawyerHood/dev-browser/releases
 
@@ -58,12 +66,12 @@ If the extension hasn't connected yet, tell the user to launch and activate it. 
 
 Execute scripts inline using heredocs:
 
+**macOS/Linux:**
 ```bash
 cd skills/dev-browser && npx tsx <<'EOF'
 import { connect, waitForPageLoad } from "@/client.js";
 
 const client = await connect();
-// Create page with custom viewport size (optional)
 const page = await client.page("example", { viewport: { width: 1920, height: 1080 } });
 
 await page.goto("https://example.com");
@@ -74,7 +82,22 @@ await client.disconnect();
 EOF
 ```
 
-**Write to `tmp/` files only when** the script needs reuse, is complex, or user explicitly requests it.
+**Windows (PowerShell):**
+```powershell
+cd skills/dev-browser
+@"
+import { connect, waitForPageLoad } from "@/client.js";
+
+const client = await connect();
+const page = await client.page("example", { viewport: { width: 1920, height: 1080 } });
+
+await page.goto("https://example.com");
+await waitForPageLoad(page);
+
+console.log({ title: await page.title(), url: page.url() });
+await client.disconnect();
+"@ | npx tsx --input-type=module
+```
 
 ### Key Principles
 
@@ -85,8 +108,6 @@ EOF
 5. **Plain JS in evaluate**: `page.evaluate()` runs in browser - no TypeScript syntax
 
 ## Workflow Loop
-
-Follow this pattern for complex tasks:
 
 1. **Write a script** to perform one action
 2. **Run it** and observe the output
@@ -99,12 +120,12 @@ Follow this pattern for complex tasks:
 Code passed to `page.evaluate()` runs in the browser, which doesn't understand TypeScript:
 
 ```typescript
-// ✅ Correct: plain JavaScript
+// Correct: plain JavaScript
 const text = await page.evaluate(() => {
   return document.body.innerText;
 });
 
-// ❌ Wrong: TypeScript syntax will fail at runtime
+// Wrong: TypeScript syntax will fail at runtime
 const text = await page.evaluate(() => {
   const el: HTMLElement = document.body; // Type annotation breaks in browser!
   return el.innerText;
@@ -113,14 +134,14 @@ const text = await page.evaluate(() => {
 
 ## Scraping Data
 
-For scraping large datasets, intercept and replay network requests rather than scrolling the DOM. See [references/scraping.md](references/scraping.md) for the complete guide covering request capture, schema discovery, and paginated API replay.
+For scraping large datasets, intercept and replay network requests rather than scrolling the DOM. See [references/scraping.md](references/scraping.md) for the complete guide.
 
 ## Client API
 
 ```typescript
 const client = await connect();
 
-// Get or create named page (viewport only applies to new pages)
+// Get or create named page
 const page = await client.page("name");
 const pageWithSize = await client.page("name", { viewport: { width: 1920, height: 1080 } });
 
@@ -133,8 +154,6 @@ const snapshot = await client.getAISnapshot("name"); // Get accessibility tree
 const element = await client.selectSnapshotRef("name", "e5"); // Get element by ref
 ```
 
-The `page` object is a standard Playwright Page.
-
 ## Waiting
 
 ```typescript
@@ -145,16 +164,14 @@ await page.waitForSelector(".results"); // For specific elements
 await page.waitForURL("**/success"); // For specific URL
 ```
 
-## Inspecting Page State
-
-### Screenshots
+## Screenshots
 
 ```typescript
 await page.screenshot({ path: "tmp/screenshot.png" });
 await page.screenshot({ path: "tmp/full.png", fullPage: true });
 ```
 
-### ARIA Snapshot (Element Discovery)
+## ARIA Snapshot (Element Discovery)
 
 Use `getAISnapshot()` to discover page elements. Returns YAML-formatted accessibility tree:
 
@@ -167,18 +184,7 @@ Use `getAISnapshot()` to discover page elements. Returns YAML-formatted accessib
   - list:
     - listitem:
       - link "Article Title" [ref=e8]
-      - link "328 comments" [ref=e9]
-- contentinfo:
-  - textbox [ref=e10]
-    - /placeholder: "Search"
 ```
-
-**Interpreting refs:**
-
-- `[ref=eN]` - Element reference for interaction (visible, clickable elements only)
-- `[checked]`, `[disabled]`, `[expanded]` - Element states
-- `[level=N]` - Heading level
-- `/url:`, `/placeholder:` - Element properties
 
 **Interacting with refs:**
 

@@ -5,15 +5,30 @@ import { extract } from "../extract"
 import { printBanner } from "../banner"
 import { bold, cyan } from "picocolors"
 import { existsSync, mkdirSync, cpSync, readFileSync, writeFileSync, rmSync } from "node:fs"
-import { join, resolve } from "node:path"
+import { join, resolve, dirname } from "node:path"
 import { execSync } from "node:child_process"
 import { KORD_DIR } from "../project-layout"
 import * as p from "@clack/prompts"
 import { parseJsonc } from "../../shared"
+import { listKordAiosSkillFilesSync } from "../../features/builtin-skills/kord-aios-loader"
 
 // Path to the builtin code squad
 const BUILTIN_SQUAD_PATH = join(import.meta.dir, "..", "..", "features", "builtin-squads", "code")
 const BUILTIN_SQUAD_FILE = "SQUAD.yaml"
+const BUILTIN_AGENTS_PATH = join(import.meta.dir, "..", "..", "features", "builtin-agents")
+const APPROVED_T2_AGENT_FILES = [
+  "pm.md",
+  "po.md",
+  "sm.md",
+  "qa.md",
+  "devops.md",
+  "data-engineer.md",
+  "ux-design-expert.md",
+  "squad-creator.md",
+  "analyst.md",
+  "plan-analyzer.md",
+  "plan-reviewer.md",
+] as const
 
 export interface InitOptions {
   directory?: string
@@ -43,6 +58,12 @@ export interface InitResult {
   squadExport: {
     success: boolean
     exported: boolean
+    error?: string
+  }
+  agentExport: {
+    success: boolean
+    exported: string[]
+    skipped: string[]
     error?: string
   }
   config: {
@@ -79,7 +100,8 @@ export interface InitResult {
  * - Project config (.opencode/kord-aios.json)
  * - OpenCode config (.opencode/opencode.jsonc) with plugin and instructions
  * - Exports code squad to .kord/squads/code/
- * - Extracts agents, skills, commands to .opencode/ (unless skipExtract is true)
+ * - Exports approved T2 agents and methodology skills to .opencode/ (unless skipExtract is true)
+ * - Syncs builtin squads to .opencode/squads/ (unless skipExtract is true)
  * - Optionally bootstrap (git init + package.json) if --bootstrap is set and mode is "new"
  *
  * Does NOT touch global config.
@@ -111,14 +133,14 @@ export async function init(options: InitOptions): Promise<InitResult> {
   // Step 1: Create .kord/ directory
   const kordResult = createKordDirectory(cwd)
 
-  // Step 2: Scaffold project structure (pass projectMode for project-mode.md generation)
+  // Step 2: Scaffold project structure (pass projectMode for project-type instruction export)
   const scaffoldResult = scaffoldProject({
     directory: cwd,
     force,
     projectMode,
   })
 
-  // Step 2.5: Migrate legacy kord-rules.md to .kord/rules/ if needed
+  // Step 2.5: Migrate legacy kord-rules.md to .kord/instructions/ if needed
   const migrationResult = migrateLegacyRulesFile(cwd)
 
   // Step 3: Export code squad to .kord/squads/code/
@@ -133,10 +155,27 @@ export async function init(options: InitOptions): Promise<InitResult> {
   // Step 6: Bootstrap if requested (git init + package.json for new projects)
   const bootstrapResult = handleBootstrap(cwd, projectMode, bootstrap)
 
-  // Step 7: Extract agents, skills, commands to .opencode/
+  // Step 7: Sync squads and export curated agents/skills to .opencode/
   let extractExitCode = 0
+  let agentExportResult: InitResult["agentExport"] = {
+    success: true,
+    exported: [],
+    skipped: [],
+  }
   if (!skipExtract) {
-    extractExitCode = await extract({ directory: cwd, force })
+    const extractResult = await extract({
+      directory: cwd,
+      force,
+      squadsOnly: true,
+    })
+
+    if (extractResult !== 0) {
+      extractExitCode = extractResult
+    } else {
+      agentExportResult = exportT2Agents(cwd, force)
+      const skillExport = exportMethodologySkills(cwd, force)
+      extractExitCode = agentExportResult.success && skillExport.success ? 0 : 1
+    }
   }
 
   // Print results
@@ -162,6 +201,7 @@ export async function init(options: InitOptions): Promise<InitResult> {
     scaffold: scaffoldResult,
     migration: migrationResult,
     squadExport: squadExportResult,
+    agentExport: agentExportResult,
     config: {
       success: configResult.success,
       configPath: configResult.configPath,
@@ -181,21 +221,98 @@ export async function init(options: InitOptions): Promise<InitResult> {
   }
 }
 
+function exportT2Agents(projectDir: string, force: boolean): {
+  success: boolean
+  exported: string[]
+  skipped: string[]
+  error?: string
+} {
+  try {
+    const agentsRoot = join(projectDir, ".opencode", "agents")
+    const exported: string[] = []
+    const skipped: string[] = []
+
+    for (const agentFile of APPROVED_T2_AGENT_FILES) {
+      const sourcePath = join(BUILTIN_AGENTS_PATH, agentFile)
+      if (!existsSync(sourcePath)) {
+        return {
+          success: false,
+          exported,
+          skipped,
+          error: `Approved T2 agent source not found: ${sourcePath}`,
+        }
+      }
+
+      const destinationPath = join(agentsRoot, agentFile)
+      if (!force && existsSync(destinationPath)) {
+        skipped.push(agentFile)
+        continue
+      }
+
+      const destinationDir = dirname(destinationPath)
+      if (!existsSync(destinationDir)) {
+        mkdirSync(destinationDir, { recursive: true })
+      }
+
+      const content = readFileSync(sourcePath, "utf-8")
+      writeFileSync(destinationPath, content, "utf-8")
+      exported.push(agentFile)
+    }
+
+    return { success: true, exported, skipped }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return {
+      success: false,
+      exported: [],
+      skipped: [],
+      error: `T2 agent export failed: ${message}`,
+    }
+  }
+}
+
+function exportMethodologySkills(projectDir: string, force: boolean): { success: boolean; error?: string } {
+  try {
+    const skillFiles = listKordAiosSkillFilesSync()
+    const skillsRoot = join(projectDir, ".opencode", "skills")
+
+    for (const skillFile of skillFiles) {
+      const destinationPath = join(skillsRoot, skillFile.relativePath)
+      if (!force && existsSync(destinationPath)) {
+        continue
+      }
+
+      const destinationDir = dirname(destinationPath)
+      if (!existsSync(destinationDir)) {
+        mkdirSync(destinationDir, { recursive: true })
+      }
+
+      const content = readFileSync(skillFile.sourcePath, "utf-8")
+      writeFileSync(destinationPath, content, "utf-8")
+    }
+
+    return { success: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return { success: false, error: `Methodology skill export failed: ${message}` }
+  }
+}
+
 /**
  * Detect project mode (new vs existing) based on filesystem.
  * If detection is ambiguous and TTY is available, prompts user.
  */
 
 /**
- * Migrate legacy kord-rules.md from project root to .kord/rules/kord-rules.md.
+ * Migrate legacy kord-rules.md from project root to .kord/instructions/kord-rules.md.
  * This ensures backward compatibility for projects that were initialized before
- * the .kord/rules/ directory was introduced.
+ * the .kord/instructions/ directory was introduced.
  *
  * Returns: { migrated: boolean, source?: string, target?: string }
  */
 function migrateLegacyRulesFile(projectDir: string): { migrated: boolean; source?: string; target?: string; error?: string } {
   const legacyPath = join(projectDir, "kord-rules.md")
-  const newPath = join(projectDir, KORD_DIR, "rules", "kord-rules.md")
+  const newPath = join(projectDir, KORD_DIR, "instructions", "kord-rules.md")
 
   // Check if legacy file exists and new location doesn't
   const hasLegacy = existsSync(legacyPath)
@@ -205,7 +322,7 @@ function migrateLegacyRulesFile(projectDir: string): { migrated: boolean; source
   if (hasLegacy && !hasNew) {
     try {
       // Ensure the target directory exists
-      const targetDir = join(projectDir, KORD_DIR, "rules")
+      const targetDir = join(projectDir, KORD_DIR, "instructions")
       if (!existsSync(targetDir)) {
         mkdirSync(targetDir, { recursive: true })
       }
@@ -353,7 +470,7 @@ function handleBootstrap(
 /**
  * Configure .opencode/opencode.jsonc with plugin and instructions.
  * - Adds "kord-aios" to plugins array
- * - Adds ".kord/rules/**" to instructions array
+ * - Adds ".kord/instructions/**" to instructions array
  * - Preserves existing configuration
  */
 async function configureOpenCodeConfig(
@@ -397,9 +514,9 @@ async function configureOpenCodeConfig(
       config.plugin = plugins
     }
 
-    // Ensure instructions array exists and contains .kord/rules/**
+    // Ensure instructions array exists and contains .kord/instructions/**
     const instructions = Array.isArray(config.instructions) ? config.instructions : []
-    const rulesGlob = ".kord/rules/**"
+    const rulesGlob = ".kord/instructions/**"
     if (!instructions.includes(rulesGlob)) {
       instructions.push(rulesGlob)
       config.instructions = instructions
@@ -534,7 +651,7 @@ function printInitResults(params: PrintResultsParams): void {
 
   // Print migration result
   if (migration.migrated) {
-    console.log(`${cyan("✓")} ${bold("Migrated")} kord-rules.md to .kord/rules/`)
+    console.log(`${cyan("✓")} ${bold("Migrated")} kord-rules.md to .kord/instructions/`)
   }
 
   // Print squad export result

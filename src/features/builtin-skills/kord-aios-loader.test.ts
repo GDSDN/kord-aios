@@ -1,5 +1,11 @@
 import { describe, test, expect, afterEach } from "bun:test"
-import { loadKordAiosSkills, loadKordAiosSkillsSync, clearKordAiosSkillCache, __test__parseKordAiosSkill } from "./kord-aios-loader"
+import {
+  loadKordAiosSkills,
+  loadKordAiosSkillsSync,
+  clearKordAiosSkillCache,
+  __test__parseKordAiosSkill,
+  listKordAiosSkillFilesSync,
+} from "./kord-aios-loader"
 import { createBuiltinSkills } from "./skills"
 
 describe("Kord AIOS skill loader", () => {
@@ -139,6 +145,46 @@ Some instructions here.
     expect(parsed!.templateRef).toBeUndefined()
     // and template should NOT contain the template reference line
     expect(parsed!.template).not.toContain("Template: Use the template at")
+  })
+
+  test("listKordAiosSkillFilesSync preserves full kord-aios domain hierarchy", () => {
+    //#given
+    const skills = listKordAiosSkillFilesSync()
+
+    //#when
+    const specGatherRequirements = skills.find(
+      s => s.relativePath === "kord-aios/analysis/spec-gather-requirements/SKILL.md"
+    )
+    const allPathsIncludeDomainHierarchy = skills.every(s => {
+      const parts = s.relativePath.split("/")
+      return parts.length >= 4 && parts[0] === "kord-aios" && parts[parts.length - 1] === "SKILL.md"
+    })
+
+    //#then
+    expect(skills.length).toBeGreaterThan(100)
+    expect(specGatherRequirements).toBeDefined()
+    expect(allPathsIncludeDomainHierarchy).toBe(true)
+  })
+
+  test("skill templates can inject local .opencode/skills base paths", () => {
+    //#given - local exported skill directory under .opencode/skills hierarchy
+    const localSkillDir = "/project/.opencode/skills/kord-aios/analysis/spec-gather-requirements"
+    const skillContent = `---
+name: spec-gather-requirements
+description: Gather requirements
+---
+
+# Spec Gather Requirements
+
+Use @path references from this skill directory.
+`
+
+    //#when
+    const parsed = __test__parseKordAiosSkill(skillContent, localSkillDir, "spec-gather-requirements")
+
+    //#then
+    expect(parsed).not.toBeNull()
+    expect(parsed!.template).toContain("Base directory for this skill: /project/.opencode/skills/kord-aios/analysis/spec-gather-requirements/")
   })
 
   test("loaded skills from directory respect templateRef frontmatter", () => {

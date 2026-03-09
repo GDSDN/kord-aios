@@ -4,7 +4,7 @@ import { join } from "path"
 
 const SQUAD_SKILLS_DIR = join(__dirname)
 
-const SKILL_GIT_PATH_PREFIX = "src/features/builtin-skills/skills/kord-aios/squad"
+const SKILL_GIT_PATH_PREFIX = "src/features/builtin-skills/kord-aios/squad"
 
 const SKILL_DIRS = [
 	"squad-creator-validate",

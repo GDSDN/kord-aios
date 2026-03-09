@@ -1103,4 +1103,3 @@ POTENTIAL ACTIONS:
 - `-S` when `-G` is appropriate -> Wrong results
 - Blame without `-C` on moved code -> Wrong attribution
 - Bisect without proper good/bad boundaries -> Wasted time
-"

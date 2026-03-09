@@ -140,4 +140,16 @@ describe("createBuiltinSkills", () => {
 		// #then
 		expect(skills.length).toBe(4)
 	})
+
+	test("hardcoded skills should take precedence over kord-aios skills with the same name", () => {
+		// given
+
+		// when
+		const skills = createBuiltinSkills()
+
+		// then
+		expect(skills.filter((skill) => skill.name === "git-master")).toHaveLength(1)
+		expect(skills.filter((skill) => skill.name === "frontend-ui-ux")).toHaveLength(1)
+		expect(skills.filter((skill) => skill.name === "dev-browser")).toHaveLength(1)
+	})
 })
