@@ -67,7 +67,7 @@ The story must follow these status transitions:
   - Include unit testing as explicit subtasks.
 
 ### 6. Review and Decision Checkpoints
-- Execute `.kord/templates/checklist-story-draft.md` checklist.
+- Execute `.kord/checklists/checklist-story-draft.md`.
 - Review all sections for completeness and accuracy.
 - Verify all source references are included for technical details.
 - Update status to "Draft" and save the story file.

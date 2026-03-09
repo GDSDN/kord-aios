@@ -17,27 +17,22 @@ export interface ProjectStatus {
   opencodeConfigPath: string | null
 }
 
-/**
- * Extract Project Mode and Project Stage from project-mode.md
- */
-function parseProjectModeFile(projectModePath: string): { mode: string | null; stage: string | null } {
-  try {
-    const content = readFileSync(projectModePath, "utf-8")
+function detectProjectModeFromInstructions(directory: string): string | null {
+  const greenfieldPath = resolve(directory, KORD_DIR, "instructions", "greenfield.md")
+  const brownfieldPath = resolve(directory, KORD_DIR, "instructions", "brownfield.md")
 
-    const modeMatch = content.match(/Project Mode:\s*(\S+)/i)
-    const stageMatch = content.match(/Project Stage:\s*(\S+)/i)
-
-    return {
-      mode: modeMatch ? modeMatch[1] : null,
-      stage: stageMatch ? stageMatch[1] : null,
-    }
-  } catch {
-    return { mode: null, stage: null }
+  if (existsSync(greenfieldPath)) {
+    return "greenfield"
   }
+  if (existsSync(brownfieldPath)) {
+    return "brownfield"
+  }
+
+  return null
 }
 
 /**
- * Check if opencode config has .kord/rules/** in instructions
+ * Check if opencode config has .kord/instructions/** in instructions
  */
 function checkRulesInstruction(directory: string): { configured: boolean; configPath: string | null } {
   const opencodeDir = resolve(directory, ".opencode")
@@ -65,9 +60,7 @@ function checkRulesInstruction(directory: string): { configured: boolean; config
     const config = parseJsonc<{ instructions?: string[] }>(content)
     const instructions = config.instructions ?? []
 
-    const hasRules = instructions.some((pattern) =>
-      pattern.includes(".kord/rules")
-    )
+    const hasRules = instructions.some((pattern) => pattern.includes(".kord/instructions"))
 
     return { configured: hasRules, configPath }
   } catch {
@@ -96,14 +89,12 @@ function formatStatusOutput(status: ProjectStatus): string {
   lines.push(pc.dim("─".repeat(40)))
   lines.push("")
 
-  // Project Mode & Stage
+  // Project Mode
   if (status.projectMode) {
     lines.push(`${pc.cyan("Project Mode:")} ${pc.white(status.projectMode)}`)
-    if (status.projectStage) {
-      lines.push(`${pc.cyan("Project Stage:")} ${pc.white(status.projectStage)}`)
-    }
+    lines.push(`${pc.cyan("Project Stage:")} ${pc.dim("unknown")}`)
   } else {
-    lines.push(`${pc.yellow("⚠")} ${pc.dim("No project-mode.md found - run 'kord-aios init' first")}`)
+    lines.push(`${pc.yellow("⚠")} ${pc.dim("Project mode unknown - run 'kord-aios init' to scaffold instructions")}`)
   }
 
   lines.push("")
@@ -145,7 +136,7 @@ function formatJsonOutput(status: ProjectStatus): string {
  * Get Kord AIOS project status.
  *
  * Reads:
- * - .kord/rules/project-mode.md for Project Mode and Project Stage
+ * - .kord/instructions/{greenfield,brownfield}.md for Project Mode
  * - .opencode/opencode.jsonc (or .json) for rules configuration
  * - .opencode/kord-aios.json (or .jsonc) for plugin installation
  *
@@ -154,11 +145,7 @@ function formatJsonOutput(status: ProjectStatus): string {
 export async function getStatus(options: StatusOptions = {}): Promise<number> {
   const directory = options.directory ?? process.cwd()
 
-  // Check for project-mode.md
-  const projectModePath = resolve(directory, KORD_DIR, "rules", "project-mode.md")
-  const { mode, stage } = existsSync(projectModePath)
-    ? parseProjectModeFile(projectModePath)
-    : { mode: null, stage: null }
+  const mode = detectProjectModeFromInstructions(directory)
 
   // Check opencode config for rules instruction
   const { configured: rulesConfigured, configPath: opencodeConfigPath } =
@@ -169,7 +156,7 @@ export async function getStatus(options: StatusOptions = {}): Promise<number> {
 
   const status: ProjectStatus = {
     projectMode: mode,
-    projectStage: stage,
+    projectStage: null,
     rulesConfigured,
     kordInstalled,
     opencodeConfigPath,

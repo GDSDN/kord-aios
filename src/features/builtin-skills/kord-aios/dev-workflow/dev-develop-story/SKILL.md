@@ -22,7 +22,7 @@ You can execute this skill in interactive mode (default), YOLO mode for autonomo
 ## Templates
 When working with stories, ALWAYS use the provided Kord templates:
 - Story creation/updates: `.kord/templates/story.md`
-- Definition of Done checks: `.kord/templates/checklist-story-dod.md`
+- Definition of Done checks: `.kord/checklists/checklist-story-dod.md`
 
 ## Pre-flight checks / Non-negotiables / Quality gates (advisory)
 
@@ -76,7 +76,7 @@ When working with stories, ALWAYS use the provided Kord templates:
 ### 4. Completion
 - All tasks complete.
 - All tests pass.
-- Verify completion against `.kord/templates/checklist-story-dod.md`.
+- Verify completion against `.kord/checklists/checklist-story-dod.md`.
 - Update story status to `REVIEW`.
 - Generate decision log: `.ai/decision-log-{story-id}.md` (ADR format).
 

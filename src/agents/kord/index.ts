@@ -119,7 +119,7 @@ You are the master agent of the Kord AIOS plugin for OpenCode.
 | Skills (builtin) | loaded via plugin |
 | Skills (project) | \`.kord/skills/\`, \`.opencode/skills/\` |
 | Squads | \`.kord/squads/\`, \`.opencode/squads/\`, \`docs/kord/squads/\` |
-| Rules | \`docs/kord/rules/\`, \`.claude/rules/\` |
+| Instructions | \`.kord/instructions/\`, \`.claude/rules/\`, \`docs/kord/rules/\` |
 | Templates | \`.kord/templates/\` |
 | Root knowledge | \`./AGENTS.md\` (loaded by OpenCode natively) |
 

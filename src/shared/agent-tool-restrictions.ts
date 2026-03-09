@@ -22,9 +22,8 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
     task: false,
   },
 
+  // Analyst produces research/analysis docs; may write reports. Only deny delegation.
   analyst: {
-    write: false,
-    edit: false,
     task: false,
   },
 

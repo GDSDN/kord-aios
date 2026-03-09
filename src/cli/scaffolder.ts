@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import {
   KORD_DIR,
@@ -21,13 +21,10 @@ import {
   CHECKLIST_SELF_CRITIQUE_CONTENT,
   KORD_ROOT_AGENTS_CONTENT,
   KORD_STANDARDS_AGENTS_CONTENT,
-  KORD_GUIDES_AGENTS_CONTENT,
   KORD_STANDARDS_QUALITY_GATES_CONTENT,
   KORD_STANDARDS_DECISION_HEURISTICS_CONTENT,
   KORD_STANDARDS_ONBOARDING_DEPTH_RUBRIC_CONTENT,
   KORD_STANDARDS_METHODOLOGY_ARTIFACTS_QUALITY_RUBRIC_CONTENT,
-  KORD_GUIDE_NEW_PROJECT_CONTENT,
-  KORD_GUIDE_EXISTING_PROJECT_CONTENT,
   CHECKLIST_AGENT_QUALITY_GATE_CONTENT,
 } from "./project-layout"
 import { BUILTIN_WORKFLOW_YAMLS } from "../features/workflow-engine"
@@ -76,6 +73,16 @@ This directory contains project-local workflow definitions used by the Kord work
 3. Run \`/workflow validate <id>\`.
 4. Run \`/<id>\` (alias) or \`/workflow <id>\` to start.
 `
+
+const GREENFIELD_INSTRUCTION_CONTENT = readFileSync(
+  join(import.meta.dir, "..", "features", "builtin-instructions", "greenfield.md"),
+  "utf-8",
+)
+
+const BROWNFIELD_INSTRUCTION_CONTENT = readFileSync(
+  join(import.meta.dir, "..", "features", "builtin-instructions", "brownfield.md"),
+  "utf-8",
+)
 
 function getWorkflowAliasCommandContent(workflowId: string): string {
   return `---
@@ -133,16 +140,16 @@ function getScaffoldEntries(baseDir: string, projectMode?: "new" | "existing"): 
   entries.push({ path: join(templatesDir, "qa-gate.md"), content: QA_GATE_TEMPLATE_CONTENT })
   entries.push({ path: join(templatesDir, "qa-report.md"), content: QA_REPORT_TEMPLATE_CONTENT })
 
-  // .kord/templates/checklists/ (flat, no subdirs)
-  entries.push({ path: join(templatesDir, "checklist-story-draft.md"), content: CHECKLIST_STORY_DRAFT_CONTENT })
-  entries.push({ path: join(templatesDir, "checklist-story-dod.md"), content: CHECKLIST_STORY_DOD_CONTENT })
-  entries.push({ path: join(templatesDir, "checklist-pr-review.md"), content: CHECKLIST_PR_REVIEW_CONTENT })
-  entries.push({ path: join(templatesDir, "checklist-architect.md"), content: CHECKLIST_ARCHITECT_CONTENT })
-  entries.push({ path: join(templatesDir, "checklist-pre-push.md"), content: CHECKLIST_PRE_PUSH_CONTENT })
-  entries.push({ path: join(templatesDir, "checklist-self-critique.md"), content: CHECKLIST_SELF_CRITIQUE_CONTENT })
-
-  // .kord/templates/checklist-agent-quality-gate.md
-  entries.push({ path: join(templatesDir, "checklist-agent-quality-gate.md"), content: CHECKLIST_AGENT_QUALITY_GATE_CONTENT })
+  // .kord/checklists/ files
+  const checklistsDir = join(baseDir, KORD_DIR, "checklists")
+  entries.push({ path: checklistsDir, isDir: true })
+  entries.push({ path: join(checklistsDir, "checklist-story-draft.md"), content: CHECKLIST_STORY_DRAFT_CONTENT })
+  entries.push({ path: join(checklistsDir, "checklist-story-dod.md"), content: CHECKLIST_STORY_DOD_CONTENT })
+  entries.push({ path: join(checklistsDir, "checklist-pr-review.md"), content: CHECKLIST_PR_REVIEW_CONTENT })
+  entries.push({ path: join(checklistsDir, "checklist-architect.md"), content: CHECKLIST_ARCHITECT_CONTENT })
+  entries.push({ path: join(checklistsDir, "checklist-pre-push.md"), content: CHECKLIST_PRE_PUSH_CONTENT })
+  entries.push({ path: join(checklistsDir, "checklist-self-critique.md"), content: CHECKLIST_SELF_CRITIQUE_CONTENT })
+  entries.push({ path: join(checklistsDir, "checklist-agent-quality-gate.md"), content: CHECKLIST_AGENT_QUALITY_GATE_CONTENT })
 
   // .kord/AGENTS.md (root index)
   entries.push({ path: join(baseDir, KORD_DIR, "AGENTS.md"), content: KORD_ROOT_AGENTS_CONTENT })
@@ -159,78 +166,40 @@ function getScaffoldEntries(baseDir: string, projectMode?: "new" | "existing"): 
     content: KORD_STANDARDS_METHODOLOGY_ARTIFACTS_QUALITY_RUBRIC_CONTENT,
   })
 
-  // .kord/guides/ files
-  const guidesDir = join(baseDir, KORD_DIR, "guides")
-  entries.push({ path: guidesDir, isDir: true })
-  entries.push({ path: join(guidesDir, "AGENTS.md"), content: KORD_GUIDES_AGENTS_CONTENT })
-  entries.push({ path: join(guidesDir, "new-project.md"), content: KORD_GUIDE_NEW_PROJECT_CONTENT })
-  entries.push({ path: join(guidesDir, "existing-project.md"), content: KORD_GUIDE_EXISTING_PROJECT_CONTENT })
+  // .kord/instructions/ files
+  const instructionsDir = join(baseDir, KORD_DIR, "instructions")
+  entries.push({ path: instructionsDir, isDir: true })
 
-  // kord-rules.md at project root
+  // kord-rules.md in .kord/instructions/
   entries.push({ path: join(baseDir, KORD_RULES_FILE), content: KORD_RULES_CONTENT })
+
+  // exactly one project-type instruction file
+  const projectTypeInstructionName = projectMode === "new" ? "greenfield.md" : "brownfield.md"
+  const projectTypeInstructionContent = projectMode === "new"
+    ? GREENFIELD_INSTRUCTION_CONTENT
+    : BROWNFIELD_INSTRUCTION_CONTENT
+  entries.push({ path: join(instructionsDir, projectTypeInstructionName), content: projectTypeInstructionContent })
 
   // .kord/workflows/ files
   const workflowsDir = join(baseDir, KORD_DIR, "workflows")
   entries.push({ path: workflowsDir, isDir: true })
   entries.push({ path: join(workflowsDir, "README.md"), content: WORKFLOWS_README_CONTENT })
   entries.push({ path: join(workflowsDir, "_template.yaml"), content: WORKFLOW_TEMPLATE_CONTENT })
-  entries.push({ path: join(workflowsDir, "greenfield-fullstack.yaml"), content: BUILTIN_WORKFLOW_YAMLS["greenfield-fullstack"] })
-  entries.push({ path: join(workflowsDir, "brownfield-discovery.yaml"), content: BUILTIN_WORKFLOW_YAMLS["brownfield-discovery"] })
+  for (const [workflowId, workflowYaml] of Object.entries(BUILTIN_WORKFLOW_YAMLS)) {
+    entries.push({ path: join(workflowsDir, `${workflowId}.yaml`), content: workflowYaml })
+  }
 
   // .opencode/command workflow aliases
   const opencodeCommandDir = join(baseDir, ".opencode", "command")
   entries.push({ path: opencodeCommandDir, isDir: true })
-  entries.push({ path: join(opencodeCommandDir, "greenfield-fullstack.md"), content: getWorkflowAliasCommandContent("greenfield-fullstack") })
-  entries.push({ path: join(opencodeCommandDir, "brownfield-discovery.md"), content: getWorkflowAliasCommandContent("brownfield-discovery") })
-
-  // .kord/rules/project-mode.md - generated dynamically based on projectMode
-  const projectModeContent = getProjectModeContent(projectMode)
-  entries.push({ path: join(baseDir, KORD_DIR, "rules", "project-mode.md"), content: projectModeContent })
+  for (const workflowId of Object.keys(BUILTIN_WORKFLOW_YAMLS)) {
+    entries.push({
+      path: join(opencodeCommandDir, `${workflowId}.md`),
+      content: getWorkflowAliasCommandContent(workflowId),
+    })
+  }
 
   return entries
-}
-
-/**
- * Generate project-mode.md content based on project mode.
- * This file tells agents how to onboard to this project.
- */
-function getProjectModeContent(projectMode?: "new" | "existing"): string {
-  const mode = projectMode ?? "existing" // Default to existing for backward compatibility
-  const stage = mode === "new" ? "NEW_SETUP" : "EXISTING_UNASSESSED"
-  const readFirst = mode === "new" ? ".kord/guides/new-project.md" : ".kord/guides/existing-project.md"
-
-  return `# Project Mode
-
-Project Mode: ${mode}
-Project Stage: ${stage}
-Read-first: ${readFirst}
-
-## Stage Gates
-
-When all items for your mode are checked, update the \`Project Stage:\` line.
-
-### New Project (NEW_SETUP -> NEW_ACTIVE)
-
-- [ ] PRD exists under \`docs/kord/prds/\`
-- [ ] First story is PO-validated (READY)
-- [ ] Verification commands are defined for the first story
-
-### Existing Project (EXISTING_UNASSESSED -> EXISTING_BASELINED)
-
-- [ ] Baseline captured (what tests/build currently pass)
-- [ ] Critical flows identified + minimal repro notes exist
-- [ ] Rollback plan exists for risky changes
-
-## Sunset Clause
-
-If \`Project Stage:\` is \`NEW_ACTIVE\` or \`EXISTING_BASELINED\`, treat this file as a pointer only (do not re-run onboarding).
-
-## References
-
-- Guides: \`.kord/guides/new-project.md\`, \`.kord/guides/existing-project.md\`
-- Rubrics: \`.kord/standards/onboarding-depth-rubric.md\`, \`.kord/standards/methodology-artifacts-quality-rubric.md\`
-- Skills: \`greenfield-kickoff\`, \`document-project\`, \`create-brownfield-story\`
-`
 }
 
 export function scaffoldProject(options: ScaffoldOptions): ScaffoldResult {

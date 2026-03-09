@@ -138,8 +138,8 @@ describe("post-install-doctor", () => {
     writeFileSync(join(configDir, "kord-aios.json"), "{}")
     mkdirSync(join(testDir, ".kord", "templates"), { recursive: true })
     writeFileSync(join(testDir, ".kord", "templates", "story.md"), "# Story")
-    mkdirSync(join(testDir, ".kord", "rules"), { recursive: true })
-    writeFileSync(join(testDir, ".kord", "rules", "kord-rules.md"), "# Rules")
+    mkdirSync(join(testDir, ".kord", "instructions"), { recursive: true })
+    writeFileSync(join(testDir, ".kord", "instructions", "kord-rules.md"), "# Rules")
     mkdirSync(join(testDir, "docs", "kord", "plans"), { recursive: true })
 
     //#when

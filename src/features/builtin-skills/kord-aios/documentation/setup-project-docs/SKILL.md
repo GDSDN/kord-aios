@@ -21,19 +21,22 @@ Set up a minimal, Kord-aligned documentation baseline so future work is traceabl
 ## Instructions
 
 1. Detect the project mode
-   - Prefer `.kord/rules/project-mode.md` if present.
-   - If missing, assume existing-project safety until proven greenfield.
+   - Check `.kord/instructions/greenfield.md` or `.kord/instructions/brownfield.md`.
+   - If neither exists, assume existing-project safety until proven greenfield.
 
 2. Confirm scaffolding exists
    - `.kord/templates/` exists
    - `.kord/standards/` exists (including both rubrics)
-   - `.kord/guides/` exists
+   - `.kord/instructions/` exists
+   - `.kord/workflows/` exists
 
 3. For new projects (greenfield)
-   - Run the `greenfield-kickoff` skill to create PRD + epic.
+   - Prefer the shipped greenfield workflow from `.kord/workflows/`.
+   - Use `greenfield-kickoff` only as an escape hatch when the workflow is not the right fit.
 
 4. For existing projects (brownfield)
-   - Run the `document-project` skill to generate a brownfield baseline and architecture map.
+   - Prefer the shipped brownfield workflow from `.kord/workflows/`.
+   - Use `document-project` only as an escape hatch for focused documentation work.
 
 5. Write a short setup note
    - What was generated

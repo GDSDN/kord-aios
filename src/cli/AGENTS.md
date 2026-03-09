@@ -4,13 +4,13 @@
 
 CLI entry: `bunx kord-aios`. 6 commands with Commander.js + @clack/prompts TUI.
 
-**Commands**: install, init, doctor, run, get-local-version, status, mcp-oauth, extract, version
+**Commands**: install, init, doctor, run, get-local-version, status, mcp-oauth, version
 
 ## STRUCTURE
 
 ```
 cli/
-├── index.ts              # Commander.js entry (9 commands)
+├── index.ts              # Commander.js entry (8 commands)
 ├── banner.ts             # Shared banner utility
 ├── install.ts            # Interactive TUI (737 lines)
 ├── config-manager.ts     # JSONC parsing (667 lines)
@@ -52,7 +52,6 @@ cli/
 | `run` | Launch session with todo enforcement |
 | `get-local-version` | Version detection and update check |
 | `status` | Show project status (mode, stage, configuration) |
-| `extract` | Extract bundled methodology content |
 | `mcp-oauth` | MCP OAuth authentication flow |
 | `version` | Show version information |
 

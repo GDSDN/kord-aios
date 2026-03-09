@@ -28,8 +28,8 @@ The story must follow these status transitions:
 ## Pre-Conditions
 - Validation rules loaded.
 - Target story available for validation.
-- Project onboarding context is available (prefer `.kord/rules/project-mode.md` if present).
-- Required templates are available in `.kord/templates/` (e.g. `.kord/templates/checklist-story-draft.md`).
+- Project onboarding context is available under `.kord/instructions/`.
+- Required templates and checklists are available in `.kord/templates/` and `.kord/checklists/` (e.g. `.kord/checklists/checklist-story-draft.md`).
 
 ## Sequential Task Execution
 

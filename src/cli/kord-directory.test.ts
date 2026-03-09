@@ -64,14 +64,14 @@ describe("createKordDirectory", () => {
     expect(existsSync(join(tempDir, ".kord", "scripts"))).toBe(false)
   })
 
-  test("should NOT create .kord/checklists/ subdirectory", () => {
+  test("should create .kord/checklists/ subdirectory", () => {
     //#given - a project directory
 
     //#when - creating the kord directory
     createKordDirectory(tempDir)
 
-    //#then - checklists subdir should NOT exist
-    expect(existsSync(join(tempDir, ".kord", "checklists"))).toBe(false)
+    //#then - checklists subdir should exist
+    expect(existsSync(join(tempDir, ".kord", "checklists"))).toBe(true)
   })
 
   test("should NOT create .kord/skills/ subdirectory", () => {
@@ -84,7 +84,7 @@ describe("createKordDirectory", () => {
     expect(existsSync(join(tempDir, ".kord", "skills"))).toBe(false)
   })
 
-  test("should create only active subdirs (templates, squads)", () => {
+  test("should create only active subdirs (templates, squads, instructions, standards, checklists)", () => {
     //#given - a project directory
 
     //#when - creating the kord directory
