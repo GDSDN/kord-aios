@@ -22,8 +22,6 @@ export const ANALYST_SYSTEM_PROMPT = parseFrontmatter(analystPrompt).body
  */
 
 const analystRestrictions = createAgentToolRestrictions([
-  "write",
-  "edit",
   "task",
 ])
 

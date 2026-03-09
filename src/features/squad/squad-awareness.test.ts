@@ -32,13 +32,14 @@ const marketingSquad: LoadedSquad = {
         tools: {},
       },
     },
-    categories: {
-      creative: {
-        description: "Creative writing tasks",
-      },
-      visual: {
-        description: "Visual design tasks",
-      },
+    components: {
+      workflows: ["workflows/marketing-campaign.yaml"],
+      tasks: ["tasks/write-copy.md", "tasks/design-assets.md"],
+    },
+    orchestration: {
+      runner: "workflow-engine",
+      delegation_mode: "chief",
+      entry_workflow: "marketing-campaign",
     },
     contract_type: "campaign",
   },
@@ -70,7 +71,7 @@ const devSquad: LoadedSquad = {
     },
     contract_type: "task",
   },
-  source: "builtin",
+  source: "user",
   basePath: "/test/dev",
   resolvedPrompts: {},
 }
@@ -146,19 +147,19 @@ describe("buildSquadPromptSection", () => {
     expect(result).toContain('task(subagent_type="squad-marketing-brand-chief")')
   })
 
-  test("includes categories when present", () => {
+  test("does not include deprecated category routing in prompt output", () => {
     //#given
     const squads: LoadedSquad[] = [marketingSquad]
     //#when
     const result = buildSquadPromptSection(squads)
     //#then
-    expect(result).toContain("### Squad Categories")
-    expect(result).toContain("task(category=")
-    expect(result).toContain('task(category="marketing:creative")')
-    expect(result).toContain('task(category="marketing:visual")')
+    expect(result).not.toContain("### Squad Categories")
+    expect(result).not.toContain("marketing:creative")
+    expect(result).not.toContain("marketing:visual")
+    expect(result).not.toContain("task(category=")
   })
 
-  test("omits categories section when no categories", () => {
+  test("omits deprecated category routing section when components are absent", () => {
     //#given
     const squads: LoadedSquad[] = [minimalSquad]
     //#when

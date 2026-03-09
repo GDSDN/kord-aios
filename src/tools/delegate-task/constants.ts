@@ -548,5 +548,8 @@ export const PLAN_AGENT_NAMES = ["plan", "planner"]
 export function isPlanAgent(agentName: string | undefined): boolean {
   if (!agentName) return false
   const lowerName = agentName.toLowerCase().trim()
-  return PLAN_AGENT_NAMES.some(name => lowerName === name || lowerName.includes(name))
+  // Exact match only.
+  // We intentionally do NOT use substring matching here because agents like
+  // "plan-analyzer" / "plan-reviewer" must remain distinct from the plan agent.
+  return PLAN_AGENT_NAMES.includes(lowerName)
 }

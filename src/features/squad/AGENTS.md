@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-Squads are portable, reusable agent team configurations. A squad brings domain-specialized agents, task categories, skill references, plan templates, and delegation targets — all defined in a single `SQUAD.yaml` manifest. The squad system handles discovery, validation, loading, and injection into agent prompts.
+Squads are portable, reusable orchestration-aware domain packages. A squad brings domain-specialized agents, package assets (workflows/tasks/templates/checklists/scripts/data), skill references, orchestration metadata, plan templates, and delegation targets — all defined in a single `SQUAD.yaml` manifest. The squad system handles discovery, validation, loading, and injection into agent prompts/runtime.
 
 ## STRUCTURE
 ```
@@ -38,11 +38,15 @@ agents:                      # Required, map of agent-name → agent-def
     temperature: 0.7                      # 0-1
     is_chief: false                       # If true, can delegate via task()
 
-categories:                  # Optional, domain-specific task routing
-  content:
-    description: "Content creation tasks"
-    model: google/gemini-3-pro
-    variant: fast
+components:                  # Optional package assets
+  workflows: ["workflows/main.yaml"]
+  tasks: ["tasks/create-campaign.md"]
+  templates: ["templates/brief.md"]
+
+orchestration:               # Optional shared workflow-engine metadata
+  runner: workflow-engine
+  delegation_mode: chief
+  entry_workflow: marketing-campaign
 
 default_executor: content-writer    # Fallback agent for task execution
 default_reviewer: editor            # Fallback agent for task review
@@ -143,7 +147,7 @@ The factory function `createSquadAgentConfig()` performs this assembly:
 | Squad name | `marketing` | kebab-case identifier |
 | YAML key | `copywriter` | Original agent key in SQUAD.yaml |
 | Runtime name | `squad-marketing-copywriter` | Full delegation target |
-| Category | `marketing:creative` | Namespaced routing |
+| Runtime alias | `marketing:marketing-campaign` | Namespaced workflow alias |
 
 ### Chief vs Worker Behavior
 
@@ -167,25 +171,25 @@ See `l2-squad-integration.test.ts` for end-to-end verification:
 
 ### Discovery Order
 ```
-1. Built-in squads: src/features/builtin-squads/{squad-name}/SQUAD.yaml
+1. .opencode/squads/{squad-name}/SQUAD.yaml
    ↓
-2. .opencode/squads/{squad-name}/SQUAD.yaml
+2. .kord/squads/{squad-name}/SQUAD.yaml
    ↓
-3. .kord/squads/{squad-name}/SQUAD.yaml
+3. docs/kord/squads/{squad-name}/SQUAD.yaml
    ↓
-4. docs/kord/squads/{squad-name}/SQUAD.yaml
+4. {OpenCodeConfigDir}/squads/{squad-name}/SQUAD.yaml
 ```
 
-**Dedup rule**: First-seen squad name wins. Built-in squads can be overridden by user squads with the same name.
+**Dedup rule**: First-seen squad name wins across user-controlled locations.
 
 ### Load Process
 ```
 loadAllSquads(projectDir)
   ↓
-  loadSquadsFromDir(BUILTIN_SQUADS_DIR, "builtin")
   loadSquadsFromDir(".opencode/squads", "user")
   loadSquadsFromDir(".kord/squads", "user")
   loadSquadsFromDir("docs/kord/squads", "user")
+  loadSquadsFromDir("{OpenCodeConfigDir}/squads", "user")
     ↓ for each {squad-name}/SQUAD.yaml
     parseSquadYaml(content) → squadSchema.safeParse()
     resolvePromptFiles(manifest, squadDir) → reads .md files
@@ -197,7 +201,7 @@ loadAllSquads(projectDir)
 ```typescript
 interface LoadedSquad {
   manifest: SquadManifest      // Validated SQUAD.yaml
-  source: "builtin" | "user"   // Where it came from
+  source: "user"              // Loaded from project/global user-controlled paths
   basePath: string             // Absolute path to squad directory
   resolvedPrompts: Record<string, string>  // agent-name → prompt content
 }
@@ -209,16 +213,16 @@ interface LoadedSquad {
 |----------|---------|
 | `createSquadAgentConfig(name, agentDef, squadName, resolvedPrompts)` | Converts a `SquadAgent` → OpenCode `AgentConfig` with resolved prompt |
 | `getSquadAgents(squads)` | Extracts all agents from loaded squads for prompt injection |
-| `getSquadCategories(squads)` | Extracts all categories (prefixed `{squad}:{category}`) |
-| `buildSquadPromptSection(squads)` | Generates markdown section injected into Kord's SystemAwareness |
+| `buildSquadPromptSection(squads)` | Generates markdown section injected into Kord's SystemAwareness with package/orchestration hints |
 | `createAllSquadAgentConfigs(squads)` | Batch creates all AgentConfigs from loaded squads |
 
 ### Prompt Section Output
 `buildSquadPromptSection()` generates:
 1. **Available Squads** table (squad name, domain, prefixed agents, prefixed chief)
 2. **How to Delegate** — `task(subagent_type="squad-{squad}-{agent}")` syntax per agent
-3. **Squad Categories** — `task(category="squad:category")` routing
-4. **Squad Skills** — skills per squad
+3. **Squad Package Assets** — workflows/tasks/templates/checklists/scripts/data counts
+4. **Squad Orchestration** — runner, delegation mode, entry workflow
+5. **Squad Skills** — skills per squad
 
 This section is injected into Kord's `<SystemAwareness>` prompt in `src/agents/kord.ts`.
 
@@ -241,7 +245,12 @@ This section is injected into Kord's `<SystemAwareness>` prompt in `src/agents/k
 Squads can be validated at runtime via `src/tools/squad-validate/`:
 - Schema validation (Zod)
 - Kebab-case name enforcement
+- categories rejection (deprecated for squads)
 - prompt_file existence check
+- package component file existence checks
+- workflow component schema + engine rule checks
+- skill existence checks across builtin/project/global skill sources
+- orchestration metadata coherence checks
 - default_executor/reviewer reference validation
 - Chief agent delegation warnings
 
@@ -254,5 +263,5 @@ Invoked via `squad_validate` tool or automatically by `/squad-create` command.
 - **Agents as record array**: Agents are a `Record<string, SquadAgent>` (keyed by name), NOT an array
 - **Missing prompt resolution**: Always pass `resolvedPrompts` to `createSquadAgentConfig()` — the prompt_file content won't appear otherwise
 - **Wrong prompt key**: `resolvedPrompts` must use original YAML key, not prefixed runtime agent name
-- **Category naming**: Categories are namespaced as `{squad}:{category}` — never use bare category names for squad categories
+- **Category routing for squads**: Deprecated/invalid — squads are teams coordinated by chiefs
 - **Bare delegation names**: Never delegate with unprefixed `task(subagent_type="agent")` for squad agents

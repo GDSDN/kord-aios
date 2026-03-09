@@ -285,6 +285,97 @@ describe("findRuleFiles", () => {
     });
   });
 
+  describe(".kord/instructions/ discovery (new location)", () => {
+    it("should discover .kord/instructions/ files", () => {
+      // given .kord/instructions/ directory (new location)
+      const rulesDir = join(TEST_DIR, ".kord", "instructions");
+      mkdirSync(rulesDir, { recursive: true });
+      writeFileSync(join(rulesDir, "project.md"), "Project rules");
+
+      const currentFile = join(TEST_DIR, "index.ts");
+      writeFileSync(currentFile, "code");
+
+      // when finding rules
+      const candidates = findRuleFiles(TEST_DIR, homeDir, currentFile);
+
+      // then should find kord rules
+      const paths = candidates.map((c) => c.path);
+      expect(paths.some((p) => p.includes(join(".kord", "instructions")))).toBe(true);
+    });
+
+    it("should discover .sisyphus/rules/ files (legacy alias)", () => {
+      // given .sisyphus/rules/ directory (legacy alias)
+      const rulesDir = join(TEST_DIR, ".sisyphus", "rules");
+      mkdirSync(rulesDir, { recursive: true });
+      writeFileSync(join(rulesDir, "legacy.md"), "Legacy rules");
+
+      const currentFile = join(TEST_DIR, "index.ts");
+      writeFileSync(currentFile, "code");
+
+      // when finding rules
+      const candidates = findRuleFiles(TEST_DIR, homeDir, currentFile);
+
+      // then should find sisyphus rules
+      const paths = candidates.map((c) => c.path);
+      expect(paths.some((p) => p.includes(join(".sisyphus", "rules")))).toBe(true);
+    });
+
+    it(".kord/instructions/ should take precedence over .claude/rules/", () => {
+      // given both .kord/instructions/ and .claude/rules/ with same-named files
+      const kordRules = join(TEST_DIR, ".kord", "instructions");
+      const claudeRules = join(TEST_DIR, ".claude", "rules");
+      mkdirSync(kordRules, { recursive: true });
+      mkdirSync(claudeRules, { recursive: true });
+      writeFileSync(join(kordRules, "test.md"), "Kord rules");
+      writeFileSync(join(claudeRules, "test.md"), "Claude rules");
+
+      const currentFile = join(TEST_DIR, "index.ts");
+      writeFileSync(currentFile, "code");
+
+      // when finding rules
+      const candidates = findRuleFiles(TEST_DIR, homeDir, currentFile);
+
+      // then .kord/instructions/ should be found first (lower distance)
+      const kordCandidate = candidates.find((c) =>
+        c.path.includes(join(".kord", "instructions", "test.md"))
+      );
+      const claudeCandidate = candidates.find((c) =>
+        c.path.includes(join(".claude", "rules", "test.md"))
+      );
+
+      expect(kordCandidate).toBeDefined();
+      expect(claudeCandidate).toBeDefined();
+      // Both are at distance 0 from project root, but .kord/instructions is checked first
+      // So the first one in the array should be from .kord/instructions
+      const firstTestMd = candidates.find((c) => c.path.endsWith("test.md"));
+      expect(firstTestMd?.path).toContain(join(".kord", "instructions"));
+    });
+
+    it(".kord/instructions/ should take precedence over docs/kord/rules/", () => {
+      // given both .kord/instructions/ and docs/kord/rules/
+      const kordRules = join(TEST_DIR, ".kord", "instructions");
+      const docsRules = join(TEST_DIR, "docs/kord", "rules");
+      mkdirSync(kordRules, { recursive: true });
+      mkdirSync(docsRules, { recursive: true });
+      writeFileSync(join(kordRules, "guide.md"), "Kord guide");
+      writeFileSync(join(docsRules, "guide.md"), "Docs guide");
+
+      const currentFile = join(TEST_DIR, "index.ts");
+      writeFileSync(currentFile, "code");
+
+      // when finding rules
+      const candidates = findRuleFiles(TEST_DIR, homeDir, currentFile);
+
+      // then .kord/instructions/ should be found first
+      const guideCandidates = candidates.filter((c) =>
+        c.path.endsWith("guide.md")
+      );
+      expect(guideCandidates.length).toBe(2);
+      // The first guide.md should be from .kord/instructions
+      expect(guideCandidates[0].path).toContain(join(".kord", "instructions"));
+    });
+  });
+
   describe("user-level rules", () => {
     it("should discover user-level .claude/rules/ files", () => {
       // given user-level rules

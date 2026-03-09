@@ -43,9 +43,9 @@ const writePathsSchema = z
  *
  * Squads bring:
  * 1. Agents — domain-specialized personas
- * 2. Categories — domain-specific task routing
+ * 2. Package assets — workflows, tasks, templates, checklists, scripts, data
  * 3. Skills — domain methodology (referenced by name)
- * 4. Plan template — domain-specific plan format
+ * 4. Orchestration metadata — shared workflow-engine integration hints
  * 5. Default executor/reviewer — fallback delegation targets
  */
 
@@ -75,15 +75,44 @@ export const squadAgentSchema = z.object({
   write_paths: writePathsSchema.optional(),
 })
 
-/** Category definition within a squad */
-export const squadCategorySchema = z.object({
-  /** Model for this category */
-  model: z.string().optional(),
-  /** What this category handles */
-  description: z.string(),
-  /** Model variant */
-  variant: z.string().optional(),
+const squadAssetListSchema = z.array(z.string().min(1)).optional()
+
+/** Package components declared by a squad manifest */
+export const squadComponentsSchema = z.object({
+  /** Task definitions owned by this squad */
+  tasks: squadAssetListSchema,
+  /** Workflow definitions owned by this squad */
+  workflows: squadAssetListSchema,
+  /** Reusable templates owned by this squad */
+  templates: squadAssetListSchema,
+  /** Validation checklists owned by this squad */
+  checklists: squadAssetListSchema,
+  /** Script assets owned by this squad */
+  scripts: squadAssetListSchema,
+  /** Data/knowledge assets owned by this squad */
+  data: squadAssetListSchema,
+}).optional()
+
+export const squadSubteamSchema = z.object({
+  /** Referenced squad name */
+  squad: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "Squad name must be kebab-case"),
+  /** Optional chief key expected in that squad */
+  chief: z.string().optional(),
+  /** Optional purpose statement */
+  purpose: z.string().optional(),
 })
+
+/** Orchestration metadata for shared workflow engine integration */
+export const squadOrchestrationSchema = z.object({
+  /** Integration runner. Currently shared workflow engine only. */
+  runner: z.literal("workflow-engine").default("workflow-engine"),
+  /** Optional entry workflow id for this squad package */
+  entry_workflow: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "entry_workflow must be kebab-case").optional(),
+  /** Delegation mode semantics for squad orchestration */
+  delegation_mode: z.enum(["chief", "hybrid"]).default("chief"),
+  /** Optional subteam wiring for team-of-teams composition */
+  subteams: z.array(squadSubteamSchema).optional(),
+}).optional()
 
 /** Squad config section (v2) */
 export const squadConfigSchema = z.object({
@@ -119,8 +148,11 @@ export const squadSchema = z.object({
   /** Named agents in this squad */
   agents: z.record(z.string(), squadAgentSchema),
 
-  /** Domain-specific task categories */
-  categories: z.record(z.string(), squadCategorySchema).optional(),
+  /** Package assets owned by this squad */
+  components: squadComponentsSchema,
+
+  /** Shared workflow-engine orchestration metadata */
+  orchestration: squadOrchestrationSchema,
 
   /** Default agent for task execution */
   default_executor: z.string().optional(),
@@ -144,7 +176,9 @@ export const squadSchema = z.object({
 
 export type SquadManifest = z.infer<typeof squadSchema>
 export type SquadAgent = z.infer<typeof squadAgentSchema>
-export type SquadCategory = z.infer<typeof squadCategorySchema>
+export type SquadComponents = z.infer<typeof squadComponentsSchema>
+export type SquadOrchestration = z.infer<typeof squadOrchestrationSchema>
+export type SquadSubteam = z.infer<typeof squadSubteamSchema>
 export type SquadConfig = z.infer<typeof squadConfigSchema>
 export type SquadDependencies = z.infer<typeof squadDependenciesSchema>
 export type SquadKord = z.infer<typeof squadKordSchema>

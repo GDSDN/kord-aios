@@ -2,19 +2,22 @@
 
 ## OVERVIEW
 
-CLI entry: `bunx kord-aios`. 5 commands with Commander.js + @clack/prompts TUI.
+CLI entry: `bunx kord-aios`. 6 commands with Commander.js + @clack/prompts TUI.
 
-**Commands**: install (interactive setup), doctor (14 health checks), run (session launcher), get-local-version, mcp-oauth
+**Commands**: install, init, doctor, run, get-local-version, status, mcp-oauth, version
 
 ## STRUCTURE
 
 ```
 cli/
-├── index.ts              # Commander.js entry (5 commands)
-├── install.ts            # Interactive TUI (542 lines)
+├── index.ts              # Commander.js entry (8 commands)
+├── banner.ts             # Shared banner utility
+├── install.ts            # Interactive TUI (737 lines)
 ├── config-manager.ts     # JSONC parsing (667 lines)
 ├── model-fallback.ts     # Model fallback configuration
 ├── types.ts              # InstallArgs, InstallConfig
+├── status/
+│   └── index.ts          # Project status command
 ├── doctor/
 │   ├── index.ts          # Doctor entry
 │   ├── runner.ts         # Check orchestration
@@ -44,10 +47,13 @@ cli/
 | Command | Purpose |
 |---------|---------|
 | `install` | Interactive setup with provider selection |
+| `init` | Initialize Kord AIOS project structure |
 | `doctor` | 14 health checks for diagnostics |
 | `run` | Launch session with todo enforcement |
 | `get-local-version` | Version detection and update check |
+| `status` | Show project status (mode, stage, configuration) |
 | `mcp-oauth` | MCP OAuth authentication flow |
+| `version` | Show version information |
 
 ## DOCTOR CATEGORIES (14 Checks)
 
@@ -71,6 +77,20 @@ cli/
 - **@clack/prompts**: `select()`, `spinner()`, `intro()`, `outro()`
 - **picocolors**: Terminal colors for status and headers
 - **Symbols**: ✓ (pass), ✗ (fail), ⚠ (warn), ℹ (info)
+
+## SCAFFOLDED TEMPLATES
+
+The CLI scaffolds 13 template files into `.kord/templates/`:
+
+| Template Files | Checklist Files |
+|----------------|-----------------|
+| story.md | checklist-story-draft.md |
+| adr.md | checklist-story-dod.md |
+| prd.md | checklist-pr-review.md |
+| epic.md | checklist-architect.md |
+| task.md | checklist-pre-push.md |
+| qa-gate.md | checklist-self-critique.md |
+| qa-report.md | |
 
 ## ANTI-PATTERNS
 

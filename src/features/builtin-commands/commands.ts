@@ -1,6 +1,7 @@
 import type { CommandDefinition } from "../claude-code-command-loader"
 import type { BuiltinCommandName, BuiltinCommands } from "./types"
 import { INIT_DEEP_TEMPLATE } from "./templates/init-deep"
+import { CREATE_WORKFLOW_TEMPLATE } from "./templates/create-workflow"
 import { RALPH_LOOP_TEMPLATE, CANCEL_RALPH_TEMPLATE } from "./templates/ralph-loop"
 import { STOP_CONTINUATION_TEMPLATE } from "./templates/stop-continuation"
 import { REFACTOR_TEMPLATE } from "./templates/refactor"
@@ -11,6 +12,7 @@ import { SQUAD_TEMPLATE } from "./templates/squad"
 import { SQUAD_CREATE_TEMPLATE } from "./templates/squad-create"
 import { GIT_COMMIT_TEMPLATE } from "./templates/git-commit"
 import { GIT_CREATE_PR_TEMPLATE } from "./templates/git-create-pr"
+import { WORKFLOW_TEMPLATE } from "./templates/workflow"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -23,6 +25,17 @@ ${INIT_DEEP_TEMPLATE}
 $ARGUMENTS
 </user-request>`,
     argumentHint: "[--create-new] [--max-depth=N]",
+  },
+  "create-workflow": {
+    description: "(builtin) Route to workflow runtime creation path",
+    template: `<command-instruction>
+${CREATE_WORKFLOW_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+    argumentHint: "<workflow-id>",
   },
    "ralph-loop": {
      description: "(builtin) Start self-referential development loop until completion",
@@ -138,6 +151,22 @@ ${GIT_CREATE_PR_TEMPLATE}
 $ARGUMENTS
 </user-request>`,
     argumentHint: "[<base-branch>] [--title=\"...\"]",
+  },
+  workflow: {
+    description: "(builtin) Execute workflow runtime actions and lifecycle",
+    template: `<command-instruction>
+${WORKFLOW_TEMPLATE}
+</command-instruction>
+
+<workflow-context>
+Session ID: $SESSION_ID
+Timestamp: $TIMESTAMP
+</workflow-context>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+    argumentHint: "list | validate <id> | <id> | continue <id> | pause <id> | abort <id> | status | create <id>",
   },
 }
 

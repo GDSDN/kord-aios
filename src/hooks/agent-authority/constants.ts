@@ -40,5 +40,5 @@ export const DEFAULT_AGENT_ALLOWLIST: Record<string, string[]> = {
     "**/design-tokens/**",
     "**/components/**/*.tsx",
   ],
-  "squad-creator": [".opencode/squads/**"],
+  "squad-creator": [".opencode/squads/**", ".kord/squads/**"],
 }

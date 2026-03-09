@@ -466,9 +466,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         : {};
 
       const planDemoteConfig = shouldDemotePlan
-           ? { mode: "subagent" as const
-         }
-       : undefined;
+        ? { mode: "subagent" as const, hidden: true }
+        : undefined;
 
       // Reuse squads loaded earlier, convert to agent configs
       const squadAgentConfigs = createAllSquadAgentConfigs(squadLoadResult.squads);

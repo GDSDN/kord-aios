@@ -91,6 +91,45 @@ agents:
 contract_type: story
 `
 
+const WITH_DEPRECATED_CATEGORIES = `
+name: legacy-squad
+description: Legacy format
+agents:
+  worker:
+    description: "Works"
+categories:
+  legacy:
+    description: "Deprecated"
+`
+
+const WITH_MISSING_SKILL = `
+name: skill-squad
+description: Skill test
+agents:
+  worker:
+    description: "Works"
+    skills:
+      - definitely-missing-skill
+`
+
+const WITH_COMPONENTS = `
+name: package-squad
+description: Package test
+agents:
+  chief:
+    description: "Chief"
+    is_chief: true
+components:
+  workflows:
+    - workflows/main.yaml
+  tasks:
+    - tasks/do.md
+orchestration:
+  runner: workflow-engine
+  delegation_mode: chief
+  entry_workflow: package-squad-main
+`
+
 describe("squad_validate", () => {
   let testDir: string
 
@@ -236,7 +275,52 @@ contract_type: story
       //#then
       expect(result.warnings.some(w => w.includes("default_executor"))).toBe(true)
     })
-  })
+
+    test("deprecated categories are rejected", () => {
+      //#when
+      const result = validateSquadManifest(WITH_DEPRECATED_CATEGORIES, testDir)
+
+      //#then
+      expect(result.valid).toBe(false)
+      expect(result.errors.some(e => e.includes("categories are not supported"))).toBe(true)
+    })
+
+    test("component references must exist", () => {
+      //#when
+      const result = validateSquadManifest(WITH_COMPONENTS, testDir)
+
+      //#then
+      expect(result.valid).toBe(false)
+      expect(result.errors.some(e => e.includes("Component \"workflows\""))).toBe(true)
+      expect(result.errors.some(e => e.includes("Component \"tasks\""))).toBe(true)
+    })
+
+    test("workflow component validates schema and id warning", () => {
+      //#given
+      const workflowDir = join(testDir, "workflows")
+      const tasksDir = join(testDir, "tasks")
+      mkdirSync(workflowDir, { recursive: true })
+      mkdirSync(tasksDir, { recursive: true })
+      writeFileSync(join(tasksDir, "do.md"), "# do")
+      writeFileSync(join(workflowDir, "main.yaml"), `schema_version: "1"
+workflow:
+  id: generic-id
+  name: Generic
+  version: "1.0.0"
+sequence:
+  - id: kickoff
+    intent: interview
+`)
+
+      //#when
+      const result = validateSquadManifest(WITH_COMPONENTS, testDir)
+
+      //#then
+      expect(result.errors).toHaveLength(0)
+      expect(result.warnings.some(w => w.includes("should be prefixed with \"package-squad-\""))).toBe(true)
+      expect(result.warnings.some(w => w.includes("entry_workflow"))).toBe(true)
+    })
+    })
 
   describe("createSquadValidateTool", () => {
     test("validates squad by name", async () => {
@@ -279,6 +363,29 @@ contract_type: story
       //#then
       expect(parsed.valid).toBe(false)
       expect(parsed.errors[0]).toContain("not found")
+    })
+
+    test("reports missing referenced skills", async () => {
+      //#given
+      const squadDir = join(testDir, ".opencode", "squads", "skill-squad")
+      mkdirSync(squadDir, { recursive: true })
+      writeFileSync(join(squadDir, "SQUAD.yaml"), WITH_MISSING_SKILL)
+
+      const tool = createSquadValidateTool({ directory: testDir } as any)
+      const toolContext = {
+        sessionID: "test-session",
+        messageID: "test-message",
+        agent: "test-agent",
+        abort: new AbortController().signal,
+      }
+
+      //#when
+      const result = await tool.execute({ squad_name: "skill-squad" }, toolContext as any)
+      const parsed = JSON.parse(result)
+
+      //#then
+      expect(parsed.valid).toBe(false)
+      expect(parsed.errors.some((e: string) => e.includes("Skill \"definitely-missing-skill\" not found"))).toBe(true)
     })
   })
 })

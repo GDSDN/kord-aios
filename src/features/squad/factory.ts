@@ -1,5 +1,5 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { SquadManifest, SquadAgent, SquadCategory } from "./schema"
+import type { SquadManifest, SquadAgent } from "./schema"
 import type { LoadedSquad } from "./loader"
 import { CHIEF_COORDINATION_TEMPLATE } from "./chief-template"
 import { convertAgentFallbackSlots } from "../../shared/agent-fallback"
@@ -112,14 +112,6 @@ export interface SquadAvailableAgent {
   isChief: boolean
 }
 
-/** Squad category entry for prompt builder injection */
-export interface SquadAvailableCategory {
-  name: string
-  description: string
-  squadName: string
-  model?: string
-}
-
 /**
  * Creates an AgentConfig from a squad agent definition.
  * Squad agents are registered as subagents that can be invoked via task(subagent_type=...).
@@ -211,31 +203,8 @@ export function getSquadAgents(squads: LoadedSquad[]): SquadAvailableAgent[] {
 }
 
 /**
- * Extracts squad category entries from loaded squads for prompt builder injection.
- */
-export function getSquadCategories(squads: LoadedSquad[]): SquadAvailableCategory[] {
-  const categories: SquadAvailableCategory[] = []
-
-  for (const { manifest } of squads) {
-    if (!manifest.categories) continue
-
-    const catEntries = Object.entries(manifest.categories) as [string, SquadCategory][]
-    for (const [name, catDef] of catEntries) {
-      categories.push({
-        name: `${manifest.name}:${name}`,
-        description: `(${manifest.name} squad) ${catDef.description}`,
-        squadName: manifest.name,
-        model: catDef.model,
-      })
-    }
-  }
-
-  return categories
-}
-
-/**
  * Builds a prompt section describing available squads for injection into Kord's system prompt.
- * Includes delegation syntax, category routing, and skills.
+ * Includes delegation syntax, package assets, and skills.
  */
 export function buildSquadPromptSection(squads: LoadedSquad[]): string {
   if (squads.length === 0) return ""
@@ -272,24 +241,6 @@ export function buildSquadPromptSection(squads: LoadedSquad[]): string {
     }
   }
 
-  // Category routing
-  const hasCategories = squads.some(({ manifest }) => manifest.categories && Object.keys(manifest.categories).length > 0)
-  if (hasCategories) {
-    lines.push("")
-    lines.push("### Squad Categories")
-    lines.push("")
-    lines.push("Use `task(category=...)` for domain-specific routing:")
-    lines.push("")
-
-    for (const { manifest } of squads) {
-      if (!manifest.categories) continue
-      const catEntries = Object.entries(manifest.categories) as [string, SquadCategory][]
-      for (const [name, catDef] of catEntries) {
-        lines.push(`- \`task(category="${manifest.name}:${name}")\` — ${catDef.description}`)
-      }
-    }
-  }
-
   // Skills per squad
   const hasSkills = squads.some(({ manifest }) => {
     const agentEntries = Object.entries(manifest.agents) as [string, SquadAgent][]
@@ -307,6 +258,55 @@ export function buildSquadPromptSection(squads: LoadedSquad[]): string {
         const unique = [...new Set(allSkills)]
         lines.push(`- **${manifest.name}**: ${unique.join(", ")}`)
       }
+    }
+  }
+
+  const hasComponents = squads.some(({ manifest }) => {
+    const components = manifest.components
+    return !!components && [
+      components.workflows,
+      components.tasks,
+      components.templates,
+      components.checklists,
+      components.scripts,
+      components.data,
+    ].some((entries) => Array.isArray(entries) && entries.length > 0)
+  })
+
+  if (hasComponents) {
+    lines.push("")
+    lines.push("### Squad Package Assets")
+    lines.push("")
+
+    for (const { manifest } of squads) {
+      const components = manifest.components
+      if (!components) continue
+
+      const parts: string[] = []
+      if (components.workflows?.length) parts.push(`workflows(${components.workflows.length})`)
+      if (components.tasks?.length) parts.push(`tasks(${components.tasks.length})`)
+      if (components.templates?.length) parts.push(`templates(${components.templates.length})`)
+      if (components.checklists?.length) parts.push(`checklists(${components.checklists.length})`)
+      if (components.scripts?.length) parts.push(`scripts(${components.scripts.length})`)
+      if (components.data?.length) parts.push(`data(${components.data.length})`)
+
+      if (parts.length > 0) {
+        lines.push(`- **${manifest.name}**: ${parts.join(", ")}`)
+      }
+    }
+  }
+
+  const hasOrchestration = squads.some(({ manifest }) => !!manifest.orchestration)
+  if (hasOrchestration) {
+    lines.push("")
+    lines.push("### Squad Orchestration")
+    lines.push("")
+
+    for (const { manifest } of squads) {
+      const orchestration = manifest.orchestration
+      if (!orchestration) continue
+      const entry = orchestration.entry_workflow ? `entry=${orchestration.entry_workflow}` : "entry=none"
+      lines.push(`- **${manifest.name}**: runner=${orchestration.runner}; mode=${orchestration.delegation_mode}; ${entry}`)
     }
   }
 

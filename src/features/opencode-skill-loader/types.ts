@@ -15,6 +15,7 @@ export interface SkillMetadata {
   metadata?: Record<string, string>
   "allowed-tools"?: string | string[]
   mcp?: SkillMcpConfig
+  template?: string
 }
 
 export interface LazyContentLoader {
@@ -35,4 +36,5 @@ export interface LoadedSkill {
   allowedTools?: string[]
   mcpConfig?: SkillMcpConfig
   lazyContent?: LazyContentLoader
+  templateRef?: string
 }

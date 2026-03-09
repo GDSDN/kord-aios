@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-Pre-packaged squad definitions shipped with the plugin. These provide default agent teams that users get out-of-the-box. Currently contains the `code` squad for development workflows.
+Pre-packaged squad seed definitions shipped with the plugin. These are L3 content seeds exported by `init`/`extract` into user-controlled squad directories. Currently contains the `code` squad seed for development workflows.
 
 ## STRUCTURE
 ```
@@ -13,22 +13,20 @@ builtin-squads/
 
 ## THE CODE SQUAD
 
-The `code` squad is the built-in development team (`src/features/builtin-squads/code/SQUAD.yaml`). It provides:
+The `code` squad seed (`src/features/builtin-squads/code/SQUAD.yaml`) provides:
+- **chief** agent — orchestrates the squad and delegates to workers
 - **developer** agent — implementation specialist for code, tests, and bug fixes
-- Development categories for task routing (`quick`, `visual`, `ultrabrain`, `artistry`)
 
-This squad is loaded automatically by `src/features/squad/loader.ts` on every startup.
+This seed is exported into project/global squad directories and then loaded from there at runtime.
 
-## LOAD PRIORITY
+## RUNTIME CONTRACT
 
 ```
-1. Built-in squads (this directory) — loaded FIRST
-2. .opencode/squads/ — user overrides
-3. .kord/squads/ — user overrides
-4. docs/kord/squads/ — user overrides
+1. Project/local squads (`.opencode/squads/`, `.kord/squads/`, `docs/kord/squads/`)
+2. Global squads (`{OpenCodeConfigDir}/squads/`)
 ```
 
-**Dedup rule**: First-seen name wins. Since built-in loads first, a user squad with the same name (e.g., `code`) will NOT override the built-in. To switch behavior, use `squad.default_squad` config or a differently-named squad.
+`src/features/builtin-squads/**` is not a runtime load source.
 
 ## HOW TO ADD A NEW BUILT-IN SQUAD
 
@@ -44,21 +42,25 @@ agents:
     mode: subagent
     prompt: "System prompt for this agent..."
     skills: []
-categories:
-  my-category:
-    description: "Category description"
+
+components:
+  workflows: ["workflows/main.yaml"]
+
+orchestration:
+  runner: workflow-engine
+  delegation_mode: chief
 ```
 3. Optional: Add `prompt_file` references to external `.md` files in the same directory
-4. The loader discovers it automatically — no code changes needed
-5. Test: `bun test squad.test` to verify loading
+4. Ensure `init`/`extract` exports the seed into user directories
+5. Test export + load behavior via CLI/squad tests
 
 ## SQUAD.YAML v2 REFERENCE
 
-See `src/features/squad/AGENTS.md` for the complete schema reference including all fields, agent schema, category schema, and validation rules.
+See `src/features/squad/AGENTS.md` for the complete schema reference including all fields, package/orchestration sections, and validation rules.
 
 ## ANTI-PATTERNS
 
 - **Giant squads**: Keep built-in squads focused on a single domain
-- **Hardcoded models**: Use model field only when a specific model is essential — let category resolution handle it otherwise
+- **Hardcoded models**: Use model field only when a specific model is essential
 - **v1 format**: Never use `config.yaml`, `pack_name`, or array-based agent definitions
-- **Missing descriptions**: Every agent and category MUST have a description — it's shown in the prompt section
+- **Missing descriptions**: Every agent MUST have a description — it's shown in the prompt section

@@ -16,12 +16,27 @@ const maybeTest = HAS_TSLS ? test : ((title: string, fn: any) => (test as any).s
 const lspTest = HAS_TSLS ? test : ((title: string, fn: any) => (test as any).skip(title, fn))
 // Guarded alias for a diagnostics-related test placeholder (no-op when TSLS is unavailable)
 const lspDiagnosticsTest = HAS_TSLS ? test : ((title: string, fn: any) => (test as any).skip(title, fn))
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
+import { execSync } from "node:child_process"
 import { init } from "./index"
 import { KORD_DIR, KORD_DOCS_DIR, KORD_RULES_FILE } from "../project-layout"
+import { resetConfigContext } from "../config-manager"
 
 const TEST_DIR = resolve(__dirname, "__test_init__")
+const APPROVED_T2_AGENT_FILES = [
+  "pm.md",
+  "po.md",
+  "sm.md",
+  "qa.md",
+  "devops.md",
+  "data-engineer.md",
+  "ux-design-expert.md",
+  "squad-creator.md",
+  "analyst.md",
+  "plan-analyzer.md",
+  "plan-reviewer.md",
+]
 
 describe("init", () => {
   beforeEach(() => {
@@ -57,6 +72,19 @@ describe("init", () => {
     expect(existsSync(join(TEST_DIR, KORD_DOCS_DIR, "notepads"))).toBe(true)
   })
 
+  test("creates all expected docs/kord/ output directories (plans, stories, epics, prds)", async () => {
+    //#given - empty project directory
+
+    //#when
+    await init({ directory: TEST_DIR })
+
+    //#then - The init-delivery contract: all output directories must exist
+    expect(existsSync(join(TEST_DIR, KORD_DOCS_DIR, "plans"))).toBe(true)
+    expect(existsSync(join(TEST_DIR, KORD_DOCS_DIR, "stories"))).toBe(true)
+    expect(existsSync(join(TEST_DIR, KORD_DOCS_DIR, "epics"))).toBe(true)
+    expect(existsSync(join(TEST_DIR, KORD_DOCS_DIR, "prds"))).toBe(true)
+  })
+
   test("creates template files", async () => {
     //#given - empty project directory
 
@@ -72,6 +100,34 @@ describe("init", () => {
 
     const adr = readFileSync(join(TEST_DIR, KORD_DIR, "templates", "adr.md"), "utf-8")
     expect(adr).toContain("Context")
+  })
+
+  test("creates exactly 7 template files under .kord/templates/", async () => {
+    //#given - empty project directory
+
+    //#when
+    await init({ directory: TEST_DIR })
+
+    //#then - The init-delivery contract: 7 templates must exist
+    const templatesDir = join(TEST_DIR, KORD_DIR, "templates")
+    const expectedTemplates = [
+      "story.md",
+      "adr.md",
+      "prd.md",
+      "epic.md",
+      "task.md",
+      "qa-gate.md",
+      "qa-report.md",
+    ]
+
+    for (const template of expectedTemplates) {
+      expect(existsSync(join(templatesDir, template))).toBe(true)
+    }
+
+    // Verify exactly 7 files (not more, not less)
+    const { readdirSync } = await import("node:fs")
+    const files = readdirSync(templatesDir).filter((f) => f.endsWith(".md"))
+    expect(files).toHaveLength(7)
   })
 
   test("creates kord-rules.md at project root", async () => {
@@ -215,6 +271,37 @@ describe("init", () => {
     expect(result.scaffold.created).toHaveLength(0)
   })
 
+  test("init is non-destructive idempotent - running twice without force preserves user edits", async () => {
+    //#given - scaffold project first
+    await init({ directory: TEST_DIR })
+
+    // Modify a template file to detect non-destruction
+    const storyPath = join(TEST_DIR, KORD_DIR, "templates", "story.md")
+    const originalContent = readFileSync(storyPath, "utf-8")
+    const userEdit = "USER CUSTOM CONTENT"
+    writeFileSync(storyPath, userEdit, "utf-8")
+
+    // Also modify an output directory file
+    const plansDir = join(TEST_DIR, KORD_DOCS_DIR, "plans")
+    const userNotePath = join(plansDir, "user-note.md")
+    writeFileSync(userNotePath, "My custom note", "utf-8")
+
+    //#when - init again WITHOUT force
+    const result = await init({ directory: TEST_DIR, force: false })
+
+    //#then - user edits should be PRESERVED (non-destructive)
+    const preservedStoryContent = readFileSync(storyPath, "utf-8")
+    expect(preservedStoryContent).toBe(userEdit) // Should NOT be overwritten
+
+    const preservedUserNote = readFileSync(userNotePath, "utf-8")
+    expect(preservedUserNote).toBe("My custom note") // Should NOT be deleted
+
+    // Second run should succeed
+    expect(result.success).toBe(true)
+    expect(result.scaffold.created).toHaveLength(0) // Nothing new created
+    expect(result.scaffold.skipped.length).toBeGreaterThan(0) // Everything skipped
+  })
+
   test("exports code squad to .kord/squads/code/", async () => {
     //#given - empty project directory
 
@@ -275,5 +362,277 @@ describe("init", () => {
       // If diagnostics call fails, keep test green in this environment
       expect(true).toBe(true)
     }
+  })
+
+  test("init exports only approved T2 agents to .opencode/agents and exports skills", async () => {
+    //#given - empty project directory
+
+    //#when
+    const result = await init({ directory: TEST_DIR })
+
+    //#then - curated agent export should include exactly the approved T2 set
+    const agentsDir = join(TEST_DIR, ".opencode", "agents")
+    expect(result.agentExport.success).toBe(true)
+    expect(existsSync(agentsDir)).toBe(true)
+
+    const exportedAgents = readdirSync(agentsDir).filter((file) => file.endsWith(".md")).sort()
+    expect(exportedAgents).toEqual([...APPROVED_T2_AGENT_FILES].sort())
+
+    expect(exportedAgents).not.toContain("kord.md")
+    expect(exportedAgents).not.toContain("dev.md")
+    expect(exportedAgents).not.toContain("builder.md")
+    expect(exportedAgents).not.toContain("planner.md")
+    expect(exportedAgents).not.toContain("architect.md")
+    expect(exportedAgents).not.toContain("librarian.md")
+    expect(exportedAgents).not.toContain("explore.md")
+    expect(exportedAgents).not.toContain("vision.md")
+    expect(exportedAgents).not.toContain("dev-junior.md")
+
+    expect(result.agentExport.exported.sort()).toEqual([...APPROVED_T2_AGENT_FILES].sort())
+    expect(result.agentExport.skipped).toHaveLength(0)
+
+    //#then - skills should still be exported
+    expect(existsSync(join(TEST_DIR, ".opencode", "skills"))).toBe(true)
+  })
+
+  test("init with skipExtract should NOT extract agents, skills, commands", async () => {
+    //#given - empty project directory
+
+    //#when
+    await init({ directory: TEST_DIR, skipExtract: true })
+
+    //#then - extract should NOT have been called
+    expect(existsSync(join(TEST_DIR, ".opencode", "agents"))).toBe(false)
+    expect(existsSync(join(TEST_DIR, ".opencode", "skills"))).toBe(false)
+    expect(existsSync(join(TEST_DIR, ".opencode", "commands"))).toBe(false)
+  })
+
+  // Project mode tests
+  test("detects existing project when package.json exists", async () => {
+    //#given - project with package.json
+    writeFileSync(join(TEST_DIR, "package.json"), JSON.stringify({ name: "test-project" }))
+
+    //#when - init without explicit project mode
+    const result = await init({ directory: TEST_DIR, skipExtract: true })
+
+    //#then - should succeed (detects existing project)
+    expect(result.success).toBe(true)
+  })
+
+  test("detects existing project when .git exists", async () => {
+    //#given - project with .git directory
+    mkdirSync(join(TEST_DIR, ".git"), { recursive: true })
+
+    //#when - init without explicit project mode
+    const result = await init({ directory: TEST_DIR, skipExtract: true })
+
+    //#then - should succeed (detects existing project)
+    expect(result.success).toBe(true)
+  })
+
+  test("accepts --project-mode flag to override detection", async () => {
+    //#given - empty directory (no markers)
+    //#when - explicitly set project mode
+    const result = await init({ directory: TEST_DIR, projectMode: "existing", skipExtract: true })
+
+    //#then - should succeed with explicit mode
+    expect(result.success).toBe(true)
+  })
+
+  // Config copy tests
+  test("copies global kord-aios.json to project when global exists", async () => {
+    //#given - set up mock global config
+    const originalEnv = process.env.OPENCODE_CONFIG_DIR
+    const globalConfigDir = resolve(__dirname, "__test_global_config_copy__")
+    const globalOpencodeDir = join(globalConfigDir, ".config", "opencode")
+    const globalKordAiosConfig = join(globalOpencodeDir, "kord-aios.json")
+
+    try {
+      // First clean any existing test dir to ensure fresh state
+      if (existsSync(join(TEST_DIR, ".opencode"))) {
+        rmSync(join(TEST_DIR, ".opencode"), { recursive: true, force: true })
+      }
+
+      // Set up mock global config with model configuration
+      mkdirSync(globalOpencodeDir, { recursive: true })
+      const globalConfig = {
+        $schema: "https://raw.githubusercontent.com/GDSDN/kord-aios/master/assets/kord-opencode.schema.json",
+        model: {
+          default: "anthropic/claude-opus-4-6",
+          fallback: {
+            kord: "openai/gpt-5.2",
+          },
+        },
+      }
+      writeFileSync(globalKordAiosConfig, JSON.stringify(globalConfig, null, 2))
+      process.env.OPENCODE_CONFIG_DIR = globalConfigDir
+      // Reset config context to pick up the new config dir
+      resetConfigContext()
+
+      //#when - init project
+      await init({ directory: TEST_DIR, skipExtract: true, force: true })
+
+      //#then - project config should exist
+      const projectConfigPath = join(TEST_DIR, ".opencode", "kord-aios.json")
+      expect(existsSync(projectConfigPath)).toBe(true)
+      const projectConfigContent = readFileSync(projectConfigPath, "utf-8")
+      const projectConfig = JSON.parse(projectConfigContent)
+      
+      // Verify config was written - it should have $schema at minimum
+      expect(projectConfig.$schema).toContain("kord-opencode.schema.json")
+    } finally {
+      // Cleanup
+      if (existsSync(globalConfigDir)) {
+        rmSync(globalConfigDir, { recursive: true, force: true })
+      }
+      if (originalEnv) {
+        process.env.OPENCODE_CONFIG_DIR = originalEnv
+      } else {
+        delete process.env.OPENCODE_CONFIG_DIR
+      }
+      // Reset again to clear cached paths
+      resetConfigContext()
+    }
+  })
+
+  // OpenCode config tests
+  test("creates .opencode/opencode.jsonc with kord-aios plugin", async () => {
+    //#given - empty project directory
+
+    //#when
+    await init({ directory: TEST_DIR, skipExtract: true })
+
+    //#then - opencode.jsonc should exist with kord-aios plugin
+    const opencodeJsoncPath = join(TEST_DIR, ".opencode", "opencode.jsonc")
+    expect(existsSync(opencodeJsoncPath)).toBe(true)
+    const content = readFileSync(opencodeJsoncPath, "utf-8")
+    const config = JSON.parse(content)
+    expect(config.plugin).toContain("kord-aios")
+  })
+
+  test("adds .kord/instructions/** to instructions in opencode.jsonc", async () => {
+    //#given - empty project directory
+
+    //#when
+    await init({ directory: TEST_DIR, skipExtract: true })
+
+    //#then - opencode.jsonc should have .kord/instructions/** in instructions
+    const opencodeJsoncPath = join(TEST_DIR, ".opencode", "opencode.jsonc")
+    const content = readFileSync(opencodeJsoncPath, "utf-8")
+    const config = JSON.parse(content)
+    expect(config.instructions).toContain(".kord/instructions/**")
+  })
+
+  test("preserves existing opencode.jsonc plugins and instructions", async () => {
+    //#given - existing opencode.jsonc with custom config
+    const opencodeDir = join(TEST_DIR, ".opencode")
+    mkdirSync(opencodeDir, { recursive: true })
+    const existingConfig = {
+      plugin: ["some-other-plugin"],
+      instructions: [".other/rules/**"],
+      customSetting: "preserved",
+    }
+    writeFileSync(join(opencodeDir, "opencode.jsonc"), JSON.stringify(existingConfig, null, 2))
+
+    //#when
+    await init({ directory: TEST_DIR, skipExtract: true })
+
+    //#then - should preserve existing and add kord-aios
+    const content = readFileSync(join(opencodeDir, "opencode.jsonc"), "utf-8")
+    const config = JSON.parse(content)
+    expect(config.plugin).toContain("kord-aios")
+    expect(config.plugin).toContain("some-other-plugin")
+    expect(config.instructions).toContain(".kord/instructions/**")
+    expect(config.instructions).toContain(".other/rules/**")
+    expect(config.customSetting).toBe("preserved")
+  })
+})
+
+describe("bootstrap", () => {
+  beforeEach(() => {
+    if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true })
+    mkdirSync(TEST_DIR, { recursive: true })
+  })
+
+  afterEach(() => {
+    if (existsSync(TEST_DIR)) rmSync(TEST_DIR, { recursive: true })
+  })
+
+  test("does not bootstrap when bootstrap flag is false (default)", async () => {
+    //#given - empty directory
+    //#when - init without bootstrap flag
+    const result = await init({ directory: TEST_DIR, skipExtract: true })
+
+    //#then - no git init or package.json created
+    expect(result.bootstrap.gitInitialized).toBe(false)
+    expect(result.bootstrap.packageJsonCreated).toBe(false)
+    expect(result.bootstrap.success).toBe(true)
+  })
+
+  test("runs git init and creates package.json when bootstrap=true and mode=new", async () => {
+    //#given - empty directory
+    //#when - init with bootstrap=true and projectMode=new
+    const result = await init({
+      directory: TEST_DIR,
+      projectMode: "new",
+      bootstrap: true,
+      skipExtract: true,
+    })
+
+    //#then - git initialized and package.json created
+    expect(result.bootstrap.gitInitialized).toBe(true)
+    expect(result.bootstrap.packageJsonCreated).toBe(true)
+    expect(result.bootstrap.success).toBe(true)
+    expect(existsSync(join(TEST_DIR, ".git"))).toBe(true)
+    expect(existsSync(join(TEST_DIR, "package.json"))).toBe(true)
+
+    const pkgJson = JSON.parse(readFileSync(join(TEST_DIR, "package.json"), "utf-8"))
+    expect(pkgJson.name).toBeDefined()
+    expect(pkgJson.version).toBe("1.0.0")
+  })
+
+  test("skips bootstrap with warning when bootstrap=true but mode=existing", async () => {
+    //#given - existing directory (has markers)
+    mkdirSync(join(TEST_DIR, "src"), { recursive: true })
+    writeFileSync(join(TEST_DIR, "src", "index.js"), "// existing code")
+
+    //#when - init with bootstrap=true but mode=existing
+    const result = await init({
+      directory: TEST_DIR,
+      projectMode: "existing",
+      bootstrap: true,
+      skipExtract: true,
+      force: true,
+    })
+
+    //#then - warning returned, no git init or package.json
+    expect(result.bootstrap.gitInitialized).toBe(false)
+    expect(result.bootstrap.packageJsonCreated).toBe(false)
+    expect(result.bootstrap.success).toBe(true)
+    expect(result.bootstrap.warning).toContain("--bootstrap ignored")
+    expect(result.bootstrap.warning).toContain("existing")
+  })
+
+  test("does not overwrite existing git or package.json during bootstrap", async () => {
+    //#given - existing git and package.json
+    execSync("git init", { cwd: TEST_DIR, stdio: "ignore" })
+    writeFileSync(join(TEST_DIR, "package.json"), JSON.stringify({ name: "my-existing-project", version: "2.0.0" }, null, 2))
+
+    //#when - init with bootstrap=true
+    const result = await init({
+      directory: TEST_DIR,
+      projectMode: "new",
+      bootstrap: true,
+      skipExtract: true,
+    })
+
+    //#then - existing files not overwritten
+    expect(result.bootstrap.gitInitialized).toBe(false) // already existed
+    expect(result.bootstrap.packageJsonCreated).toBe(false) // already existed
+    expect(result.bootstrap.success).toBe(true)
+
+    const pkgJson = JSON.parse(readFileSync(join(TEST_DIR, "package.json"), "utf-8"))
+    expect(pkgJson.name).toBe("my-existing-project") // unchanged
+    expect(pkgJson.version).toBe("2.0.0") // unchanged
   })
 })

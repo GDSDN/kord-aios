@@ -1,5 +1,5 @@
 import { promises as fs, readFileSync, readdirSync } from "node:fs"
-import { join, dirname } from "node:path"
+import { join, dirname, relative } from "node:path"
 import { fileURLToPath } from "node:url"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import type { BuiltinSkill } from "./types"
@@ -11,9 +11,79 @@ import type { BuiltinSkill } from "./types"
  */
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url))
-const KORD_AIOS_SKILLS_DIR = join(MODULE_DIR, "skills", "kord-aios")
+const BUILTIN_SKILLS_DIR = MODULE_DIR
+const KORD_AIOS_SKILLS_DIR = join(MODULE_DIR, "kord-aios")
 
 let cachedSkills: BuiltinSkill[] | null = null
+
+export interface KordAiosSkillFile {
+  sourcePath: string
+  relativePath: string
+}
+
+function listKordAiosSkillFilesInDirSync(directory: string): KordAiosSkillFile[] {
+  const files: KordAiosSkillFile[] = []
+
+  const entries = readdirSync(directory, { withFileTypes: true })
+  for (const entry of entries) {
+    if (entry.name.startsWith(".")) continue
+
+    const entryPath = join(directory, entry.name)
+    if (entry.isDirectory()) {
+      files.push(...listKordAiosSkillFilesInDirSync(entryPath))
+      continue
+    }
+
+    if (entry.isFile() && entry.name === "SKILL.md") {
+      files.push({
+        sourcePath: entryPath,
+        relativePath: relative(BUILTIN_SKILLS_DIR, entryPath).replace(/\\/g, "/"),
+      })
+    }
+  }
+
+  return files
+}
+
+async function listKordAiosSkillFilesInDir(directory: string): Promise<KordAiosSkillFile[]> {
+  const files: KordAiosSkillFile[] = []
+
+  const entries = await fs.readdir(directory, { withFileTypes: true })
+  for (const entry of entries) {
+    if (entry.name.startsWith(".")) continue
+
+    const entryPath = join(directory, entry.name)
+    if (entry.isDirectory()) {
+      files.push(...await listKordAiosSkillFilesInDir(entryPath))
+      continue
+    }
+
+    if (entry.isFile() && entry.name === "SKILL.md") {
+      files.push({
+        sourcePath: entryPath,
+        relativePath: relative(BUILTIN_SKILLS_DIR, entryPath).replace(/\\/g, "/"),
+      })
+    }
+  }
+
+  return files
+}
+
+export function listKordAiosSkillFilesSync(): KordAiosSkillFile[] {
+  try {
+    return listKordAiosSkillFilesInDirSync(KORD_AIOS_SKILLS_DIR)
+  } catch {
+    return []
+  }
+}
+
+async function listKordAiosSkillFiles(): Promise<KordAiosSkillFile[]> {
+  try {
+    return await listKordAiosSkillFilesInDir(KORD_AIOS_SKILLS_DIR)
+  } catch {
+    return []
+  }
+}
 
 function parseKordAiosSkill(content: string, skillBaseDir: string, skillNameFallback: string): BuiltinSkill | null {
   const { data, body } = parseFrontmatter<{
@@ -24,6 +94,7 @@ function parseKordAiosSkill(content: string, skillBaseDir: string, skillNameFall
     subtask?: boolean
     "argument-hint"?: string
     "allowed-tools"?: string | string[]
+    template?: string
   }>(content)
 
   const name = data.name || skillNameFallback
@@ -36,12 +107,26 @@ function parseKordAiosSkill(content: string, skillBaseDir: string, skillNameFall
       : data["allowed-tools"].split(/\s+/).filter(Boolean)
   }
 
-  const template = `<skill-instruction>\nBase directory for this skill: ${skillBaseDir}/\nFile references (@path) in this skill are relative to this directory.\n\n${body.trim()}\n</skill-instruction>\n\n<user-request>\n$ARGUMENTS\n</user-request>`
+  // Build template reference line if template frontmatter is present
+  const templateRefLine = data.template
+    ? `Template: Use the template at .kord/templates/${data.template} when creating this artifact.\n`
+    : ""
+
+  const template = `<skill-instruction>
+Base directory for this skill: ${skillBaseDir}/
+File references (@path) in this skill are relative to this directory.
+${templateRefLine}${body.trim()}
+</skill-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`
 
   return {
     name,
     description: `(kord-aios - Skill) ${description}`,
     template,
+    templateRef: data.template,
     agent: data.agent,
     model: data.model,
     subtask: data.subtask ?? false,
@@ -50,37 +135,38 @@ function parseKordAiosSkill(content: string, skillBaseDir: string, skillNameFall
   }
 }
 
+/**
+ * Test-only helper to parse a skill from content.
+ * Exported for testing purposes only.
+ */
+export function __test__parseKordAiosSkill(
+  content: string,
+  skillBaseDir: string,
+  skillNameFallback: string
+): BuiltinSkill | null {
+  return parseKordAiosSkill(content, skillBaseDir, skillNameFallback)
+}
+
 export async function loadKordAiosSkills(): Promise<BuiltinSkill[]> {
   if (cachedSkills) return cachedSkills
 
   const skills: BuiltinSkill[] = []
 
-  try {
-    const domains = await fs.readdir(KORD_AIOS_SKILLS_DIR, { withFileTypes: true })
-
-    for (const domain of domains) {
-      if (!domain.isDirectory() || domain.name.startsWith(".")) continue
-
-      const domainPath = join(KORD_AIOS_SKILLS_DIR, domain.name)
-      const skillDirs = await fs.readdir(domainPath, { withFileTypes: true }).catch(() => [])
-
-      for (const skillDir of skillDirs) {
-        if (!skillDir.isDirectory() || skillDir.name.startsWith(".")) continue
-
-        const skillMdPath = join(domainPath, skillDir.name, "SKILL.md")
-        try {
-          const content = await fs.readFile(skillMdPath, "utf-8")
-          const parsed = parseKordAiosSkill(content, join(domainPath, skillDir.name), skillDir.name)
-          if (parsed) {
-            skills.push(parsed)
-          }
-        } catch {
-          // Skip unreadable skill files
-        }
+  const skillFiles = await listKordAiosSkillFiles()
+  for (const skillFile of skillFiles) {
+    try {
+      const content = await fs.readFile(skillFile.sourcePath, "utf-8")
+      const parsed = parseKordAiosSkill(
+        content,
+        dirname(skillFile.sourcePath),
+        dirname(skillFile.relativePath).split("/").pop() ?? "skill"
+      )
+      if (parsed) {
+        skills.push(parsed)
       }
+    } catch {
+      // Skip unreadable skill files
     }
-  } catch {
-    // kord-aios/ directory doesn't exist or is unreadable
   }
 
   cachedSkills = skills
@@ -92,32 +178,21 @@ export function loadKordAiosSkillsSync(): BuiltinSkill[] {
 
   const skills: BuiltinSkill[] = []
 
-  try {
-    const domains = readdirSync(KORD_AIOS_SKILLS_DIR, { withFileTypes: true })
-
-    for (const domain of domains) {
-      if (!domain.isDirectory() || domain.name.startsWith(".")) continue
-
-      const domainPath = join(KORD_AIOS_SKILLS_DIR, domain.name)
-      const skillDirs = readdirSync(domainPath, { withFileTypes: true })
-
-      for (const skillDir of skillDirs) {
-        if (!skillDir.isDirectory() || skillDir.name.startsWith(".")) continue
-
-        const skillMdPath = join(domainPath, skillDir.name, "SKILL.md")
-        try {
-          const content = readFileSync(skillMdPath, "utf-8")
-          const parsed = parseKordAiosSkill(content, join(domainPath, skillDir.name), skillDir.name)
-          if (parsed) {
-            skills.push(parsed)
-          }
-        } catch {
-          // Skip unreadable skill files
-        }
+  const skillFiles = listKordAiosSkillFilesSync()
+  for (const skillFile of skillFiles) {
+    try {
+      const content = readFileSync(skillFile.sourcePath, "utf-8")
+      const parsed = parseKordAiosSkill(
+        content,
+        dirname(skillFile.sourcePath),
+        dirname(skillFile.relativePath).split("/").pop() ?? "skill"
+      )
+      if (parsed) {
+        skills.push(parsed)
       }
+    } catch {
+      // Skip unreadable skill files
     }
-  } catch {
-    // kord-aios/ directory doesn't exist or is unreadable
   }
 
   cachedSkills = skills

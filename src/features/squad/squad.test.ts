@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test"
 import { existsSync, mkdirSync, writeFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { squadSchema } from "./schema"
@@ -6,11 +6,11 @@ import { loadSquadsFromDir, loadAllSquads, type LoadedSquad } from "./loader"
 import {
   createSquadAgentConfig,
   getSquadAgents,
-  getSquadCategories,
   buildSquadPromptSection,
   createAllSquadAgentConfigs,
 } from "./factory"
 import type { SquadAgent } from "./schema"
+import * as opencodeConfigDir from "../../shared/opencode-config-dir"
 
 const TEST_DIR = join(import.meta.dir, "__test_squads__")
 
@@ -33,11 +33,19 @@ agents:
     mode: subagent
     is_chief: true
 
-categories:
-  creative:
-    description: "Creative writing and ideation tasks"
-  visual:
-    description: "Visual design and layout tasks"
+components:
+  workflows:
+    - workflows/creative-campaign.yaml
+  tasks:
+    - tasks/write-copy.md
+    - tasks/design-asset.md
+  templates:
+    - templates/campaign-brief.md
+
+orchestration:
+  runner: workflow-engine
+  delegation_mode: chief
+  entry_workflow: marketing-campaign
 
 default_executor: copywriter
 default_reviewer: brand-chief
@@ -74,9 +82,16 @@ agents:
     description: "Data analyst"
     prompt: "You are a data analyst."
 
-categories:
-  data:
-    description: "Data processing tasks"
+components:
+  workflows:
+    - workflows/data-pipeline.yaml
+  tasks:
+    - tasks/build-etl.md
+
+orchestration:
+  runner: workflow-engine
+  delegation_mode: chief
+  entry_workflow: data-team-pipeline
 
 default_executor: etl-engineer
 contract_type: pipeline
@@ -175,6 +190,9 @@ describe("squadSchema", () => {
     if (result.success) {
       expect(result.data.config?.extends).toBe("strict")
       expect(result.data.config?.rules).toEqual(["Always validate schema before write", "Log every transformation step"])
+      expect(result.data.components?.workflows).toEqual(["workflows/data-pipeline.yaml"])
+      expect(result.data.components?.tasks).toEqual(["tasks/build-etl.md"])
+      expect(result.data.orchestration?.runner).toBe("workflow-engine")
       expect(result.data.dependencies?.skills).toEqual(["data-pipeline", "sql-expert"])
       expect(result.data.dependencies?.squads).toEqual(["dev"])
       expect(result.data.tags).toEqual(["data-engineering", "etl", "analytics"])
@@ -330,16 +348,25 @@ describe("loadSquadsFromDir", () => {
 })
 
 describe("loadAllSquads", () => {
-  test("loads built-in code squad", () => {
+  beforeEach(() => {
+    spyOn(opencodeConfigDir, "getOpenCodeConfigDir").mockReturnValue(undefined as any)
+  })
+
+  afterEach(() => {
+    ;(opencodeConfigDir.getOpenCodeConfigDir as any)?.mockRestore?.()
+  })
+
+  test("does not load bundled builtin squad at runtime", () => {
+    //#given
+    const projectDir = join(TEST_DIR, "empty-project")
+    mkdirSync(projectDir, { recursive: true })
+
     //#when
-    const result = loadAllSquads()
+    const result = loadAllSquads(projectDir)
 
     //#then
-    expect(result.squads.length).toBeGreaterThanOrEqual(1)
     const codeSquad = result.squads.find(s => s.manifest.name === "code")
-    expect(codeSquad).toBeDefined()
-    expect(codeSquad!.source).toBe("builtin")
-    expect(codeSquad!.manifest.default_executor).toBe("developer")
+    expect(codeSquad).toBeUndefined()
   })
 
   test("searches .kord/squads/ path", () => {
@@ -648,32 +675,18 @@ describe("createSquadAgentConfig", () => {
 describe("getSquadAgents", () => {
   test("extracts agents from loaded squads", () => {
     //#given
-    const result = loadAllSquads()
+    const jsYaml = require("js-yaml")
+    const manifest = squadSchema.parse(jsYaml.load(VALID_SQUAD_YAML))
+    const squads: LoadedSquad[] = [{ manifest, source: "user", basePath: "/tmp/marketing", resolvedPrompts: {} }]
 
     //#when
-    const agents = getSquadAgents(result.squads)
+    const agents = getSquadAgents(squads)
 
     //#then
     expect(agents.length).toBeGreaterThan(0)
-    const devJunior = agents.find(a => a.name === "squad-code-developer")
-    expect(devJunior).toBeDefined()
-    expect(devJunior!.squadName).toBe("code")
-  })
-})
-
-describe("getSquadCategories", () => {
-  test("extracts categories from loaded squads", () => {
-    //#given
-    const result = loadAllSquads()
-
-    //#when
-    const categories = getSquadCategories(result.squads)
-
-    //#then
-    expect(categories.length).toBeGreaterThan(0)
-    const quickCat = categories.find(c => c.name === "code:quick")
-    expect(quickCat).toBeDefined()
-    expect(quickCat!.squadName).toBe("code")
+    const copywriter = agents.find(a => a.name === "squad-marketing-copywriter")
+    expect(copywriter).toBeDefined()
+    expect(copywriter!.squadName).toBe("marketing")
   })
 })
 
@@ -684,53 +697,61 @@ describe("buildSquadPromptSection", () => {
 
   test("builds markdown table for squads", () => {
     //#given
-    const result = loadAllSquads()
+    const jsYaml = require("js-yaml")
+    const manifest = squadSchema.parse(jsYaml.load(VALID_SQUAD_YAML))
+    const squads: LoadedSquad[] = [{ manifest, source: "user", basePath: "/tmp/marketing", resolvedPrompts: {} }]
 
     //#when
-    const section = buildSquadPromptSection(result.squads)
+    const section = buildSquadPromptSection(squads)
 
     //#then
     expect(section).toContain("### Available Squads")
-    expect(section).toContain("| code |")
-    expect(section).toContain("@squad-code-developer")
+    expect(section).toContain("| marketing |")
+    expect(section).toContain("@squad-marketing-copywriter")
     expect(section).toContain("### How to Delegate to Squad Agents")
   })
 
   test("includes delegation syntax per agent with task(subagent_type=...)", () => {
     //#given
-    const result = loadAllSquads()
+    const jsYaml = require("js-yaml")
+    const manifest = squadSchema.parse(jsYaml.load(VALID_SQUAD_YAML))
+    const squads: LoadedSquad[] = [{ manifest, source: "user", basePath: "/tmp/marketing", resolvedPrompts: {} }]
 
     //#when
-    const section = buildSquadPromptSection(result.squads)
+    const section = buildSquadPromptSection(squads)
 
     //#then
-    expect(section).toContain('task(subagent_type="squad-code-developer")')
+    expect(section).toContain('task(subagent_type="squad-marketing-copywriter")')
     expect(section).toContain("Use `task(subagent_type=...)` to invoke a specific squad agent:")
   })
 
-  test("includes category routing syntax with task(category=...)", () => {
+  test("does not include category section in prompt output", () => {
     //#given
-    const result = loadAllSquads()
+    const jsYaml = require("js-yaml")
+    const manifest = squadSchema.parse(jsYaml.load(VALID_SQUAD_YAML))
+    const squads: LoadedSquad[] = [{ manifest, source: "user", basePath: "/tmp/marketing", resolvedPrompts: {} }]
 
     //#when
-    const section = buildSquadPromptSection(result.squads)
+    const section = buildSquadPromptSection(squads)
 
-    //#then — code squad has categories (quick, visual, ultrabrain, artistry)
-    expect(section).toContain("### Squad Categories")
-    expect(section).toContain('task(category="code:quick")')
-    expect(section).toContain("Use `task(category=...)` for domain-specific routing:")
+    //#then
+    expect(section).not.toContain("### Squad Categories")
+    expect(section).not.toContain("marketing:creative")
+    expect(section).not.toContain("task(category=")
   })
 
   test("includes squad skills section", () => {
     //#given
-    const result = loadAllSquads()
+    const jsYaml = require("js-yaml")
+    const manifest = squadSchema.parse(jsYaml.load(VALID_SQUAD_YAML))
+    const squads: LoadedSquad[] = [{ manifest, source: "user", basePath: "/tmp/marketing", resolvedPrompts: {} }]
 
     //#when
-    const section = buildSquadPromptSection(result.squads)
+    const section = buildSquadPromptSection(squads)
 
-    //#then — code squad agents have skills
+    //#then
     expect(section).toContain("### Squad Skills")
-    expect(section).toContain("**code**:")
+    expect(section).toContain("**marketing**:")
   })
 
   test("omits categories section when no squads have categories", () => {
@@ -788,8 +809,8 @@ describe("buildSquadPromptSection", () => {
     expect(section).toContain('task(subagent_type="squad-marketing-designer")')
     expect(section).toContain('task(subagent_type="squad-marketing-brand-chief")')
     expect(section).toContain('task(subagent_type="squad-minimal-worker")')
-    expect(section).toContain('task(category="marketing:creative")')
-    expect(section).toContain('task(category="marketing:visual")')
+    expect(section).not.toContain("marketing:creative")
+    expect(section).not.toContain("marketing:visual")
     expect(section).toContain("**marketing**: brand-voice")
   })
 })
@@ -797,16 +818,18 @@ describe("buildSquadPromptSection", () => {
 describe("createAllSquadAgentConfigs", () => {
   test("creates configs for all agents in all squads", () => {
     //#given
-    const result = loadAllSquads()
+    const jsYaml = require("js-yaml")
+    const manifest = squadSchema.parse(jsYaml.load(VALID_SQUAD_YAML))
+    const squads: LoadedSquad[] = [{ manifest, source: "user", basePath: "/tmp/marketing", resolvedPrompts: {} }]
 
     //#when
-    const configs = createAllSquadAgentConfigs(result.squads)
+    const configs = createAllSquadAgentConfigs(squads)
 
     //#then
     expect(configs.size).toBeGreaterThan(0)
-    expect(configs.has("squad-code-developer")).toBe(true)
-    const devJuniorConfig = configs.get("squad-code-developer")!
-    expect(devJuniorConfig.prompt).toContain("squad-code-developer")
+    expect(configs.has("squad-marketing-copywriter")).toBe(true)
+    const copywriterConfig = configs.get("squad-marketing-copywriter")!
+    expect(copywriterConfig.prompt).toContain("squad-marketing-copywriter")
   })
 
   test("prevents yaml key collisions across squads via auto-prefixed names", () => {

@@ -13,6 +13,7 @@ import type { CommandFrontmatter } from "../../features/claude-code-command-load
 import { isMarkdownFile } from "../../shared/file-utils"
 import { discoverAllSkills, type LoadedSkill, type LazyContentLoader } from "../../features/opencode-skill-loader"
 import type { ParsedSlashCommand } from "./types"
+import { buildWorkflowAliasTemplate, loadWorkflowRegistry } from "../../features/workflow-engine"
 
 interface CommandScope {
   type: "user" | "project" | "opencode" | "opencode-project" | "skill" | "builtin"
@@ -200,6 +201,14 @@ export async function executeSlashCommand(parsed: ParsedSlashCommand, options?: 
   const command = await findCommand(parsed.command, options)
 
   if (!command) {
+    const workflowRegistry = loadWorkflowRegistry(process.cwd())
+    if (workflowRegistry.has(parsed.command)) {
+      return {
+        success: true,
+        replacementText: buildWorkflowAliasTemplate(parsed.command, parsed.args),
+      }
+    }
+
     return {
       success: false,
       error: `Command "/${parsed.command}" not found. Use the slashcommand tool to list available commands.`,

@@ -44,6 +44,7 @@ import {
   createPreemptiveCompactionHook,
   createTasksTodowriteDisablerHook,
   createWriteExistingFileGuardHook,
+  createWorkflowHook,
 } from "./hooks";
 import { createAnthropicEffortHook } from "./hooks/anthropic-effort";
 import {
@@ -89,6 +90,7 @@ import {
   createPlanReadTool,
   createSquadLoadTool,
   createDecisionLogTool,
+  createChecklistRunnerTool,
   interactive_bash,
   startTmuxCheck,
   lspManager,
@@ -281,6 +283,10 @@ const KordAIOSPlugin: Plugin = async (ctx) => {
 
   const startWork = isHookEnabled("start-work")
     ? createStartWorkHook(ctx)
+    : null;
+
+  const workflow = isHookEnabled("workflow")
+    ? createWorkflowHook(ctx)
     : null;
 
   const planMdOnly = isHookEnabled("plan-md-only")
@@ -547,6 +553,7 @@ const KordAIOSPlugin: Plugin = async (ctx) => {
   const planReadTool = createPlanReadTool(ctx);
   const squadLoadTool = createSquadLoadTool(ctx);
   const decisionLogTool = createDecisionLogTool(ctx);
+  const checklistRunnerTool = createChecklistRunnerTool(ctx);
 
   const autoSlashCommand = isHookEnabled("auto-slash-command")
     ? createAutoSlashCommandHook({ skills: mergedSkills })
@@ -578,6 +585,7 @@ const KordAIOSPlugin: Plugin = async (ctx) => {
     plan_read: planReadTool,
     squad_load: squadLoadTool,
     decision_log: decisionLogTool,
+    checklist_runner: checklistRunnerTool,
     task: delegateTask,
     skill: skillTool,
     skill_mcp: skillMcpTool,
@@ -652,6 +660,7 @@ const KordAIOSPlugin: Plugin = async (ctx) => {
       await claudeCodeHooks["chat.message"]?.(input, output);
       await autoSlashCommand?.["chat.message"]?.(input, output);
       await startWork?.["chat.message"]?.(input, output);
+      await workflow?.["chat.message"]?.(input, output);
 
       if (!hasConnectedProvidersCache()) {
         ctx.client.tui

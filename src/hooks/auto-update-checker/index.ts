@@ -51,12 +51,12 @@ export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdat
   const getToastMessage = (isUpdate: boolean, latestVersion?: string): string => {
     if (isKordEnabled) {
       return isUpdate
-        ? `Kord on steroids is steering OpenCode.\nv${latestVersion} available. Restart to apply.`
-        : `Kord on steroids is steering OpenCode.`
+        ? `Kord AIOS is steering OpenCode.\nv${latestVersion} available. Restart to apply.`
+        : `Kord AIOS is steering OpenCode.`
     }
     return isUpdate
-      ? `OpenCode is now on Steroids. oMoMoMoMo...\nv${latestVersion} available. Restart OpenCode to apply.`
-      : `OpenCode is now on Steroids. oMoMoMoMo...`
+      ? `Kord AIOS plugin active.\nv${latestVersion} available. Restart OpenCode to apply.`
+      : `Kord AIOS plugin active.`
   }
 
   let hasChecked = false
@@ -247,7 +247,7 @@ async function showSpinnerToast(ctx: PluginInput, version: string, message: stri
     await ctx.client.tui
       .showToast({
         body: {
-          title: `${spinner} OhMyOpenCode ${version}`,
+          title: `${spinner} Kord AIOS v${version}`,
           message,
           variant: "info" as const,
           duration: frameInterval + 50,
@@ -266,7 +266,7 @@ async function showUpdateAvailableToast(
   await ctx.client.tui
     .showToast({
       body: {
-        title: `OhMyOpenCode ${latestVersion}`,
+        title: `Kord AIOS v${latestVersion}`,
         message: getToastMessage(true, latestVersion),
         variant: "info" as const,
         duration: 8000,
@@ -280,7 +280,7 @@ async function showAutoUpdatedToast(ctx: PluginInput, oldVersion: string, newVer
   await ctx.client.tui
     .showToast({
       body: {
-        title: `OhMyOpenCode Updated!`,
+        title: `Kord AIOS Updated!`,
         message: `v${oldVersion} → v${newVersion}\nRestart OpenCode to apply.`,
         variant: "success" as const,
         duration: 8000,
@@ -294,7 +294,7 @@ async function showLocalDevToast(ctx: PluginInput, version: string | null, isKor
   const displayVersion = version ?? "dev"
   const message = isKordEnabled
     ? "Kord running in local development mode."
-    : "Running in local development mode. oMoMoMo..."
+    : "Running in local development mode."
   await showSpinnerToast(ctx, `${displayVersion} (dev)`, message)
   log(`[auto-update-checker] Local dev toast shown: v${displayVersion}`)
 }

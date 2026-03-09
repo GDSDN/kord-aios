@@ -1,0 +1,3 @@
+- Decision: Kord workflow YAML v1 compatibility mode -> adopt a Synkra-compat-v1 parser with a strict Kord-only extension envelope, preserving Synkra semantics (`elicit`, `confirmation_required`, phase/condition/repeat/delegate/validation/meta constructs) while keeping Kord ownership fields explicit.
+- Decision: step guidance storage -> use mixed storage with Markdown asset references as the default and inline YAML notes only for short/localized guidance, to avoid bloated workflow YAML and keep prompt assets reusable/versionable.
+- Decision: adaptation matrix is governance input for Wave 2-4 execution and closure review; current MVP baseline (minimal schema, basic registry/state, alias routing, two simplified builtins) is explicitly non-parity.

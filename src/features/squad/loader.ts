@@ -1,16 +1,12 @@
-import { promises as fs, readdirSync, readFileSync, existsSync } from "node:fs"
-import { join, dirname } from "node:path"
-import { fileURLToPath } from "node:url"
+import { readdirSync, readFileSync, existsSync } from "node:fs"
+import { join } from "node:path"
 import jsYaml from "js-yaml"
 import { squadSchema, type SquadManifest } from "./schema"
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 
-const MODULE_DIR = dirname(fileURLToPath(import.meta.url))
-const BUILTIN_SQUADS_DIR = join(MODULE_DIR, "..", "builtin-squads")
-
 export interface LoadedSquad {
   manifest: SquadManifest
-  source: "builtin" | "user"
+  source: "user"
   basePath: string
   /** Resolved prompt_file contents keyed by agent name */
   resolvedPrompts: Record<string, string>
@@ -48,7 +44,7 @@ function isSquadLoadError(result: SquadManifest | SquadLoadError): result is Squ
  * Discovers and loads squads from a directory.
  * Expects: {dir}/{squad-name}/SQUAD.yaml
  */
-function loadSquadsFromDir(dir: string, source: "builtin" | "user"): SquadLoadResult {
+function loadSquadsFromDir(dir: string, source: "user"): SquadLoadResult {
   const squads: LoadedSquad[] = []
   const errors: SquadLoadError[] = []
 
@@ -131,8 +127,7 @@ function getGlobalSquadPath(): string | undefined {
 }
 
 /**
- * Loads all squads from built-in and user directories.
- * Built-in squads: src/features/builtin-squads/
+ * Loads all squads from user-controlled directories.
  * User squads (in order): .opencode/squads/ → .kord/squads/ → docs/kord/squads/
  * Global squads: ~/.config/opencode/squads/
  */
@@ -141,15 +136,7 @@ export function loadAllSquads(projectDir?: string): SquadLoadResult {
   const allErrors: SquadLoadError[] = []
   const seenNames = new Set<string>()
 
-  // 1. Built-in squads
-  const builtin = loadSquadsFromDir(BUILTIN_SQUADS_DIR, "builtin")
-  for (const squad of builtin.squads) {
-    seenNames.add(squad.manifest.name)
-    allSquads.push(squad)
-  }
-  allErrors.push(...builtin.errors)
-
-  // 2. User squads from multiple search paths
+  // 1. User squads from multiple search paths
   if (projectDir) {
     for (const pathParts of USER_SQUAD_SEARCH_PATHS) {
       const userDir = join(projectDir, ...pathParts)
@@ -164,7 +151,7 @@ export function loadAllSquads(projectDir?: string): SquadLoadResult {
     }
   }
 
-  // 3. Global squads from OpenCode config dir
+  // 2. Global squads from OpenCode config dir
   const globalSquadPath = getGlobalSquadPath()
   if (globalSquadPath) {
     const global = loadSquadsFromDir(globalSquadPath, "user")

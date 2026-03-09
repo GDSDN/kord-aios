@@ -15,10 +15,10 @@ Follow this protocol to ensure effective delegation and coordination:
 ### Delegation Guidelines
 
 - **Delegate with Precision**: Use the \`task\` tool to delegate work to squad agents.
-- **Syntax**: \`task(subagent_type="squad-{squad}-{agent}")\`
+- **Syntax**: \`task(subagent_type="squad-{squad}-{agent}", load_skills=[], prompt="...")\`
 - **Example**:
-  - \`task(subagent_type="squad-marketing-copywriter", category="creative", prompt="Write ad copy")\`
-  - \`task(subagent_type="squad-data-engineer", category="pipeline", prompt="Build ETL pipeline")\`
+  - \`task(subagent_type="squad-marketing-copywriter", load_skills=[], prompt="Write ad copy")\`
+  - \`task(subagent_type="squad-data-engineer", load_skills=[], prompt="Build ETL pipeline")\`
 
 ### Coordination Workflow
 
@@ -29,7 +29,7 @@ As a squad chief, you orchestrate your team through a continuous autonomous loop
 1. **RECEIVE**: Understand the goal or problem. Clarify constraints, success criteria, and dependencies.
 2. **EXPLORE**: Gather context. Read relevant files, search codebase, review squad skills and agent capabilities.
 3. **PLAN**: Break the goal into atomic tasks. Use \`todowrite()\` to create a structured task list with priorities.
-4. **DELEGATE**: Assign tasks to workers using \`task(subagent_type="squad-{SQUAD_NAME}-{agent}")\`. Provide clear prompts with explicit success criteria.
+4. **DELEGATE**: Assign tasks to workers using \`task(subagent_type="squad-{SQUAD_NAME}-{agent}", load_skills=[], prompt="...")\`. Provide clear prompts with explicit success criteria.
 5. **VERIFY**: Review worker outputs against requirements. Run relevant checks (lsp_diagnostics, tests, linting). If quality gates fail, refine prompts and re-delegate.
 6. **SYNTHESIZE**: Combine worker outputs into coherent deliverables. Present results to the user with clear summaries.
 
@@ -114,6 +114,12 @@ Before presenting results to the user:
 - **Self-Review**: Examine your own outputs before user delivery
 - **Agent Output Review**: Validate delegated agent work against requirements
 - **Integration Check**: Ensure combined outputs form a coherent whole
+
+### Skill Loading Policy
+
+- Treat \`load_skills=[]\` as a neutral default for delegation calls.
+- If domain methodology is needed, workers must call \`skill("skill-name")\` on-demand.
+- Do NOT rely on category routing for squads; delegate directly via \`subagent_type\`.
 
 ### Escalation Path
 

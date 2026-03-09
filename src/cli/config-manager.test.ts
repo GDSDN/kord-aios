@@ -180,11 +180,11 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
     expect(models).toBeTruthy()
 
     const required = [
-      "antigravity-gemini-3-pro",
+      "antigravity-gemini-3.1-pro",
       "antigravity-gemini-3-flash",
-      "antigravity-claude-sonnet-4-5",
-      "antigravity-claude-sonnet-4-5-thinking",
-      "antigravity-claude-opus-4-5-thinking",
+      "antigravity-claude-sonnet-4-6",
+      "antigravity-claude-sonnet-4-6-thinking",
+      "antigravity-claude-opus-4-6-thinking",
     ]
 
     for (const key of required) {
@@ -208,7 +208,7 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
     const models = (ANTIGRAVITY_PROVIDER_CONFIG as any).google.models as Record<string, any>
 
     // #when checking Gemini Pro variants
-    const pro = models["antigravity-gemini-3-pro"]
+    const pro = models["antigravity-gemini-3.1-pro"]
     // #then should have low and high variants
     expect(pro.variants).toBeTruthy()
     expect(pro.variants.low).toBeTruthy()
@@ -229,8 +229,8 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
     const models = (ANTIGRAVITY_PROVIDER_CONFIG as any).google.models as Record<string, any>
 
     // #when checking Claude thinking variants
-    const sonnetThinking = models["antigravity-claude-sonnet-4-5-thinking"]
-    const opusThinking = models["antigravity-claude-opus-4-5-thinking"]
+    const sonnetThinking = models["antigravity-claude-sonnet-4-6-thinking"]
+    const opusThinking = models["antigravity-claude-opus-4-6-thinking"]
 
     // #then both should have low and max variants
     for (const model of [sonnetThinking, opusThinking]) {
@@ -1015,7 +1015,7 @@ describe("addProviderConfig", () => {
     expect(parsed.provider.google).toBeDefined()
     expect(parsed.provider.google.name).toBe("Google")
     expect(parsed.provider.google.models).toBeDefined()
-    expect(parsed.provider.google.models["antigravity-gemini-3-pro"]).toBeDefined()
+    expect(parsed.provider.google.models["antigravity-gemini-3.1-pro"]).toBeDefined()
   })
 
   test("does NOT add google provider when hasGemini is false", () => {

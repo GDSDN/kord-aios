@@ -2,54 +2,55 @@
 
 ## OVERVIEW
 
-144 methodology skills organized by domain. Skills are SKILL.md files with YAML frontmatter — they encode expert instructions for agents, not executable code. The loader discovers them from `skills/kord-aios/{domain}/{skill-name}/SKILL.md`, parses frontmatter, wraps the body in a `<skill-instruction>` template, and registers them with OpenCode.
+144 methodology skills organized by domain. Skills are SKILL.md files with YAML frontmatter — they encode expert instructions for agents, not executable code. The loader discovers them from `kord-aios/{domain}/{skill-name}/SKILL.md`, parses frontmatter, wraps the body in a `<skill-instruction>` template, and registers them with OpenCode.
 
 ## STRUCTURE
 ```
 builtin-skills/
-├── skills.ts                # createBuiltinSkills() — merges hardcoded + kord-aios skills (34 lines)
+├── skills.ts                # createBuiltinSkills() — registry merging runtime wrappers + kord-aios skills
 ├── kord-aios-loader.ts      # Discovers SKILL.md from kord-aios/ tree (130 lines)
 ├── types.ts                 # BuiltinSkill interface
 ├── index.ts                 # Barrel exports
 ├── skills.test.ts           # Registration and filtering tests
 ├── kord-aios-loader.test.ts # Loader discovery tests
-└── skills/
-    ├── index.ts             # Hardcoded skill exports (playwright, git-master, etc.)
-    └── kord-aios/           # 13 domain directories, 144 skill directories
-        ├── analysis/        # ~18 skills: requirements, patterns, brainstorming, ROI
-        ├── database/        # ~20 skills: DB setup, migrations, RLS, Supabase
-        ├── design-system/   # ~12 skills: Tailwind, shadcn, design tokens, UX
-        ├── dev-workflow/    # ~15 skills: build, test, develop, collaborative edit
-        ├── devops/          # ~8 skills: CI/CD, PR automation, environment bootstrap
-        ├── documentation/   # ~5 skills: docs generation, API docs
-        ├── mcp/             # ~3 skills: MCP server setup
-        ├── product/         # ~5 skills: PO backlog, story creation
-        ├── qa/              # ~8 skills: test strategies, review, validation
-        ├── squad/           # ~7 skills: squad creation, agent creation, validation
-        ├── story/           # ~5 skills: story lifecycle, checkpoints
-        ├── utilities/       # ~5 skills: git, general utilities
-        └── worktrees/       # ~3 skills: git worktree management
+├── runtime/
+│   ├── index.ts             # Runtime wrappers (playwright, git-master, etc.)
+│   └── *.ts                 # TS-only engine skills and wrappers around canonical SKILL.md content
+└── kord-aios/               # 13 domain directories, 144 canonical/exportable skill directories
+    ├── analysis/            # ~18 skills: requirements, patterns, brainstorming, ROI
+    ├── database/            # ~20 skills: DB setup, migrations, RLS, Supabase
+    ├── design-system/       # ~12 skills: Tailwind, shadcn, design tokens, UX
+    ├── dev-workflow/        # ~15 skills: build, test, develop, collaborative edit
+    ├── devops/              # ~8 skills: CI/CD, PR automation, environment bootstrap
+    ├── documentation/       # ~5 skills: docs generation, API docs
+    ├── mcp/                 # ~3 skills: MCP server setup
+    ├── product/             # ~5 skills: PO backlog, story creation
+    ├── qa/                  # ~8 skills: test strategies, review, validation
+    ├── squad/               # ~7 skills: squad creation, agent creation, validation
+    ├── story/               # ~5 skills: story lifecycle, checkpoints
+    ├── utilities/           # ~5 skills: git, general utilities
+    └── worktrees/           # ~3 skills: git worktree management
 ```
 
 ## TWO SKILL TYPES
 
 ### 1. Hardcoded Skills (5)
-Defined as TypeScript constants in `skills/index.ts`:
+Defined as TypeScript constants in `runtime/index.ts`:
 
 | Skill | File | Description |
 |-------|------|-------------|
-| `playwright` | `skills/playwright.ts` | Browser automation via Playwright MCP |
-| `agent-browser` | `skills/agent-browser.ts` | Vercel agent-browser CLI |
-| `dev-browser` | `skills/dev-browser.ts` | Persistent browser state |
-| `frontend-ui-ux` | `skills/frontend-ui-ux.ts` | Frontend design methodology |
-| `git-master` | `skills/git-master.ts` | Git workflow methodology (1107 lines) |
+| `playwright` | `runtime/playwright.ts` | Browser automation via Playwright MCP |
+| `agent-browser` | `runtime/playwright.ts` | Vercel agent-browser CLI |
+| `dev-browser` | `runtime/dev-browser.ts` | Persistent browser state wrapper |
+| `frontend-ui-ux` | `runtime/frontend-ui-ux.ts` | Frontend design methodology wrapper |
+| `git-master` | `runtime/git-master.ts` | Git workflow methodology wrapper |
 
 These are always loaded. `playwright` vs `agent-browser` is selected via `browser_automation_engine.provider` config.
 
 ### 2. Kord AIOS Skills (144)
-Discovered from `skills/kord-aios/` at startup by `kord-aios-loader.ts`:
+Discovered from `kord-aios/` at startup by `kord-aios-loader.ts`:
 
-**Directory convention**: `skills/kord-aios/{domain}/{skill-name}/SKILL.md`
+**Directory convention**: `kord-aios/{domain}/{skill-name}/SKILL.md`
 
 **Loading**: `loadKordAiosSkillsSync()` walks the tree, parses each SKILL.md, caches results.
 
@@ -63,6 +64,7 @@ agent: dev                    # Optional: force specific agent
 model: openai/gpt-5.2         # Optional: force specific model
 subtask: false                # Optional: run as subtask (default false)
 argument-hint: "describe what to build"  # Optional: hint for $ARGUMENTS
+template: story.md            # Optional: reference .kord/templates/{template}
 allowed-tools: read edit bash  # Optional: tool allowlist (space-separated or array)
 ---
 
@@ -90,6 +92,7 @@ What the agent should NOT do...
 | `model` | string | No | Force specific model override |
 | `subtask` | boolean | No | Run as subtask (default: false) |
 | `argument-hint` | string | No | Hint text for $ARGUMENTS placeholder |
+| `template` | string | No | Reference a template from `.kord/templates/{template}` — injects template reference line inside `<skill-instruction>` |
 | `allowed-tools` | string \| string[] | No | Restrict tools available during skill execution |
 
 ### Template Wrapping
@@ -143,8 +146,8 @@ interface BuiltinSkill {
 
 ## HOW TO ADD A NEW SKILL
 
-1. Choose the domain category (or create a new one under `skills/kord-aios/`)
-2. Create directory: `skills/kord-aios/{domain}/{my-skill-name}/`
+1. Choose the domain category (or create a new one under `kord-aios/`)
+2. Create directory: `kord-aios/{domain}/{my-skill-name}/`
 3. Create `SKILL.md` with YAML frontmatter + methodology content
 4. Test: `bun test kord-aios-loader` to verify discovery
 5. The skill is automatically available — no registration code needed
@@ -152,7 +155,7 @@ interface BuiltinSkill {
 ### Example: Adding a "code-review" skill to qa/
 ```bash
 # Create the directory
-mkdir -p src/features/builtin-skills/skills/kord-aios/qa/code-review/
+mkdir -p src/features/builtin-skills/kord-aios/qa/code-review/
 ```
 
 Create `SKILL.md`:
@@ -175,14 +178,14 @@ agent: qa
 
 ## HOW TO ADD A NEW DOMAIN CATEGORY
 
-1. Create directory: `skills/kord-aios/{new-domain}/`
+1. Create directory: `kord-aios/{new-domain}/`
 2. Add skill directories inside it with SKILL.md files
 3. The loader discovers new domains automatically — no code changes needed
 
 ## HOW TO ADD A NEW HARDCODED SKILL
 
-1. Create `skills/{my-skill}.ts` exporting a `BuiltinSkill` constant
-2. Import in `skills/index.ts`
+1. Create `runtime/{my-skill}.ts` exporting a `BuiltinSkill` constant
+2. Import in `runtime/index.ts`
 3. Add to the `skills` array in `skills.ts` → `createBuiltinSkills()`
 4. Add skill name to `BuiltinSkillNameSchema` in `src/config/schema.ts`
 5. Run `bun run build:schema` to update JSON schema

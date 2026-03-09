@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
-import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { createAgentToolAllowlist } from "../shared/permission-compat"
 import { SKILLS_PROTOCOL_SECTION } from "./prompt-snippets"
 import { parseFrontmatter } from "../shared/frontmatter"
 import { squadCreatorPrompt } from "../features/builtin-agents/prompts"
@@ -43,7 +43,14 @@ export const squadCreatorPromptMetadata: AgentPromptMetadata = {
 }
 
 export function createSquadCreatorAgent(model: string): AgentConfig {
-  const restrictions = createAgentToolRestrictions([
+  const restrictions = createAgentToolAllowlist([
+    "read",
+    "write",
+    "edit",
+    "glob",
+    "grep",
+    "skill",
+    "squad_validate",
     "task",
   ])
 

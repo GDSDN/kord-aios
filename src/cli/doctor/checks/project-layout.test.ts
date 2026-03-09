@@ -22,6 +22,7 @@ describe("checkProjectLayout", () => {
   test("should pass when project structure is complete", async () => {
     // Setup valid structure
     mkdirSync(join(tempDir, KORD_DIR, "templates"), { recursive: true })
+    mkdirSync(join(tempDir, KORD_DIR, "instructions"), { recursive: true })
     mkdirSync(join(tempDir, KORD_DOCS_DIR, "plans"), { recursive: true })
     writeFileSync(join(tempDir, KORD_RULES_FILE), "rules")
 

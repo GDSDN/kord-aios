@@ -1,6 +1,30 @@
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
+
+const BUILTIN_TEMPLATES_DIR = join(import.meta.dir, "..", "features", "builtin-templates")
+const BUILTIN_CHECKLISTS_DIR = join(import.meta.dir, "..", "features", "builtin-checklists")
+const BUILTIN_STANDARDS_DIR = join(import.meta.dir, "..", "features", "builtin-standards")
+const BUILTIN_INSTRUCTIONS_DIR = join(import.meta.dir, "..", "features", "builtin-instructions")
+
+function readBuiltinTemplate(fileName: string): string {
+  return readFileSync(join(BUILTIN_TEMPLATES_DIR, fileName), "utf-8")
+}
+
+function readBuiltinChecklist(fileName: string): string {
+  return readFileSync(join(BUILTIN_CHECKLISTS_DIR, fileName), "utf-8")
+}
+
+function readBuiltinStandard(fileName: string): string {
+  return readFileSync(join(BUILTIN_STANDARDS_DIR, fileName), "utf-8")
+}
+
+function readBuiltinInstruction(fileName: string): string {
+  return readFileSync(join(BUILTIN_INSTRUCTIONS_DIR, fileName), "utf-8")
+}
+
 export const KORD_DIR = ".kord"
 export const KORD_DOCS_DIR = "docs/kord"
-export const KORD_RULES_FILE = "kord-rules.md"
+export const KORD_RULES_FILE = ".kord/instructions/kord-rules.md"
 
 export const KORD_INPUT_SUBDIRS = [
   "scripts",
@@ -17,6 +41,9 @@ export const KORD_INPUT_SUBDIRS = [
 export const KORD_ACTIVE_SUBDIRS = [
   "templates",
   "squads",
+  "instructions",
+  "standards",
+  "checklists",
 ] as const
 
 /**
@@ -25,111 +52,56 @@ export const KORD_ACTIVE_SUBDIRS = [
  */
 export const KORD_RESERVED_SUBDIRS = [
   "scripts",
-  "checklists",
   "skills",
 ] as const
 
 export const KORD_OUTPUT_SUBDIRS = [
   "plans",
+  "stories",
+  "epics",
+  "prds",
   "drafts",
   "notepads",
 ] as const
 
-export const KORD_RULES_CONTENT = `# Kord AIOS — Project Rules
+export const KORD_RULES_CONTENT = readBuiltinInstruction("kord-rules.md")
 
-This file is loaded by OpenCode via the \`instructions\` array in \`opencode.json\`.
-It provides project-level rules that all Kord agents follow.
+export const STORY_TEMPLATE_CONTENT = readBuiltinTemplate("story.md")
 
-## Agent Workflow
+export const ADR_TEMPLATE_CONTENT = readBuiltinTemplate("adr.md")
 
-- **Planning**: Use \`/plan\` to create structured work plans in \`docs/kord/plans/\`
-- **Execution**: Use \`/start-work\` to execute plans via the Build orchestrator
-- **Delegation**: Build delegates to specialist agents via \`task()\`
-- **Verification**: Build verifies all subagent work before marking tasks complete
+export const PRD_TEMPLATE_CONTENT = readBuiltinTemplate("prd.md")
 
-## Directory Conventions
+export const EPIC_TEMPLATE_CONTENT = readBuiltinTemplate("epic.md")
 
-| Path | Purpose |
-|------|---------|
-| \`docs/kord/plans/\` | Work plans (markdown) |
-| \`docs/kord/drafts/\` | Draft plans (deleted after finalization) |
-| \`docs/kord/notepads/\` | Agent working memory per plan |
-| \`.kord/templates/\` | Story, ADR, and other templates |
+export const TASK_TEMPLATE_CONTENT = readBuiltinTemplate("task.md")
 
-## Rules
+export const QA_GATE_TEMPLATE_CONTENT = readBuiltinTemplate("qa-gate.md")
 
-1. Agents write plans and notes ONLY to \`docs/kord/\`
-2. Implementation code goes to the project source tree
-3. Use \`task()\` for delegation — never implement directly from Build
-4. Mark plan checkboxes \`- [x]\` as tasks complete
-5. Record learnings in \`docs/kord/notepads/{plan-name}/\`
-`
+export const QA_REPORT_TEMPLATE_CONTENT = readBuiltinTemplate("qa-report.md")
 
-export const STORY_TEMPLATE_CONTENT = `---
-title: "{TITLE}"
-type: story
-status: draft
-priority: medium
-created: "{DATE}"
----
+export const CHECKLIST_STORY_DRAFT_CONTENT = readBuiltinChecklist("checklist-story-draft.md")
 
-# {TITLE}
+export const CHECKLIST_STORY_DOD_CONTENT = readBuiltinChecklist("checklist-story-dod.md")
 
-## Description
+export const CHECKLIST_PR_REVIEW_CONTENT = readBuiltinChecklist("checklist-pr-review.md")
 
-_As a [user/role], I want [goal] so that [benefit]._
+export const CHECKLIST_ARCHITECT_CONTENT = readBuiltinChecklist("checklist-architect.md")
 
-## Acceptance Criteria
+export const CHECKLIST_PRE_PUSH_CONTENT = readBuiltinChecklist("checklist-pre-push.md")
 
-- [ ] Criterion 1
-- [ ] Criterion 2
-- [ ] Criterion 3
+export const CHECKLIST_SELF_CRITIQUE_CONTENT = readBuiltinChecklist("checklist-self-critique.md")
 
-## Technical Notes
+export const KORD_ROOT_AGENTS_CONTENT = readBuiltinInstruction("kord-root-agents.md")
 
-_Implementation details, constraints, dependencies._
+export const KORD_STANDARDS_AGENTS_CONTENT = readBuiltinStandard("AGENTS.md")
 
-## Definition of Done
+export const KORD_STANDARDS_ONBOARDING_DEPTH_RUBRIC_CONTENT = readBuiltinStandard("onboarding-depth-rubric.md")
 
-- [ ] Code implemented and passes linting
-- [ ] Unit tests written and passing
-- [ ] Integration tests passing (if applicable)
-- [ ] Documentation updated
-- [ ] PR reviewed and approved
-`
+export const KORD_STANDARDS_METHODOLOGY_ARTIFACTS_QUALITY_RUBRIC_CONTENT = readBuiltinStandard("methodology-artifacts-quality-rubric.md")
 
-export const ADR_TEMPLATE_CONTENT = `---
-title: "ADR-{NUMBER}: {TITLE}"
-type: adr
-status: proposed
-created: "{DATE}"
----
+export const KORD_STANDARDS_QUALITY_GATES_CONTENT = readBuiltinStandard("quality-gates.md")
 
-# ADR-{NUMBER}: {TITLE}
+export const KORD_STANDARDS_DECISION_HEURISTICS_CONTENT = readBuiltinStandard("decision-heuristics.md")
 
-## Status
-
-Proposed
-
-## Context
-
-_What is the issue that we're seeing that is motivating this decision or change?_
-
-## Decision
-
-_What is the change that we're proposing and/or doing?_
-
-## Consequences
-
-### Positive
-
-- _Benefit 1_
-
-### Negative
-
-- _Trade-off 1_
-
-### Neutral
-
-- _Observation 1_
-`
+export const CHECKLIST_AGENT_QUALITY_GATE_CONTENT = readBuiltinChecklist("checklist-agent-quality-gate.md")

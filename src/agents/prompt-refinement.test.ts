@@ -435,12 +435,13 @@ describe("EPIC-10: Agent architecture refinement", () => {
       expect(agent.prompt).toContain('task(subagent_type="{agent-name}"')
     })
 
-    test("SystemAwareness shows category routing syntax task(category=...)", () => {
+    test("SystemAwareness does not use squad category routing", () => {
       //#given
       const agent = createKordAgent(TEST_MODEL)
 
       //#then
-      expect(agent.prompt).toContain('task(category="{squad}:{category}"')
+      expect(agent.prompt).not.toContain('task(category="{squad}:{category}"')
+      expect(agent.prompt).toContain("Chief-first orchestration")
     })
 
     test("SystemAwareness references squad_validate tool", () => {

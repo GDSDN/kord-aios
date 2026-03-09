@@ -280,6 +280,52 @@ describe("promptWithRetry", () => {
     expect(fallbackCall.body.model).toEqual({ providerID: "openai", modelID: "gpt-5.2" })
   })
 
+  it("emits retry events when fallback is triggered", async () => {
+    const promptMock = mock()
+      .mockRejectedValueOnce(new Error("429 rate limit exceeded"))
+      .mockResolvedValueOnce(undefined)
+    const abortMock = mock(() => Promise.resolve())
+    const events: Array<Record<string, unknown>> = []
+
+    const client = {
+      session: {
+        prompt: promptMock,
+        abort: abortMock,
+      },
+    }
+
+    await promptWithRetry(client as unknown as Client, {
+      path: { id: "session-1" },
+      body: {
+        parts: [{ type: "text", text: "hello" }],
+        model: { providerID: "openai", modelID: "gpt-5.2" },
+      },
+    }, [
+      { providers: ["anthropic"], model: "claude-sonnet-4-5" },
+    ], {
+      onRetryEvent: (event) => {
+        events.push(event as unknown as Record<string, unknown>)
+      },
+    })
+
+    expect(events.map((event) => event.type)).toEqual([
+      "retryable-error-detected",
+      "fallback-attempt",
+      "fallback-success",
+    ])
+
+    expect(events[0]).toMatchObject({
+      reason: "quota",
+      fromModel: "openai/gpt-5.2",
+    })
+
+    expect(events[1]).toMatchObject({
+      toModel: "anthropic/claude-sonnet-4-5",
+      attempt: 1,
+      total: 1,
+    })
+  })
+
   it("should retry with suggestion on model-not-found error", async () => {
     // given a client that fails first with model-not-found, then succeeds
     const promptMock = mock()
@@ -801,6 +847,55 @@ describe("promptWithRetry", () => {
     // then
     expect(promptMock).toHaveBeenCalledTimes(1)
     expect(abortMock).toHaveBeenCalledTimes(0)
+  })
+
+  it("should preserve fallback attempt on timeout when fallback model has output progress", async () => {
+    // given
+    const now = Date.now() + 60_000
+    const promptMock = mock()
+      .mockRejectedValueOnce(new Error("429 too many requests"))
+      .mockRejectedValueOnce(new Error("session.prompt timed out after 30000ms for session session-1"))
+    const messagesMock = mock()
+      // snapshot before initial prompt
+      .mockResolvedValueOnce({ data: [] })
+      // snapshot before fallback prompt
+      .mockResolvedValueOnce({ data: [] })
+      // timeout preservation check after fallback timeout
+      .mockResolvedValueOnce({
+        data: [
+          {
+            info: { role: "tool", time: { created: now } },
+            parts: [],
+          },
+        ],
+      })
+    const abortMock = mock(() => Promise.resolve())
+
+    const client = {
+      session: {
+        prompt: promptMock,
+        messages: messagesMock,
+        abort: abortMock,
+      },
+    }
+
+    // when
+    await promptWithRetry(
+      client as unknown as Client,
+      {
+        path: { id: "session-1" },
+        body: {
+          parts: [{ type: "text", text: "hello" }],
+          model: { providerID: "openai", modelID: "gpt-5.2" },
+        },
+      },
+      [{ providers: ["anthropic"], model: "claude-opus-4-6" }],
+    )
+
+    // then
+    expect(promptMock).toHaveBeenCalledTimes(2)
+    // initial abort before first fallback is expected, but fallback timeout should not trigger another abort
+    expect(abortMock).toHaveBeenCalledTimes(1)
   })
 
   it("should handle string error message with suggestion", async () => {
