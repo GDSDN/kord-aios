@@ -280,6 +280,8 @@ NEVER use Write to overwrite an existing file. ALWAYS check existence first via 
 
 **Quality gates**: 50-150 lines, no generic advice, no obvious info.
 
+**Do NOT duplicate Kord framework instructions** inside AGENTS.md. Root AGENTS.md should point readers to \`.kord/instructions/\` for framework behavior and keep AGENTS focused on project context.
+
 ### Subdirectory AGENTS.md (Parallel)
 
 Launch writing tasks for each location:
@@ -463,6 +465,12 @@ PRD (@pm) → Epic → Stories (@sm) → Validation (@po) → Waves → Implemen
 Skills are SKILL.md files injected into agents during delegation via load_skills=[].
 Built-in skills come from the plugin. Project skills live in .kord/skills/.
 
+### Framework Instructions
+- \`.kord/instructions/kord-rules.md\` = framework operating contract
+- \`.kord/instructions/greenfield.md\` or \`.kord/instructions/brownfield.md\` = project-type guidance
+- \`.kord/instructions/modular-code-enforcement.md\` = TypeScript / TSX architecture rule when applicable
+- \`AGENTS.md\` files = project context, structure, and local conventions only
+
 ### Continuation
 Boulder state (docs/kord/boulder.json) persists execution across sessions.
 Ralph Loop enables self-referential continuation until task completion.
@@ -476,7 +484,7 @@ Ralph Loop enables self-referential continuation until task completion.
 | Boulder state | docs/kord/boulder.json |
 | Skills (project) | .kord/skills/ |
 | Squads | .kord/squads/, .opencode/squads/ |
-| Rules | docs/kord/rules/, .claude/rules/ |
+| Instructions | .kord/instructions/, docs/kord/rules/, .claude/rules/ |
 | Templates | .kord/templates/ |
 \\\`\\\`\\\`
 
