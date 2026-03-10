@@ -1,4 +1,4 @@
-# .kord/standards — Quality Standards and Heuristics
+# .kord/standards -- Quality Standards and Heuristics
 
 This directory contains quality gates and decision heuristics for Kord AIOS agents.
 

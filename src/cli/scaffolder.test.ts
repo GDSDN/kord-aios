@@ -196,9 +196,11 @@ describe("scaffoldProject", () => {
     const instructionsDir = join(TEST_DIR, ".kord", "instructions")
     const greenfieldPath = join(instructionsDir, "greenfield.md")
     const brownfieldPath = join(instructionsDir, "brownfield.md")
+    const modularRulePath = join(instructionsDir, "modular-code-enforcement.md")
 
     expect(existsSync(greenfieldPath)).toBe(false)
     expect(existsSync(brownfieldPath)).toBe(true)
+    expect(existsSync(modularRulePath)).toBe(true)
 
     const brownfield = readFileSync(brownfieldPath, "utf-8")
     expect(brownfield).toContain("## Safety First")
@@ -209,6 +211,10 @@ describe("scaffoldProject", () => {
     expect(brownfield).toContain("## Verification Commands")
     expect(brownfield).toContain("## What Not To Do")
     expect(brownfield.toLowerCase()).toContain("rollback")
+
+    const modularRule = readFileSync(modularRulePath, "utf-8")
+    expect(modularRule).toContain("Modular Code Architecture")
+    expect(modularRule).toContain("200 LOC")
   })
 
   test("creates workflow pack and workflow alias commands", () => {

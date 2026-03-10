@@ -1,7 +1,10 @@
 # Kord AIOS — Project Rules
 
 This file is loaded by OpenCode via the `instructions` array in `opencode.json`.
-It provides project-level rules that all Kord agents follow.
+It provides the framework-level operating contract for Kord AIOS inside an initialized project.
+
+Use this file for framework rules and execution semantics.
+Use `AGENTS.md` for project-specific codebase context and navigation.
 
 ## Agent Workflow
 
@@ -9,6 +12,7 @@ It provides project-level rules that all Kord agents follow.
 - **Execution**: Use `/start-work` to execute plans via the Build orchestrator
 - **Delegation**: Build delegates to specialist agents via `task()`
 - **Verification**: Build verifies all subagent work before marking tasks complete
+- **Project Context**: `AGENTS.md` files describe the codebase; `.kord/instructions/*.md` describe how Kord AIOS should operate inside it
 
 ## Directory Conventions
 
@@ -31,3 +35,4 @@ It provides project-level rules that all Kord agents follow.
 5. Record learnings in `docs/kord/notepads/{plan-name}/`
 6. Treat workflows as the primary execution path for greenfield and brownfield delivery
 7. Treat project-local `.kord/**` and `.opencode/**` files as override layers over builtin framework content
+8. Keep specialized architecture rules in dedicated instruction files (for example, `modular-code-enforcement.md`) instead of duplicating them here

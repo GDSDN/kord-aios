@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import {
   KORD_DIR,
@@ -26,6 +26,9 @@ import {
   KORD_STANDARDS_ONBOARDING_DEPTH_RUBRIC_CONTENT,
   KORD_STANDARDS_METHODOLOGY_ARTIFACTS_QUALITY_RUBRIC_CONTENT,
   CHECKLIST_AGENT_QUALITY_GATE_CONTENT,
+  GREENFIELD_INSTRUCTION_CONTENT,
+  BROWNFIELD_INSTRUCTION_CONTENT,
+  MODULAR_CODE_ENFORCEMENT_CONTENT,
 } from "./project-layout"
 import { BUILTIN_WORKFLOW_YAMLS } from "../features/workflow-engine"
 
@@ -73,16 +76,6 @@ This directory contains project-local workflow definitions used by the Kord work
 3. Run \`/workflow validate <id>\`.
 4. Run \`/<id>\` (alias) or \`/workflow <id>\` to start.
 `
-
-const GREENFIELD_INSTRUCTION_CONTENT = readFileSync(
-  join(import.meta.dir, "..", "features", "builtin-instructions", "greenfield.md"),
-  "utf-8",
-)
-
-const BROWNFIELD_INSTRUCTION_CONTENT = readFileSync(
-  join(import.meta.dir, "..", "features", "builtin-instructions", "brownfield.md"),
-  "utf-8",
-)
 
 function getWorkflowAliasCommandContent(workflowId: string): string {
   return `---
@@ -179,6 +172,10 @@ function getScaffoldEntries(baseDir: string, projectMode?: "new" | "existing"): 
     ? GREENFIELD_INSTRUCTION_CONTENT
     : BROWNFIELD_INSTRUCTION_CONTENT
   entries.push({ path: join(instructionsDir, projectTypeInstructionName), content: projectTypeInstructionContent })
+  entries.push({
+    path: join(instructionsDir, "modular-code-enforcement.md"),
+    content: MODULAR_CODE_ENFORCEMENT_CONTENT,
+  })
 
   // .kord/workflows/ files
   const workflowsDir = join(baseDir, KORD_DIR, "workflows")

@@ -1,25 +1,19 @@
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
-
-const BUILTIN_TEMPLATES_DIR = join(import.meta.dir, "..", "features", "builtin-templates")
-const BUILTIN_CHECKLISTS_DIR = join(import.meta.dir, "..", "features", "builtin-checklists")
-const BUILTIN_STANDARDS_DIR = join(import.meta.dir, "..", "features", "builtin-standards")
-const BUILTIN_INSTRUCTIONS_DIR = join(import.meta.dir, "..", "features", "builtin-instructions")
+import { readBuiltinAsset } from "../features/builtin-assets"
 
 function readBuiltinTemplate(fileName: string): string {
-  return readFileSync(join(BUILTIN_TEMPLATES_DIR, fileName), "utf-8")
+  return readBuiltinAsset("builtin-templates", fileName)
 }
 
 function readBuiltinChecklist(fileName: string): string {
-  return readFileSync(join(BUILTIN_CHECKLISTS_DIR, fileName), "utf-8")
+  return readBuiltinAsset("builtin-checklists", fileName)
 }
 
 function readBuiltinStandard(fileName: string): string {
-  return readFileSync(join(BUILTIN_STANDARDS_DIR, fileName), "utf-8")
+  return readBuiltinAsset("builtin-standards", fileName)
 }
 
 function readBuiltinInstruction(fileName: string): string {
-  return readFileSync(join(BUILTIN_INSTRUCTIONS_DIR, fileName), "utf-8")
+  return readBuiltinAsset("builtin-instructions", fileName)
 }
 
 export const KORD_DIR = ".kord"
@@ -65,6 +59,12 @@ export const KORD_OUTPUT_SUBDIRS = [
 ] as const
 
 export const KORD_RULES_CONTENT = readBuiltinInstruction("kord-rules.md")
+
+export const GREENFIELD_INSTRUCTION_CONTENT = readBuiltinInstruction("greenfield.md")
+
+export const BROWNFIELD_INSTRUCTION_CONTENT = readBuiltinInstruction("brownfield.md")
+
+export const MODULAR_CODE_ENFORCEMENT_CONTENT = readBuiltinInstruction("modular-code-enforcement.md")
 
 export const STORY_TEMPLATE_CONTENT = readBuiltinTemplate("story.md")
 

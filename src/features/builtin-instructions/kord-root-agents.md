@@ -19,12 +19,14 @@ This directory contains project-level methodology and configuration for Kord AIO
 - Instructions define project-level operating guidance for Kord agents
 - Standards provide guidance for agent decision-making
 - Workflows are the primary execution path for greenfield and brownfield delivery
+- `AGENTS.md` files provide project context and navigation, not a replacement for framework instructions
 
 ## Read Order (Recommended)
 
 1. `.kord/instructions/kord-rules.md`
 2. `.kord/instructions/greenfield.md` or `.kord/instructions/brownfield.md`
-3. `.kord/standards/onboarding-depth-rubric.md`
-4. `.kord/standards/methodology-artifacts-quality-rubric.md`
+3. `.kord/instructions/modular-code-enforcement.md` (when editing TypeScript / TSX)
+4. `.kord/standards/onboarding-depth-rubric.md`
+5. `.kord/standards/methodology-artifacts-quality-rubric.md`
 
 For details, see individual directory `AGENTS.md` files.
