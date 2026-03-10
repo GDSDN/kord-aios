@@ -11,11 +11,13 @@ import { KORD_DIR } from "../project-layout"
 import * as p from "@clack/prompts"
 import { parseJsonc } from "../../shared"
 import { listKordAiosSkillFilesSync } from "../../features/builtin-skills/kord-aios-loader"
+import { resolveBuiltinAssetDir } from "../../features/builtin-assets"
 
 // Path to the builtin code squad
-const BUILTIN_SQUAD_PATH = join(import.meta.dir, "..", "..", "features", "builtin-squads", "code")
+const BUILTIN_SQUADS_PATH = resolveBuiltinAssetDir("builtin-squads")
+const BUILTIN_SQUAD_PATH = join(BUILTIN_SQUADS_PATH, "code")
 const BUILTIN_SQUAD_FILE = "SQUAD.yaml"
-const BUILTIN_AGENTS_PATH = join(import.meta.dir, "..", "..", "features", "builtin-agents")
+const BUILTIN_AGENTS_PATH = resolveBuiltinAssetDir("builtin-agents")
 const APPROVED_T2_AGENT_FILES = [
   "pm.md",
   "po.md",

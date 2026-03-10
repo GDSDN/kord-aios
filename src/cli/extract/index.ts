@@ -2,12 +2,12 @@ import { promises as fs } from "node:fs"
 import { dirname, join, relative } from "node:path"
 import { fileURLToPath } from "node:url"
 import { getOpenCodeConfigDir } from "../../shared"
+import { resolveBuiltinAssetDir } from "../../features/builtin-assets"
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url))
-const FEATURES_DIR = join(MODULE_DIR, "..", "..", "features")
-const BUILTIN_AGENTS_DIR = join(FEATURES_DIR, "builtin-agents")
-const BUILTIN_SKILLS_DIR = join(FEATURES_DIR, "builtin-skills", "kord-aios")
-const BUILTIN_SQUADS_DIR = join(FEATURES_DIR, "builtin-squads")
+const BUILTIN_AGENTS_DIR = resolveBuiltinAssetDir("builtin-agents")
+const BUILTIN_SKILLS_DIR = join(resolveBuiltinAssetDir("builtin-skills"), "kord-aios")
+const BUILTIN_SQUADS_DIR = resolveBuiltinAssetDir("builtin-squads")
 
 export interface ExtractOptions {
   global?: boolean

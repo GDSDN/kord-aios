@@ -1,7 +1,7 @@
 import { promises as fs, readFileSync, readdirSync } from "node:fs"
 import { join, dirname, relative } from "node:path"
-import { fileURLToPath } from "node:url"
 import { parseFrontmatter } from "../../shared/frontmatter"
+import { resolveBuiltinAssetDir } from "../builtin-assets"
 import type { BuiltinSkill } from "./types"
 
 /**
@@ -10,9 +10,8 @@ import type { BuiltinSkill } from "./types"
  * Each SKILL.md has YAML frontmatter (name, description, agent) + markdown body.
  */
 
-const MODULE_DIR = dirname(fileURLToPath(import.meta.url))
-const BUILTIN_SKILLS_DIR = MODULE_DIR
-const KORD_AIOS_SKILLS_DIR = join(MODULE_DIR, "kord-aios")
+const BUILTIN_SKILLS_DIR = resolveBuiltinAssetDir("builtin-skills")
+const KORD_AIOS_SKILLS_DIR = join(BUILTIN_SKILLS_DIR, "kord-aios")
 
 let cachedSkills: BuiltinSkill[] | null = null
 
