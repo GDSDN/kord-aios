@@ -37,3 +37,4 @@ oauth-success.html
 *.bun-build
 nul
 .opencode
+.kord/memory/.local/

@@ -460,6 +460,77 @@ export const SquadConfigSchema = z.object({
   search_paths: z.array(z.string()).optional(),
 })
 
+export const ProjectMemoryClassSchema = z.enum([
+  "decision",
+  "constraint",
+  "preference",
+  "thread",
+  "artifact",
+  "entity",
+  "gotcha",
+])
+
+export const ProjectMemoryBudgetsSchema = z.object({
+  /** Maximum durable memory records across all classes. */
+  durable_records: z.number().int().positive().default(5000),
+  /** Maximum local cache records kept under .kord/memory/.local. */
+  local_cache_records: z.number().int().positive().default(20000),
+  /** Maximum durable storage budget in bytes. */
+  durable_bytes: z.number().int().positive().default(10_000_000),
+  /** Maximum local cache storage budget in bytes. */
+  local_cache_bytes: z.number().int().positive().default(25_000_000),
+}).strict()
+
+export const ProjectMemoryPoliciesSchema = z.object({
+  /** Durable retention policy controls pruning strategy. */
+  durable_retention: z.enum(["manual", "lru", "ttl"]).default("lru"),
+  /** Local cache retention policy controls local cache eviction strategy. */
+  local_cache_retention: z.enum(["session", "branch", "workspace"]).default("branch"),
+  /** Conflict strategy for repeated durable writes with same logical key. */
+  conflict_resolution: z.enum(["append", "replace", "new-version"]).default("new-version"),
+  /** Workspace scoping strategy for durable memory. */
+  workspace_scope: z.enum(["project", "workspace"]).default("workspace"),
+}).strict()
+
+export const ProjectMemoryCaptureSchema = z.object({
+  decision: z.boolean().default(true),
+  constraint: z.boolean().default(true),
+  preference: z.boolean().default(true),
+  thread: z.boolean().default(true),
+  artifact: z.boolean().default(true),
+  entity: z.boolean().default(true),
+  gotcha: z.boolean().default(true),
+  branch_metadata: z.boolean().default(true),
+  workspace_metadata: z.boolean().default(true),
+}).strict()
+
+export const ProjectMemoryConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  budgets: ProjectMemoryBudgetsSchema.default({
+    durable_records: 5000,
+    local_cache_records: 20000,
+    durable_bytes: 10_000_000,
+    local_cache_bytes: 25_000_000,
+  }),
+  policies: ProjectMemoryPoliciesSchema.default({
+    durable_retention: "lru",
+    local_cache_retention: "branch",
+    conflict_resolution: "new-version",
+    workspace_scope: "workspace",
+  }),
+  capture: ProjectMemoryCaptureSchema.default({
+    decision: true,
+    constraint: true,
+    preference: true,
+    thread: true,
+    artifact: true,
+    entity: true,
+    gotcha: true,
+    branch_metadata: true,
+    workspace_metadata: true,
+  }),
+}).strict()
+
 export const KordTasksConfigSchema = z.object({
   /** Absolute or relative storage path override. When set, bypasses global config dir. */
   storage_path: z.string().optional(),
@@ -516,6 +587,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   browser_automation_engine: BrowserAutomationConfigSchema.optional(),
   websearch: WebsearchConfigSchema.optional(),
   tmux: TmuxConfigSchema.optional(),
+  project_memory: ProjectMemoryConfigSchema.optional(),
   kord: KordConfigSchema.optional(),
 })
 
@@ -551,6 +623,11 @@ export type KordConfig = z.infer<typeof KordConfigSchema>
 export type WaveCheckpointConfig = z.infer<typeof WaveCheckpointConfigSchema>
 export type ExecutorResolverConfig = z.infer<typeof ExecutorResolverConfigSchema>
 export type SquadConfig = z.infer<typeof SquadConfigSchema>
+export type ProjectMemoryClass = z.infer<typeof ProjectMemoryClassSchema>
+export type ProjectMemoryBudgets = z.infer<typeof ProjectMemoryBudgetsSchema>
+export type ProjectMemoryPolicies = z.infer<typeof ProjectMemoryPoliciesSchema>
+export type ProjectMemoryCapture = z.infer<typeof ProjectMemoryCaptureSchema>
+export type ProjectMemoryConfig = z.infer<typeof ProjectMemoryConfigSchema>
 export type AgentFallbackSlot = z.infer<typeof AgentFallbackSlotSchema>
 export type RoutingMode = z.infer<typeof RoutingModeSchema>
 
