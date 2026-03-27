@@ -27,6 +27,7 @@
   - [Tools](#tools)
   - [MCPs](#mcps-built-in)
   - [Context Injection](#context-injection)
+  - [Project Memory](#project-memory)
   - [Claude Code Compatibility](#claude-code-compatibility)
 - [Configuration](#configuration)
 - [Uninstallation](#uninstallation)
@@ -253,6 +254,17 @@ Skills can embed their own MCP servers via YAML frontmatter, including OAuth-pro
 - **README.md** — directory context injection
 - **Conditional rules** — `.claude/rules/*.md` with glob patterns and `alwaysApply`
 
+### Project Memory
+
+Kord AIOS supports project-scoped memory with a strict repo/local split and bounded retrieval:
+
+- **Durable project memory (`.kord/memory/`)** — structured JSON files (`active-context`, `open-threads`, `decision-index`, `entity-index`, `gotchas`, `timeline`) intended to preserve project continuity.
+- **Local runtime state (`.kord/memory/.local/`)** — local SQLite/FTS index plus cache/metadata files (`search-index.db`, cache, workspace/branch metadata). This layer is local-only runtime state and should stay gitignored.
+- **Layered retrieval model** — 1) structured durable memory in `.kord/memory/`, 2) local SQLite/FTS lookup in `.kord/memory/.local/`, 3) OpenCode session-history fallback for deeper recall.
+- **Governance controls** — operator surface includes `memory_search`, `memory_forget`, and `memory_rebuild` for scoped lookup, tombstone-based forgetting, and controlled pruning/reindexing.
+- **Git strategy** — commit/share durable files when you want team-visible continuity; do not commit `.kord/memory/.local/` artifacts.
+- **Current boundaries (MVP)** — cross-project/global memory and remote sync are intentionally out of scope.
+
 ### Claude Code Compatibility
 
 Full compatibility layer for Claude Code configurations:
@@ -289,7 +301,7 @@ You can override methodology agents from disk with `.opencode/agents/*.md` and `
 - Frontmatter `write_paths` is enforced by `agent-authority` to gate file writes.
 - T0 agents (`kord`, `dev`, `builder`, `planner`) are protected and cannot be overridden from OpenCode agent files.
 
-See the full [Configuration Documentation](docs/configurations.md) for details.
+See the full [Configuration Documentation](docs/guide/configurations.md) for details.
 
 ## Uninstallation
 

@@ -128,6 +128,75 @@ When both `kord-aios.jsonc` and `kord-aios.json` files exist, `.jsonc` takes pri
 }
 ```
 
+## Project Memory
+
+Project memory is an opt-in, project-scoped continuity layer. Configure it with `project_memory`:
+
+```jsonc
+{
+  "project_memory": {
+    "enabled": true,
+    "budgets": {
+      "durable_records": 5000,
+      "local_cache_records": 20000,
+      "durable_bytes": 10000000,
+      "local_cache_bytes": 25000000
+    },
+    "policies": {
+      "durable_retention": "lru",
+      "local_cache_retention": "branch",
+      "conflict_resolution": "new-version",
+      "workspace_scope": "workspace"
+    },
+    "capture": {
+      "decision": true,
+      "constraint": true,
+      "preference": true,
+      "thread": true,
+      "artifact": true,
+      "entity": true,
+      "gotcha": true,
+      "branch_metadata": true,
+      "workspace_metadata": true
+    }
+  }
+}
+```
+
+### Memory Layout and Git Strategy
+
+| Layer | Path | Purpose | Git Strategy |
+|------|------|---------|--------------|
+| Durable structured memory | `.kord/memory/` | Shared project continuity (`active-context`, `open-threads`, `decision-index`, `entity-index`, `gotchas`, `timeline`) | Commit when you want team-visible continuity |
+| Local runtime index/cache | `.kord/memory/.local/` | Local SQLite/FTS index, cache, workspace/branch metadata | Keep gitignored (local-only runtime state) |
+
+This split is intentional: durable files are reviewable project state, while `.local` artifacts are high-churn machine-local data.
+
+### Layered Retrieval Model
+
+Project memory retrieval is bounded and staged:
+
+1. Structured durable memory in `.kord/memory/`
+2. Local SQLite/FTS retrieval in `.kord/memory/.local/`
+3. OpenCode session-history fallback for deeper recall
+
+The memory block injected into prompts is advisory context only and never outranks current system, developer, or user instructions.
+
+### Operator Controls
+
+The project-memory control surface is:
+
+- `memory_search` - scoped lookup (`workspace_id` + `branch`) over durable timeline-backed records
+- `memory_forget` - explicit forget by ID with durable tombstones
+- `memory_rebuild` - prune/reindex pass that rebuilds secondary durable indexes from scoped timeline state
+
+### Current Boundaries (Out of Scope)
+
+- Cross-project/global memory
+- Remote sync or hosted memory service
+
+Project memory remains strictly local to a single project workspace and branch scope.
+
 ## Google Auth
 
 **Recommended**: For Google Gemini authentication, install the [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth) plugin (`@latest`). It provides multi-account load balancing, variant-based thinking levels, dual quota system (Antigravity + Gemini CLI), and active maintenance. See [Installation > Google Gemini](installation.md#google-gemini-antigravity-oauth).
