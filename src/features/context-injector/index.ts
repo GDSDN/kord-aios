@@ -1,6 +1,7 @@
 export { ContextCollector, contextCollector } from "./collector"
 export {
   createContextInjectorMessagesTransformHook,
+  createProjectMemoryContextHook,
 } from "./injector"
 export type {
   ContextSourceType,
