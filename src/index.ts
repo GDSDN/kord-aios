@@ -50,6 +50,7 @@ import { createAnthropicEffortHook } from "./hooks/anthropic-effort";
 import {
   contextCollector,
   createContextInjectorMessagesTransformHook,
+  createProjectMemoryContextHook,
 } from "./features/context-injector";
 import {
   applyAgentVariant,
@@ -248,6 +249,14 @@ const KordAIOSPlugin: Plugin = async (ctx) => {
   const keywordDetector = isHookEnabled("keyword-detector")
     ? createKeywordDetectorHook(ctx, contextCollector)
     : null;
+  const projectMemoryContextHook = createProjectMemoryContextHook(
+    contextCollector,
+    {
+      projectRoot: ctx.directory,
+      enabled: pluginConfig.project_memory?.enabled ?? false,
+      budgets: pluginConfig.project_memory?.budgets,
+    },
+  );
   const contextInjectorMessagesTransform =
     createContextInjectorMessagesTransformHook(contextCollector);
   const agentUsageReminder = isHookEnabled("agent-usage-reminder")
@@ -661,6 +670,7 @@ const KordAIOSPlugin: Plugin = async (ctx) => {
       await autoSlashCommand?.["chat.message"]?.(input, output);
       await startWork?.["chat.message"]?.(input, output);
       await workflow?.["chat.message"]?.(input, output);
+      await projectMemoryContextHook["chat.message"]?.(input, output);
 
       if (!hasConnectedProvidersCache()) {
         ctx.client.tui
@@ -765,6 +775,7 @@ const KordAIOSPlugin: Plugin = async (ctx) => {
       await ralphLoop?.event(input);
       await stopContinuationGuard?.event(input);
       await buildHook?.handler(input);
+      await projectMemoryContextHook.event?.(input);
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;
