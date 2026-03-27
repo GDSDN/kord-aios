@@ -1,0 +1,23 @@
+## 2026-03-26
+
+- Durable project memory should live under `.kord/memory/` and remain non-gitignored.
+- Local cache and branch-scoped metadata should live under `.kord/memory/.local/` and be treated as gitignored runtime state.
+- Initial contract tests are most useful when they assert storage layout and branch/workspace scoping before implementation details exist.
+- Deterministic bootstrap writes should use one timestamp per initialization run and preserve `created_at` when files already exist.
+- Workspace and branch metadata are safer when path segments are sanitized for filesystem usage while preserving original scope values in stored payloads.
+- Distillation is safest when capture payloads are secret-scrubbed before classification so typed records never persist raw credential-like values.
+- Duplicate suppression works best with stable class-specific comparison keys and timeline-backed dedupe so repeated boundaries do not inflate durable memory.
+- Hook capture should be boundary-only (`experimental.session.compacting`, `session.stop`, checkpoint/build/story boundaries) to avoid noisy every-turn memory growth.
+- Retrieval quality improves when durable timeline records are always scope-filtered (`workspace_id` + `branch`) before any ranking math runs.
+- A lightweight local FTS index can stay deterministic by rebuilding from scoped durable records on each retrieval call and then only adding score boosts.
+- Session fallback remains safe when evidence is clipped to short assistant snippets and only activated when durable recall does not fill the retrieval budget.
+- Memory injection is safest when retrieval always registers through `contextCollector.register(...)` instead of mutating arbitrary prompts directly, preserving source ordering and dedupe behavior.
+- Fresh-session preload plus explicit `start-work` refresh gives memory relevance without forcing retrieval on every user turn.
+- Advisory contract text must explicitly state instruction precedence so durable memory cannot override active system/developer/user directives.
+- Operator memory controls are safest when they operate from timeline events and always re-filter by `workspace_id` + `branch` before mutation.
+- Durable `forget` tombstones in timeline events prevent accidental resurrection during later rebuild/prune passes, even if stale record events reappear.
+- Rebuild should regenerate secondary durable indexes (`decision-index`, `entity-index`, `gotchas`, `open-threads`, `active-context`) from scoped timeline state to correct drift/corruption.
+- End-to-end regression is most reliable when one integration suite validates the full chain (capture -> distill -> durable write -> retrieve -> context inject -> govern) instead of testing each module in isolation only.
+- Restart continuity checks should assert both semantic recall (active thread/decision presence) and bounded injection behavior (`Retrieved items` stays within configured limits).
+- Wrong-project isolation needs validation at two boundaries: separate project roots and branch scope inside the same project root.
+- Release docs must describe the exact `.kord/memory/` vs `.kord/memory/.local/` split and explicitly call out that cross-project/global memory and remote sync are out of scope.
